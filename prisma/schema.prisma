@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid()) @map("_id")
+  email         String   @unique
+  name          String?
+  password      String
+  createdAt     DateTime @default(now())
+  classId       String
+  permutationId String?
+
+  Permutation Permutation[]
+  Class       Class         @relation(fields: [classId], references: [id])
+}
+
+model Class {
+  id                              String   @id @default(uuid()) @map("_id")
+  name                            String
+  createdAt                       DateTime @default(now())
+  User                            User[]
+  permutationId                   String?
+  interesetedClassesId            String?
+  interesetedClassesPermutationId String?
+  interesetedClassesClassId       String?
+
+  InteresetedClasses InteresetedClasses[]
+}
+
+model Permutation {
+  id        String   @id @default(uuid()) @map("_id")
+  createdAt DateTime @default(now())
+  isSolved  Boolean  @default(false)
+  userId    String
+
+  User               User                 @relation(fields: [userId], references: [id])
+  InteresetedClasses InteresetedClasses[]
+}
+
+model InteresetedClasses {
+  id            String @id @default(uuid()) @map("_id")
+  permutationId String
+  classId       String
+
+  permutation Permutation @relation(fields: [permutationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  class       Class       @relation(fields: [classId], references: [id])
+}
