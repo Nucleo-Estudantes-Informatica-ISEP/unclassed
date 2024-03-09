@@ -1,8 +1,10 @@
-"use client"
+"use client";
 
-import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-import { Button } from "@/lib/components/ui/button"
+import { Button } from "@/lib/components/ui/button";
 import {
   Form,
   FormControl,
@@ -11,23 +13,21 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/lib/components/ui/form"
-import { Input } from "@/lib/components/ui/input"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+} from "@/lib/components/ui/form";
+import { Input } from "@/lib/components/ui/input";
 
 const Register: React.FC = () => {
   const formSchema = z.object({
-    username: z.string().min(2, {
-      message: "Username must be at least 2 characters.",
+    username: z.string().min(4, {
+      message: "O nome de utilizador deve ter pelo menos 4 caracteres.",
     }),
     email: z.string().email({
-      message: "Invalid email address.",
+      message: "O email deve ter um formato válido",
     }),
     password: z.string().min(8, {
-      message: "Password must be at least 8 characters.",
+      message: "A password deve ter pelo menos 8 caracteres.",
     }),
-  })
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -36,15 +36,19 @@ const Register: React.FC = () => {
       email: "",
       password: "",
     },
-  })
+  });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
+    console.log(values);
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-4 px-6 py-8"
+      >
+        <h2 className="pb-4 text-2xl font-bold">Criar conta</h2>
         <FormField
           control={form.control}
           name="username"
@@ -71,7 +75,8 @@ const Register: React.FC = () => {
                 <Input placeholder="Email..." {...field} />
               </FormControl>
               <FormDescription>
-                O teu email vai servir para os outros alunos te poderem contactar.
+                O teu email vai servir para os outros alunos te poderem
+                contactar.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -97,6 +102,6 @@ const Register: React.FC = () => {
       </form>
     </Form>
   );
-}
+};
 
 export default Register;

@@ -1,13 +1,15 @@
-import { ThemeProvider } from "@/context/ThemeContext";
-import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+
+import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/context/ThemeContext";
+
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Permutas de Turma",
+  title: "NEI-ISEP: Permutas",
   description:
     "Uma plataforma para simplificar o processo de permutas de turma nos cursos de Informática do ISEP. By: NEI-ISEP",
 };
@@ -25,11 +27,7 @@ export default function RootLayout({
           inter.variable
         )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-        >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
       </body>

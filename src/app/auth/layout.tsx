@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import Image from "next/image";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -6,9 +6,9 @@ interface AuthLayoutProps {
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
-    <div className="flex items-center justify-center w-full">
-      <div className="flex flex-col items-center justify-center flex-1 h-full max-w-4xl bg-white rounded-lg shadow-xl dark:shadow-secondary-dark lg:flex-row dark:bg-primary-dark">
-        <div className="relative w-full h-32 lg:h-full lg:w-1/2">
+    <div className="flex min-h-[420px] w-full items-center justify-center">
+      <div className=" mx-auto flex h-full max-w-4xl flex-1 flex-col items-center justify-center rounded-lg bg-white shadow-xl lg:flex-row">
+        <div className="relative min-h-32 w-full lg:h-full lg:w-1/2">
           <Image
             aria-hidden="true"
             fill
@@ -20,8 +20,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         {children}
       </div>
     </div>
-
   );
-}
+};
 
 export default AuthLayout;
