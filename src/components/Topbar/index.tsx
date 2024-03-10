@@ -9,27 +9,28 @@ import DarkModeToggle from "../DarkModeToggle";
 
 const Topbar: React.FC = () => {
   const token = cookies().get(config.cookies.token)?.value;
-  console.log(token);
 
   return (
-    <nav className="flex h-[8vh] items-center justify-between px-8">
-      <div className="flex items-center gap-x-1">
-        <Image
-          className="block dark:hidden"
-          src="/logo/png/icon-dark.png"
-          alt="ISEP"
-          width={30}
-          height={30}
-        />
-        <Image
-          className="hidden dark:block"
-          src="/logo/png/icon-light.png"
-          alt="ISEP"
-          width={30}
-          height={30}
-        />
-        <h2 className="font-poppins text-xl font-black uppercase">nclassed</h2>
-      </div>
+    <nav className="flex h-[12vh] items-center justify-between px-8">
+      <Link href="/" className="flex items-center gap-x-1">
+        <div className="relative size-8 md:size-12">
+          <Image
+            className="block dark:hidden"
+            src="/logo/png/icon-dark.png"
+            alt="ISEP"
+            fill
+          />
+          <Image
+            className="hidden dark:block"
+            src="/logo/png/icon-light.png"
+            alt="ISEP"
+            fill
+          />
+        </div>
+        <h2 className="font-poppins text-lg font-black uppercase md:text-xl">
+          nclassed
+        </h2>
+      </Link>
       <div className="flex items-center justify-center gap-x-4">
         <DarkModeToggle />
         {!token && (

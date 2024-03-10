@@ -9,19 +9,14 @@ import { Button } from "@/lib/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/lib/components/ui/form";
 import { Input } from "@/lib/components/ui/input";
 
 const Register: React.FC = () => {
   const formSchema = z.object({
-    username: z.string().min(4, {
-      message: "O nome de utilizador deve ter pelo menos 4 caracteres.",
-    }),
     email: z.string().email({
       message: "O email deve ter um formato válido",
     }),
@@ -33,7 +28,6 @@ const Register: React.FC = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
       email: "",
       password: "",
     },
@@ -47,25 +41,9 @@ const Register: React.FC = () => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-2 px-6 py-8"
+        className="w-full space-y-2 px-6 py-8"
       >
-        <h2 className="pb-4 text-2xl font-bold">Criar conta</h2>
-        <FormField
-          control={form.control}
-          name="username"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Username</FormLabel>
-              <FormControl>
-                <Input placeholder="Username..." {...field} />
-              </FormControl>
-              <FormDescription>
-                O teu nome de utilizador é único e não pode ser alterado.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <h2 className="pb-4 text-2xl font-bold">Entra na tua conta!</h2>
         <FormField
           control={form.control}
           name="email"
@@ -75,11 +53,6 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Email..." {...field} />
               </FormControl>
-              <FormDescription>
-                O teu email vai servir para os outros alunos te poderem
-                contactar.
-              </FormDescription>
-              <FormMessage />
             </FormItem>
           )}
         />
@@ -92,19 +65,15 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Password..." {...field} />
               </FormControl>
-              <FormDescription>
-                A tua password deve ter pelo menos 8 caracteres.
-              </FormDescription>
-              <FormMessage />
             </FormItem>
           )}
         />
         <div className="flex flex-col gap-y-2">
           <Button className="mt-8" type="submit">
-            Criar Conta
+            Entrar
           </Button>
-          <Link className="underline" href="/login">
-            Já tens uma conta? Faz login!
+          <Link className="underline" href="/register">
+            Ainda não tens conta? Regista-te!
           </Link>
         </div>
       </form>
