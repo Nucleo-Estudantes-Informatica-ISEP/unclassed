@@ -27,7 +27,7 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Topbar />
-          <main className="flex size-full min-h-[88vh] items-center justify-center py-4">
+          <main className="flex size-full min-h-screen items-center justify-center py-4">
             {children}
           </main>
         </ThemeProvider>
