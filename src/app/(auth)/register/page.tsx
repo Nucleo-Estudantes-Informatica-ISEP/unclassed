@@ -46,7 +46,7 @@ const Register: React.FC = () => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-4 px-6 py-8"
+        className="space-y-2 px-6 py-8"
       >
         <h2 className="pb-4 text-2xl font-bold">Criar conta</h2>
         <FormField
@@ -98,7 +98,9 @@ const Register: React.FC = () => {
             </FormItem>
           )}
         />
-        <Button type="submit">Criar conta</Button>
+        <Button className="mt-8" type="submit">
+          Criar conta
+        </Button>
       </form>
     </Form>
   );
