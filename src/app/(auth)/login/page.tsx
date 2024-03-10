@@ -72,7 +72,7 @@ const Register: React.FC = () => {
           <Button className="mt-8" type="submit">
             Entrar
           </Button>
-          <Link className="underline" href="/register">
+          <Link className="text-sm underline" href="/register">
             Ainda não tens conta? Regista-te!
           </Link>
         </div>
