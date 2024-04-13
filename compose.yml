@@ -1,15 +1,10 @@
 version: "3.8"
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: permutas-mysql
-    # restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: docker
-      MYSQL_DATABASE: permutas
+  mongo:
+    container_name: unclassed-mongodb
+    image: mongodb/mongodb-community-server
     ports:
-      - 3306:3306
-    volumes:
-      - mysql:/var/lib/mysql
-volumes:
-  mysql:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: docker
