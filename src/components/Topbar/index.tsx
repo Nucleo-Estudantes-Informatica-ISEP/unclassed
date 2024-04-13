@@ -8,7 +8,7 @@ import { buttonVariants } from "@/lib/components/ui/button";
 import DarkModeToggle from "../DarkModeToggle";
 
 const Topbar: React.FC = () => {
-  const token = cookies().get(config.cookies.token)?.value;
+  const token = cookies().get(config.cookies.auth.name)?.value;
 
   return (
     <nav className="absolute top-0 flex h-[12vh] w-full items-center justify-between px-8">
