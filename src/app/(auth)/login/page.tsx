@@ -14,16 +14,10 @@ import {
   FormLabel,
 } from "@/lib/components/ui/form";
 import { Input } from "@/lib/components/ui/input";
+import { loginSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
-  const formSchema = z.object({
-    email: z.string().email({
-      message: "O email deve ter um formato válido",
-    }),
-    password: z.string().min(8, {
-      message: "A password deve ter pelo menos 8 caracteres.",
-    }),
-  });
+  const formSchema = loginSchema;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

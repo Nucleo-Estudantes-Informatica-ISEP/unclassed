@@ -16,34 +16,26 @@ import {
   FormMessage,
 } from "@/lib/components/ui/form";
 import { Input } from "@/lib/components/ui/input";
+import { registerSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
-  const formSchema = z.object({
-    username: z.string().min(4, {
-      message: "O nome de utilizador deve ter pelo menos 4 caracteres.",
-    }),
-    email: z.string().email({
-      message: "O email deve ter um formato válido",
-    }),
-    phone: z.string().regex(/^9[1236]\d{7}$/, {
-      message: "O número de telemóvel deve ter um formato válido",
-    }),
-    password: z.string().min(8, {
-      message: "A password deve ter pelo menos 8 caracteres.",
-    }),
-  });
+  const formSchema = registerSchema;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      name: "",
       email: "",
       password: "",
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    const res = await fetch("/api/auth/register", {
+      method: "post",
+      body: JSON.stringify(values),
+    });
+    console.log(res);
   }
 
   return (
@@ -55,15 +47,15 @@ const Register: React.FC = () => {
         <h2 className="pb-4 text-2xl font-bold">Criar conta</h2>
         <FormField
           control={form.control}
-          name="username"
+          name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Nome</FormLabel>
               <FormControl>
-                <Input placeholder="Username..." {...field} />
+                <Input placeholder="Nome..." {...field} />
               </FormControl>
               <FormDescription>
-                O teu nome de utilizador é único e não pode ser alterado.
+                O teu nome será mostrado a quem te quiser contactar.
               </FormDescription>
               <FormMessage />
             </FormItem>
