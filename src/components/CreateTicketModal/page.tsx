@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/lib/components/ui/dialog";
-
+import MultipleClassSelect from "../MultipleClassSelect/page";
 import ClassSelect from "../ClassSelect/page";
 
 const CreateTicketModal: React.FC = () => {
@@ -89,6 +89,8 @@ const CreateTicketModal: React.FC = () => {
                 />
 
                 <ClassSelect />
+                
+                <MultipleClassSelect />
 
                 <div className="flex flex-col gap-y-2">
                   <Button className="mt-8" type="submit">
