@@ -2,21 +2,29 @@ import { Permutation } from "@prisma/client";
 
 import { columns } from "./columns"
 import { DataTable } from "./data-table"
+import CreateTicketModal from "../CreateTicketModal/page";
 
-// TODO: data will come from the socket server and not from the API
+
 async function getData(): Promise<Permutation[]> {
     // Fetch data from your API here.
     return [
-    
+
     ]
 }
 
-export default async function TicketTable() {
+const TicketTable: React.FC = async () => {
     const data = await getData()
 
     return (
         <div className="container mx-auto pt-16 py-10">
-            <DataTable columns={columns} data={data} />
+            <div className="pb-4">
+                <CreateTicketModal />
+            </div>
+            <div>
+                <DataTable columns={columns} data={data} />
+            </div>
         </div>
     )
 }
+
+export default TicketTable;
