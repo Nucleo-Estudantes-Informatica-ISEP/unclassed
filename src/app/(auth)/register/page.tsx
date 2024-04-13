@@ -25,6 +25,9 @@ const Register: React.FC = () => {
     email: z.string().email({
       message: "O email deve ter um formato válido",
     }),
+    phone: z.string().regex(/^9[1236]\d{7}$/, {
+      message: "O número de telemóvel deve ter um formato válido",
+    }),
     password: z.string().min(8, {
       message: "A password deve ter pelo menos 8 caracteres.",
     }),
@@ -77,6 +80,23 @@ const Register: React.FC = () => {
               </FormControl>
               <FormDescription>
                 O teu email vai servir para os outros alunos te poderem
+                contactar.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Número de telemóvel</FormLabel>
+              <FormControl>
+                <Input placeholder="Número de telemóvel..." {...field} />
+              </FormControl>
+              <FormDescription>
+                O teu telemóvel vai servir para os outros alunos te poderem
                 contactar.
               </FormDescription>
               <FormMessage />
