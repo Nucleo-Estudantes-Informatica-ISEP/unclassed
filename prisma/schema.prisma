@@ -14,7 +14,7 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid()) @map("_id") @db.ObjectId
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   email       String   @unique
   password    String
@@ -24,7 +24,7 @@ model User {
 }
 
 model Ticket {
-  id                String    @id @default(uuid()) @map("_id") @db.ObjectId
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
   state             Boolean   @default(true)
   author            User      @relation(fields: [authorId], references: [id])
   currentClass      Class     @relation(fields: [currentClassId], references: [id])
@@ -40,7 +40,7 @@ model Ticket {
 }
 
 model Class {
-  id                       String   @id @default(uuid()) @map("_id") @db.ObjectId
+  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
   name                     String
   currentClassOnTickets    Ticket[]
   interestedClassOnTickets Ticket[] @relation(name: "_InterestedClassToTicket", fields: [interestedClassOnTicketIds], references: [id])
@@ -49,7 +49,7 @@ model Class {
 }
 
 model Subject {
-  id       String   @id @default(uuid()) @map("_id") @db.ObjectId
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
   name     String
   semester Int
   tickets  Ticket[] @relation(fields: [ticketIds], references: [id])
