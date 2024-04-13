@@ -6,7 +6,6 @@ import Topbar from "@/components/Topbar";
 import { ThemeProvider } from "@/context/ThemeContext";
 
 import "./globals.css";
-import { SocketProvider } from "@/context/SocketContext";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -26,14 +25,12 @@ export default function RootLayout({
       <body
         className={cn("bg-background font-sans antialiased", inter.variable)}
       >
-        <SocketProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <Topbar />
             <main className="flex size-full min-h-screen items-center justify-center py-4">
               {children}
             </main>
           </ThemeProvider>
-        </SocketProvider>
       </body>
     </html>
   );
