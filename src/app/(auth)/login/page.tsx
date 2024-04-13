@@ -63,7 +63,7 @@ const Register: React.FC = () => {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input placeholder="Password..." {...field} />
+                <Input placeholder="Password..." type="password" {...field} />
               </FormControl>
             </FormItem>
           )}

@@ -90,7 +90,7 @@ const Register: React.FC = () => {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input placeholder="Password..." {...field} />
+                <Input placeholder="Password..." type="password" {...field} />
               </FormControl>
               <FormDescription>
                 A tua password deve ter pelo menos 8 caracteres.
