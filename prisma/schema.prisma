@@ -14,46 +14,45 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid()) @map("_id")
-  email         String   @unique
-  name          String?
-  password      String
-  createdAt     DateTime @default(now())
-  classId       String
-  permutationId String?
+  id          String   @id @default(uuid()) @map("_id") @db.ObjectId
+  name        String
+  email       String   @unique
+  password    String
+  phoneNumber String?
+  createdAt   DateTime @default(now())
+  tickets     Ticket[]
+}
 
-  Permutation Permutation[]
-  Class       Class         @relation(fields: [classId], references: [id])
+model Ticket {
+  id                String    @id @default(uuid()) @map("_id") @db.ObjectId
+  state             Boolean   @default(true)
+  author            User      @relation(fields: [authorId], references: [id])
+  currentClass      Class     @relation(fields: [currentClassId], references: [id])
+  interestedClasses Class[]   @relation(name: "_InterestedClassToTicket", fields: [interestedClassIds], references: [id])
+  subjects          Subject[] @relation(fields: [subjectIds], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  authorId           String   @db.ObjectId
+  currentClassId     String   @db.ObjectId
+  subjectIds         String[] @db.ObjectId
+  interestedClassIds String[] @db.ObjectId
 }
 
 model Class {
-  id                              String   @id @default(uuid()) @map("_id")
-  name                            String
-  createdAt                       DateTime @default(now())
-  User                            User[]
-  permutationId                   String?
-  interesetedClassesId            String?
-  interesetedClassesPermutationId String?
-  interesetedClassesClassId       String?
+  id                       String   @id @default(uuid()) @map("_id") @db.ObjectId
+  name                     String
+  currentClassOnTickets    Ticket[]
+  interestedClassOnTickets Ticket[] @relation(name: "_InterestedClassToTicket", fields: [interestedClassOnTicketIds], references: [id])
 
-  InteresetedClasses InteresetedClasses[]
+  interestedClassOnTicketIds String[] @db.ObjectId
 }
 
-model Permutation {
-  id        String   @id @default(uuid()) @map("_id")
-  createdAt DateTime @default(now())
-  isSolved  Boolean  @default(false)
-  userId    String
+model Subject {
+  id       String   @id @default(uuid()) @map("_id") @db.ObjectId
+  name     String
+  semester Int
+  tickets  Ticket[] @relation(fields: [ticketIds], references: [id])
 
-  User               User                 @relation(fields: [userId], references: [id])
-  InteresetedClasses InteresetedClasses[]
-}
-
-model InteresetedClasses {
-  id            String @id @default(uuid()) @map("_id")
-  permutationId String
-  classId       String
-
-  permutation Permutation @relation(fields: [permutationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  class       Class       @relation(fields: [classId], references: [id])
+  ticketIds String[] @db.ObjectId
 }
