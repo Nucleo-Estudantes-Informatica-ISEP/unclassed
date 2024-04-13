@@ -21,15 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt">
+    <html lang="pt" className={cn("h-full")}>
       <body
-        className={cn("bg-background font-sans antialiased", inter.variable)}
+        className={cn(
+          "flex min-h-full flex-col bg-background font-sans antialiased",
+          inter.variable
+        )}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Topbar />
-          <main className="flex size-full min-h-screen items-center justify-center py-4">
-            {children}
-          </main>
+          <main className="flex h-full grow flex-col">{children}</main>
         </ThemeProvider>
       </body>
     </html>
