@@ -4,14 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/lib/components/ui/form";
-import { Input } from "@/lib/components/ui/input";
 import { Button } from "@/lib/components/ui/button";
 import {
   Dialog,
@@ -21,8 +13,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/lib/components/ui/dialog";
-import MultipleClassSelect from "../MultipleClassSelect/page";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/lib/components/ui/form";
+import { Input } from "@/lib/components/ui/input";
+
 import ClassSelect from "../ClassSelect/page";
+import MultipleClassSelect from "../MultipleClassSelect/page";
 
 const CreateTicketModal: React.FC = () => {
   const formSchema = z.object({
@@ -44,12 +45,16 @@ const CreateTicketModal: React.FC = () => {
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     console.log(values);
-  }
+  };
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="button" variant={"secondary"} className="bg-green-700 hover:bg-green-800">
+        <Button
+          type="button"
+          variant={"secondary"}
+          className="bg-green-700 hover:bg-green-800"
+        >
           Criar Ticket
         </Button>
       </DialogTrigger>
@@ -89,7 +94,7 @@ const CreateTicketModal: React.FC = () => {
                 />
 
                 <ClassSelect />
-                
+
                 <MultipleClassSelect />
 
                 <div className="flex flex-col gap-y-2">
@@ -103,9 +108,7 @@ const CreateTicketModal: React.FC = () => {
         </DialogHeader>
       </DialogContent>
     </Dialog>
-
-  )
-
-}
+  );
+};
 
 export default CreateTicketModal;

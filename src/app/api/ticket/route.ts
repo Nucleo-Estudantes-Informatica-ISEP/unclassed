@@ -6,7 +6,6 @@ import { ticketSchema } from "@/schemas/ticketSchema";
 
 export async function POST(req: Request) {
   try {
-   
   } catch (e) {
     if (e instanceof ZodError)
       return NextResponse.json({ error: e.errors }, { status: 400 });

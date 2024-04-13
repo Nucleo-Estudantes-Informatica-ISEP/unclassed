@@ -25,12 +25,12 @@ export default function RootLayout({
       <body
         className={cn("bg-background font-sans antialiased", inter.variable)}
       >
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <Topbar />
-            <main className="flex size-full min-h-screen items-center justify-center py-4">
-              {children}
-            </main>
-          </ThemeProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <Topbar />
+          <main className="flex size-full min-h-screen items-center justify-center py-4">
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );
