@@ -1,3 +1,6 @@
 export const cookies = {
-  token: "@Unclassed:token",
+  auth: {
+    name: "@Unclassed:auth",
+    maxAge: 315360000,
+  },
 };
