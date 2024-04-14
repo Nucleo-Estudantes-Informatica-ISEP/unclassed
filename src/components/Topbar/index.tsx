@@ -11,7 +11,7 @@ const Topbar: React.FC = () => {
   const token = cookies().get(config.cookies.auth.name)?.value;
 
   return (
-    <nav className="flex h-20 w-full items-center justify-between px-8">
+    <nav className="sticky top-0  flex h-20 w-full items-center justify-between px-8">
       <Link href="/" className="flex items-center gap-x-1">
         <div className="relative size-8 md:size-12">
           <Image
