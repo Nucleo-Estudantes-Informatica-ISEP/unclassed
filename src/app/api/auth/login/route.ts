@@ -40,8 +40,6 @@ export async function POST(req: NextRequest) {
     if (e instanceof ZodError)
       return NextResponse.json({ error: e.errors }, { status: 400 });
 
-    console.error(e);
-
     return NextResponse.json(
       { error: "Ocorreu um erro inesperado." },
       { status: 500 }

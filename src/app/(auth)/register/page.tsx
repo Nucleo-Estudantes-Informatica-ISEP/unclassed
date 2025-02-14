@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import swal from "sweetalert";
 import { z } from "zod";
 
 import { Button } from "@/lib/components/ui/button";
@@ -20,6 +22,7 @@ import { registerSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
   const formSchema = registerSchema;
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,7 +38,13 @@ const Register: React.FC = () => {
       method: "post",
       body: JSON.stringify(values),
     });
-    console.log(res);
+
+    if (res.status === 201) {
+      swal("Conta criada com sucesso!", "Agora podes fazer login.", "success");
+      router.push("/login");
+    } else {
+      swal("Erro ao criar conta", "Por favor tenta novamente.", "error");
+    }
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/lib/components/ui/button";
@@ -42,8 +42,8 @@ const frameworks = [
 ];
 
 const ClassSelect = () => {
-  const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState("");
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,7 +74,7 @@ const ClassSelect = () => {
               >
                 <Check
                   className={cn(
-                    "mr-2 h-4 w-4",
+                    "mr-2 size-4",
                     value === framework.value ? "opacity-100" : "opacity-0"
                   )}
                 />

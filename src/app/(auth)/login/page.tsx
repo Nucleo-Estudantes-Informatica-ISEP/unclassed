@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +19,7 @@ import { loginSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
   const formSchema = loginSchema;
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -27,8 +29,14 @@ const Register: React.FC = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    const res = await fetch("/api/auth/login", {
+      method: "post",
+      body: JSON.stringify(values),
+    });
+
+    if (res.status === 200) router.push("/");
+    else swal("Erro ao fazer login", "Por favor tenta novamente.", "error");
   }
 
   return (

@@ -1,10 +1,8 @@
-import { Permutation } from "@prisma/client";
-
-import CreateTicketModal from "../CreateTicketModal/page";
+import CreateTicketModal from "../CreateTicketModal";
 import { columns } from "./columns";
 import { DataTable } from "./data-table";
 
-async function getData(): Promise<Permutation[]> {
+async function getData() {
   // Fetch data from your API here.
   return [];
 }
