@@ -1,22 +1,22 @@
 "use client";
 
-import { Permutation } from "@prisma/client";
+import { Ticket } from "@prisma/client";
 import { ColumnDef } from "@tanstack/react-table";
 
 // This type is used to define the shape of our data.
 // You can use a Zod schema here if you want.
 
-export const columns: ColumnDef<Permutation>[] = [
+export const columns: ColumnDef<Ticket>[] = [
   {
-    accessorKey: "turmaAtual",
+    accessorKey: "currentClassId",
     header: "Turma Atual",
   },
   {
-    accessorKey: "turmaDestino",
+    accessorKey: "interestedClassIds",
     header: "Turma Destino",
   },
   {
-    accessorKey: "cadeiras",
+    accessorKey: "subjectIds",
     header: "Cadeiras",
   },
 ];

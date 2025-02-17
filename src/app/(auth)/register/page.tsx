@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import swal from "sweetalert";
 import { z } from "zod";
 
 import { Button } from "@/lib/components/ui/button";
@@ -40,10 +39,10 @@ const Register: React.FC = () => {
     });
 
     if (res.status === 201) {
-      swal("Conta criada com sucesso!", "Agora podes fazer login.", "success");
+      // TODO FIX      swal("Conta criada com sucesso!", "Agora podes fazer login.", "success");
       router.push("/login");
     } else {
-      swal("Erro ao criar conta", "Por favor tenta novamente.", "error");
+      // TODO FIX      swal("Erro ao criar conta", "Por favor tenta novamente.", "error");
     }
   }
 
