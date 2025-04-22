@@ -21,44 +21,9 @@ model User {
   phone     String?
   createdAt DateTime @default(now())
   role      Role     @default(USER)
-  tickets   Ticket[]
 }
 
 enum Role {
   USER
   ADMIN
-}
-
-model Ticket {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  state             Boolean   @default(true)
-  author            User      @relation(fields: [authorId], references: [id])
-  currentClass      Class     @relation(fields: [currentClassId], references: [id])
-  interestedClasses Class[]   @relation(name: "_InterestedClassToTicket", fields: [interestedClassIds], references: [id])
-  subjects          Subject[] @relation(fields: [subjectIds], references: [id])
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  authorId           String   @db.ObjectId
-  currentClassId     String   @db.ObjectId
-  subjectIds         String[] @db.ObjectId
-  interestedClassIds String[] @db.ObjectId
-}
-
-model Class {
-  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
-  name                     String
-  currentClassOnTickets    Ticket[]
-  interestedClassOnTickets Ticket[] @relation(name: "_InterestedClassToTicket", fields: [interestedClassOnTicketIds], references: [id])
-
-  interestedClassOnTicketIds String[] @db.ObjectId
-}
-
-model Subject {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  name     String   @unique
-  semester Int
-  tickets  Ticket[] @relation(fields: [ticketIds], references: [id])
-
-  ticketIds String[] @db.ObjectId
 }
