@@ -14,16 +14,109 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  email     String   @unique
-  password  String
-  phone     String?
-  createdAt DateTime @default(now())
-  role      Role     @default(USER)
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  email            String   @unique
+  alternativeEmail String?  @unique
+  discordId        String?  @unique
+  password         String
+  createdAt        DateTime @default(now())
+  role             Role     @default(USER)
+  courseId       String  @db.ObjectId
+
+  course Course @relation(fields: [courseId], references: [id])
+  singleSwapRequests SingleSwapRequest[]
+  sundleSwapRequests BundleSwapRequest[]
 }
+
+model Course {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String
+
+  users    User[]
+  classes Class[]
+  subjects Subject[]
+}
+
+model Class {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String
+  courseId String @db.ObjectId
+
+  course Course @relation(fields: [courseId], references: [id])
+  singleSwapRequests SingleSwapRequest[]
+  bundleSwapRequests BundleSwapRequest[]
+}
+
+model Subject {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  year     Int    @default(1)
+  semester Int    @default(1)
+  courseId String @db.ObjectId
+
+  course   Course @relation(fields: [courseId], references: [id])
+  singleSwapRequests SingleSwapRequest[]
+}
+
+model SingleSwapRequest {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String        @db.ObjectId
+  subjectId         String        @db.ObjectId
+  currentClassId    String        @db.ObjectId
+  preferredClassIds String[]
+  status            RequestStatus @default(PENDING)
+  lastProcessed     DateTime
+  createdAt         DateTime      @default(now())
+
+  user         User    @relation(fields: [userId], references: [id])
+  subject      Subject @relation(fields: [subjectId], references: [id])
+  currentClass Class   @relation(fields: [currentClassId], references: [id])
+}
+
+model BundleSwapRequest {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String        @db.ObjectId
+  currentClassId    String        @db.ObjectId
+  preferredClassIds String[]
+  status            RequestStatus @default(PENDING)
+  lastProcessed     DateTime
+  createdAt         DateTime      @default(now())
+
+  user         User  @relation(fields: [userId], references: [id])
+  currentClass Class @relation(fields: [currentClassId], references: [id])
+}
+
+model Match {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  requestIds     String[]
+  participantIds String[]
+  status         RequestStatus @default(PENDING)
+  swapType       MatchType     @default(SINGLE)
+  swapPattern    SwapPattern   @default(DIRECT)
+  createdAt      DateTime      @default(now())
+}
+
+// Enums go here
 
 enum Role {
   USER
   ADMIN
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  TIMEOUT
+}
+
+enum MatchType {
+  SINGLE
+  BUNDLE
+}
+
+enum SwapPattern {
+  DIRECT
+  MULTIWAY
 }
