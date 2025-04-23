@@ -1,0 +1,111 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+actor "Student" as User
+
+participant ":Unclassed" as System
+participant ":Matching Algorithm" as Algorithm
+participant ":Unclassed Queue" as Queue
+
+activate User
+
+    User -> System : Asks to swap classes (creates a request)
+
+    activate System
+
+        System -> Algorithm : Asks algorithm to find a match
+
+        activate Algorithm
+
+            Algorithm -> Queue : Checks if there are any matches in queue
+
+            activate Queue
+
+                Queue --> Algorithm : Returns matches
+
+            deactivate Queue    
+
+            alt If there are no matches
+
+                Algorithm --> System : Asks to add request to queue 
+
+                deactivate Algorithm
+
+                System -> Queue : Adds request to queue
+
+                activate Queue
+
+                    Queue --> System : Confirms addition to queue
+
+                deactivate Queue    
+
+                System --> User : Notifies user of request status
+
+                deactivate System
+
+            else If there are matches
+                activate Algorithm
+
+                Algorithm --> System : List<Match>
+
+                deactivate Algorithm
+
+                    activate System
+
+                    System --> User : Notifies user of matches
+
+                    deactivate System
+
+                        alt Accepts match
+
+                            User -> System : Accepts match
+
+                                activate System
+
+                                    System -> Queue : Removes request from queue
+
+                                    activate Queue
+
+                                        Queue --> System : Confirms removal from queue
+
+                                    deactivate Queue    
+
+                                    System --> User : Notifies users of match acceptance
+                                
+                                deactivate System
+
+                        else Rejects match
+
+                            User -> System : Rejects match
+
+                            activate System
+
+                                System -> Queue : Adds request to queue's last position   
+                            
+                                activate Queue
+
+                                    Queue --> System : Confirms addition to queue
+
+                                deactivate Queue
+
+                                System --> User : Notifies users of match rejection
+
+                            deactivate System
+
+                        end 
+
+                    deactivate User
+
+                deactivate System
+
+            end
+
+        deactivate Algorithm
+
+    deactivate System
+
+deactivate User 
+
+@enduml
