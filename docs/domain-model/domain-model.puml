@@ -1,0 +1,97 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+' Core domain model
+class User {
+  - userId: String
+  - name: String
+  - email: String
+  - createdAt: Date
+}
+
+class Class {
+  - classId: String
+  - name: String
+}
+
+class Subject {
+  - subjectId: String
+  - name: String
+}
+
+class BundleSwapRequest {
+  - requestId: String
+  - userId: String
+  - currentClassId: String
+  - preferredClasses: List<String>
+  - status: String
+  - createdAt: Date
+  - lastProcessed: Date
+}
+
+class SingleSwapRequest {
+  - requestId: String
+  - userId: String
+  - subjectId: String
+  - currentClassId: String
+  - preferredClasses: List<String>
+  - status: String
+  - createdAt: Date
+  - lastProcessed: Date
+}
+
+class Match {
+  - matchId: String
+  - matchType: String ("bundle" or "single")
+  - requestIds: List<String>
+  - swapPattern: String ("direct" or "multi-way")
+  - status: String
+  - createdAt: Date
+  - participants: List<Object>
+}
+
+' Relationships
+User "1" ---> "*" BundleSwapRequest: creates
+User "1" ---> "*" SingleSwapRequest: creates
+
+
+SingleSwapRequest "*" --> "1" Subject: references
+BundleSwapRequest "*" --> "1" Class: current
+SingleSwapRequest "*" --> "1" Class: current
+BundleSwapRequest "*" --> "*" Class: preferred
+SingleSwapRequest "*" --> "*" Class: preferred
+
+BundleSwapRequest "*" --> "*" Match: participates in
+SingleSwapRequest "*" --> "*" Match: participates in
+
+note top of BundleSwapRequest
+  For changing all subjects to a new class
+
+  MongoDB indexes:
+  - createdAt
+  - status
+  - currentClassId
+end note
+
+note right of SingleSwapRequest
+  For changing one subject to a new class
+
+  MongoDB indexes:
+  - createdAt
+  - status
+  - subjectId
+  - currentClassId
+end note
+
+note left of Match
+  matchType: "bundle" or "single"
+  swapPattern: "direct", "three-way", "multi-way"
+
+  MongoDB indexes:
+  - status
+  - matchType
+  - requestIds
+end note
+@enduml
