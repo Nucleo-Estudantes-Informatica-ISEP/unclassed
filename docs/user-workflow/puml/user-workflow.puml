@@ -7,7 +7,6 @@ actor "Student" as User
 
 participant ":Unclassed" as System
 participant ":Matching Algorithm" as Algorithm
-participant ":Unclassed Queue" as Queue
 
 activate User
 
@@ -19,27 +18,19 @@ activate User
 
         activate Algorithm
 
-            Algorithm -> Queue : Checks if there are any matches in queue
+            Algorithm --> System : Checks if there are any matches in queue
 
-            activate Queue
+        deactivate Algorithm
 
-                Queue --> Algorithm : Returns matches
+        System -> Algorithm : Returns matches
 
-            deactivate Queue    
+        activate Algorithm
 
             alt If there are no matches
 
                 Algorithm --> System : Asks to add request to queue 
 
                 deactivate Algorithm
-
-                System -> Queue : Adds request to queue
-
-                activate Queue
-
-                    Queue --> System : Confirms addition to queue
-
-                deactivate Queue    
 
                 System --> User : Notifies user of request status
 
@@ -64,14 +55,6 @@ activate User
 
                                 activate System
 
-                                    System -> Queue : Removes request from queue
-
-                                    activate Queue
-
-                                        Queue --> System : Confirms removal from queue
-
-                                    deactivate Queue    
-
                                     System --> User : Notifies users of match acceptance
                                 
                                 deactivate System
@@ -82,14 +65,8 @@ activate User
 
                             activate System
 
-                                System -> Queue : Adds request to queue's last position   
+                                System -> System : Adds request to queue's last position   
                             
-                                activate Queue
-
-                                    Queue --> System : Confirms addition to queue
-
-                                deactivate Queue
-
                                 System --> User : Notifies users of match rejection
 
                             deactivate System
