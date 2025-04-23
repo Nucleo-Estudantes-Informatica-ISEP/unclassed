@@ -1,0 +1,88 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+actor "Student" as User
+
+participant ":Unclassed" as System
+participant ":Matching Algorithm" as Algorithm
+
+activate User
+
+    User -> System : Asks to swap classes (creates a request)
+
+    activate System
+
+        System -> Algorithm : Asks algorithm to find a match
+
+        activate Algorithm
+
+            Algorithm --> System : Checks if there are any matches in queue
+
+        deactivate Algorithm
+
+        System -> Algorithm : Returns matches
+
+        activate Algorithm
+
+            alt If there are no matches
+
+                Algorithm --> System : Asks to add request to queue 
+
+                deactivate Algorithm
+
+                System --> User : Notifies user of request status
+
+                deactivate System
+
+            else If there are matches
+                activate Algorithm
+
+                Algorithm --> System : List<Match>
+
+                deactivate Algorithm
+
+                    activate System
+
+                    System --> User : Notifies user of matches
+
+                    deactivate System
+
+                        alt Accepts match
+
+                            User -> System : Accepts match
+
+                                activate System
+
+                                    System --> User : Notifies users of match acceptance
+                                
+                                deactivate System
+
+                        else Rejects match
+
+                            User -> System : Rejects match
+
+                            activate System
+
+                                System -> System : Adds request to queue's last position   
+                            
+                                System --> User : Notifies users of match rejection
+
+                            deactivate System
+
+                        end 
+
+                    deactivate User
+
+                deactivate System
+
+            end
+
+        deactivate Algorithm
+
+    deactivate System
+
+deactivate User 
+
+@enduml
