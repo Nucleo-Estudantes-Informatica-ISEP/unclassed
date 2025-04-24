@@ -8,16 +8,26 @@ class User {
   - userId: String
   - name: String
   - email: String
+  - alternativeEmail: String
+  - discordId: String
+  - courseId: String
   - createdAt: Date
 }
 
 class Class {
   - classId: String
   - name: String
+  - courseId: String
 }
 
 class Subject {
   - subjectId: String
+  - name: String
+  - courseId: String
+}
+
+class Course {
+  - courseId: String
   - name: String
 }
 
@@ -55,7 +65,11 @@ class Match {
 ' Relationships
 User "1" ---> "*" BundleSwapRequest: creates
 User "1" ---> "*" SingleSwapRequest: creates
+User "1" --> "1" Course : enrolled in
 
+Subject "1" ----> "1" Course: belongs to
+
+Class "1" ----> "1" Course: belongs to
 
 SingleSwapRequest "*" --> "1" Subject: references
 BundleSwapRequest "*" --> "1" Class: current
@@ -63,8 +77,8 @@ SingleSwapRequest "*" --> "1" Class: current
 BundleSwapRequest "*" --> "*" Class: preferred
 SingleSwapRequest "*" --> "*" Class: preferred
 
-BundleSwapRequest "*" --> "*" Match: participates in
-SingleSwapRequest "*" --> "*" Match: participates in
+BundleSwapRequest "*" -----> "*" Match: participates in
+SingleSwapRequest "*" -----> "*" Match: participates in
 
 note top of BundleSwapRequest
   For changing all subjects to a new class
