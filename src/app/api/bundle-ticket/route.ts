@@ -40,21 +40,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if current class exists and belongs to user's course
-    const currentClass = await prisma.class.findUnique({
-      where: { id: currentClassId },
-    });
-
-    if (!currentClass) {
-      return NextResponse.json({ error: "Turma atual não encontrada." }, { status: 404 });
-    }
-
-    if (currentClass.courseId !== user.courseId) {
-      return NextResponse.json(
-        { error: "A turma atual não pertence ao curso do utilizador." },
-        { status: 400 }
-      );
-    }
 
     // Validate preferred classes
     const preferredClasses = await prisma.class.findMany({
