@@ -22,11 +22,11 @@ model User {
   password         String
   createdAt        DateTime @default(now())
   role             Role     @default(USER)
-  courseId       String  @db.ObjectId
+  courseId         String   @db.ObjectId
 
-  course Course @relation(fields: [courseId], references: [id])
+  course             Course              @relation(fields: [courseId], references: [id])
   singleSwapRequests SingleSwapRequest[]
-  sundleSwapRequests BundleSwapRequest[]
+  bundleSwapRequests BundleSwapRequest[]
 }
 
 model Course {
@@ -34,16 +34,16 @@ model Course {
   name String
 
   users    User[]
-  classes Class[]
+  classes  Class[]
   subjects Subject[]
 }
 
 model Class {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  name String
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
   courseId String @db.ObjectId
 
-  course Course @relation(fields: [courseId], references: [id])
+  course             Course              @relation(fields: [courseId], references: [id])
   singleSwapRequests SingleSwapRequest[]
   bundleSwapRequests BundleSwapRequest[]
 }
@@ -55,7 +55,7 @@ model Subject {
   semester Int    @default(1)
   courseId String @db.ObjectId
 
-  course   Course @relation(fields: [courseId], references: [id])
+  course             Course              @relation(fields: [courseId], references: [id])
   singleSwapRequests SingleSwapRequest[]
 }
 
