@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { CONTAINER_VARIANTS, ITEM_VARIANTS } from '@/config/animations';
 
 export default function TicketsPage() {
   const router = useRouter();
@@ -14,40 +15,6 @@ export default function TicketsPage() {
 
     const id = Date.now().toString();
     router.push(`/tickets/${id}?class1=${encodeURIComponent(class1)}&class2=${encodeURIComponent(class2)}`);
-  };
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      }
-    }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 10
-      }
-    }
-  };
-
-  const hoverEffect = {
-    hover: {
-      y: -3,
-      transition: { 
-        type: "spring",
-        stiffness: 400,
-        damping: 10
-      }
-    }
   };
 
   return (
@@ -64,12 +31,12 @@ export default function TicketsPage() {
         className="w-full max-w-5xl rounded-2xl bg-gradient-to-br from-blue-600/30 via-blue-700/30 to-blue-900/30 p-[2px]"
       >
         <motion.div
-          variants={container}
+          variants={CONTAINER_VARIANTS}
           initial="hidden"
-          animate="show"
+          animate="visible"
           className="bg-gray-900 rounded-2xl p-6 sm:p-8"
         >
-          <motion.header variants={item} className="text-center mb-10 sm:mb-12 pt-4 sm:pt-6">
+          <motion.header variants={ITEM_VARIANTS} className="text-center mb-10 sm:mb-12 pt-4 sm:pt-6">
             <motion.h1 
               whileHover={{ scale: 1.02 }}
               className="text-3xl sm:text-4xl font-bold text-white mb-3 sm:mb-4"
@@ -85,7 +52,7 @@ export default function TicketsPage() {
           </motion.header>
 
           <motion.div
-            variants={item}
+            variants={ITEM_VARIANTS}
             whileHover="hover"
             className="bg-gray-800 rounded-xl p-6 sm:p-8 shadow-lg border border-gray-700"
           >
@@ -99,13 +66,13 @@ export default function TicketsPage() {
             <motion.form 
               onSubmit={handleSubmit} 
               className="space-y-6"
-              variants={container}
+              variants={CONTAINER_VARIANTS}
             >
               <motion.div 
-                variants={container}
+                variants={CONTAINER_VARIANTS}
                 className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6"
               >
-                <motion.div variants={item}>
+                <motion.div variants={ITEM_VARIANTS}>
                   <label htmlFor="current-class" className="block text-sm font-medium text-gray-400 mb-2">
                     Turma Atual
                   </label>
@@ -115,7 +82,7 @@ export default function TicketsPage() {
                     value={class1}
                     onChange={(e) => setClass1(e.target.value)}
                     placeholder="Ex: 1DA"
-                    className="w-full p-3 sm:p-4 rounded-lg bg-gray-700 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full p-3 sm:p-4 rounded-lg bg-gray-700 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     required
                     whileFocus={{ 
                       scale: 1.02,
@@ -123,7 +90,7 @@ export default function TicketsPage() {
                     }}
                   />
                 </motion.div>
-                <motion.div variants={item}>
+                <motion.div variants={ITEM_VARIANTS}>
                   <label htmlFor="new-class" className="block text-sm font-medium text-gray-400 mb-2">
                     Turma Desejada
                   </label>
@@ -133,7 +100,7 @@ export default function TicketsPage() {
                     value={class2}
                     onChange={(e) => setClass2(e.target.value)}
                     placeholder="Ex: 1DJ"
-                    className="w-full p-3 sm:p-4 rounded-lg bg-gray-700 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full p-3 sm:p-4 rounded-lg bg-gray-700 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     required
                     whileFocus={{ 
                       scale: 1.02,
@@ -143,7 +110,7 @@ export default function TicketsPage() {
                 </motion.div>
               </motion.div>
 
-              <motion.div variants={item} className="pt-2">
+              <motion.div variants={ITEM_VARIANTS} className="pt-2">
                 <motion.button
                   type="submit"
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 sm:py-4 px-6 rounded-lg shadow-lg relative overflow-hidden"

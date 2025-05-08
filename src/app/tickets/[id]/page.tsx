@@ -2,53 +2,18 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { CONTAINER_VARIANTS, ITEM_VARIANTS, STATUS_BUTTON_VARIANTS } from '@/config/animations';
+import { STATUS_CONFIG } from '@/config/status';
 
-type Status = 'não-analisado' | 'em-analise' | 'aceite' | 'recusado';
+type Status = keyof typeof STATUS_CONFIG;
 
 export default function TicketPage({
-  params,
   searchParams,
 }: {
-  params: { id: string };
   searchParams: { class1: string; class2: string };
 }) {
-  const [status, setStatus] = useState<Status>('não-analisado');
+  const [status, setStatus] = useState<Status>('not-analized');
   const router = useRouter();
-
-  const statusConfig = {
-    'não-analisado': { label: 'Não Analisado', color: 'bg-gray-600' },
-    'em-analise': { label: 'Em Análise', color: 'bg-blue-600' },
-    'aceite': { label: 'Aceite', color: 'bg-green-600' },
-    'recusado': { label: 'Recusado', color: 'bg-red-600' },
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { type: 'spring', stiffness: 100 }
-    }
-  };
-
-  const statusButtonVariants = {
-    inactive: { scale: 1, backgroundColor: '#374151' },
-    active: { 
-      scale: 1.05, 
-      transition: { type: 'spring', stiffness: 400, damping: 15 } 
-    }
-  };
 
   return (
     <div className="min-h-screen bg-transparent p-4 sm:p-6 flex items-center justify-center">
@@ -59,13 +24,12 @@ export default function TicketPage({
         className="w-full max-w-5xl rounded-2xl bg-gradient-to-br from-blue-600/30 via-blue-700/30 to-blue-900/30 p-[2px]"
       >
         <motion.div
-          variants={containerVariants}
+          variants={CONTAINER_VARIANTS}
           initial="hidden"
           animate="visible"
           className="bg-gray-900 rounded-2xl p-6 sm:p-8"
         >
-
-          <motion.header variants={itemVariants} className="text-center mb-10 sm:mb-12 pt-4 sm:pt-6">
+                    <motion.header variants={ITEM_VARIANTS} className="text-center mb-10 sm:mb-12 pt-4 sm:pt-6">
             <motion.h1 
               whileHover={{ scale: 1.02 }}
               className="text-3xl sm:text-4xl font-bold text-white mb-3 sm:mb-4"
@@ -81,7 +45,7 @@ export default function TicketPage({
           </motion.header>
 
           <motion.div 
-            variants={itemVariants}
+            variants={ITEM_VARIANTS}
             className="bg-gray-800 rounded-xl p-4 sm:p-6 mb-8 shadow-lg border border-gray-700"
           >
             <motion.h2 
@@ -91,31 +55,31 @@ export default function TicketPage({
               Status do Pedido
             </motion.h2>
             <motion.div 
-              variants={containerVariants}
+              variants={CONTAINER_VARIANTS}
               className="flex flex-wrap justify-center gap-3"
             >
-              {(Object.keys(statusConfig) as Status[]).map((s) => (
+              {(Object.keys(STATUS_CONFIG) as Status[]).map((s) => (
                 <motion.button
                   key={s}
                   onClick={() => setStatus(s)}
-                  variants={statusButtonVariants}
+                  variants={STATUS_BUTTON_VARIANTS}
                   animate={status === s ? "active" : "inactive"}
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                   className={`px-5 py-2.5 rounded-lg ${
                     status === s
-                      ? `${statusConfig[s].color} text-white shadow-lg`
+                      ? `${STATUS_CONFIG[s].color} text-white shadow-lg`
                       : 'bg-gray-700 text-gray-400'
                   } font-medium text-sm uppercase tracking-wider`}
                 >
-                  {statusConfig[s].label}
+                  {STATUS_CONFIG[s].label}
                 </motion.button>
               ))}
             </motion.div>
           </motion.div>
 
           <motion.div 
-            variants={itemVariants}
+            variants={ITEM_VARIANTS}
             className="bg-gray-800 rounded-xl p-6 sm:p-8 shadow-lg border border-gray-700"
           >
             <motion.h2 
@@ -126,7 +90,7 @@ export default function TicketPage({
             </motion.h2>
             
             <motion.div 
-              variants={containerVariants}
+              variants={CONTAINER_VARIANTS}
               className="flex flex-col items-center space-y-8"
             >
               <motion.div 
@@ -135,10 +99,10 @@ export default function TicketPage({
               >
                 <motion.div 
                   className="flex justify-center items-center gap-4 flex-wrap"
-                  variants={containerVariants}
+                  variants={CONTAINER_VARIANTS}
                 >
                   <motion.div 
-                    variants={itemVariants}
+                    variants={ITEM_VARIANTS}
                     className="text-center"
                     whileHover={{ scale: 1.05 }}
                   >
@@ -153,7 +117,7 @@ export default function TicketPage({
                   </motion.div>
                   
                   <motion.div 
-                    variants={itemVariants}
+                    variants={ITEM_VARIANTS}
                     transition={{ repeat: Infinity, duration: 2 }}
                     className="text-blue-400 text-2xl mt-5"
                   >
@@ -161,7 +125,7 @@ export default function TicketPage({
                   </motion.div>
                   
                   <motion.div 
-                    variants={itemVariants}
+                    variants={ITEM_VARIANTS}
                     className="text-center"
                     whileHover={{ scale: 1.05 }}
                   >
@@ -187,12 +151,12 @@ export default function TicketPage({
                   className="inline-flex items-center gap-2 bg-gray-700 px-6 py-3 rounded-lg"
                 >
                   <motion.span 
-                    className={`w-3 h-3 rounded-full ${statusConfig[status].color}`}
+                    className={`size-3 rounded-full ${STATUS_CONFIG[status].color}`}
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 0.5, repeat: 1 }}
                   />
                   <span className="font-medium uppercase tracking-wider text-sm sm:text-base">
-                    Status Atual: {statusConfig[status].label}
+                    Status Atual: {STATUS_CONFIG[status].label}
                   </span>
                 </motion.div>
               </AnimatePresence>
@@ -200,7 +164,7 @@ export default function TicketPage({
           </motion.div>
 
           <motion.div 
-            variants={itemVariants}
+            variants={ITEM_VARIANTS}
             className="mt-8 text-center"
           >
             <motion.button
