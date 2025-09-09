@@ -37,3 +37,11 @@ next-env.d.ts
 
 .env
 /.idea/
+
+# Development and testing files
+test-*.js
+cookies*.txt
+*.md
+WARP.md
+pnpm-workspace.yaml
+scripts/
