@@ -1,0 +1,38 @@
+import { NextRequest, NextResponse } from "next/server";
+import getServerSession from "@/services/getServerSession";
+import prisma from "@/lib/prisma";
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const year = searchParams.get("year");
+
+    // Build where clause
+    const where: any = {};
+    
+    if (year) {
+      where.year = parseInt(year);
+    }
+
+    const classes = await prisma.class.findMany({
+      where,
+      orderBy: [
+        { year: "asc" },
+        { name: "asc" }
+      ]
+    });
+
+    return NextResponse.json(classes);
+  } catch (error) {
+    console.error("Error fetching classes:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const { id } = user;
-    const token = signJwt({ id });
+    const { id, role } = user;
+    const token = signJwt({ id, role });
     setCookie(token);
 
     const sanitizedUser = exclude(user, ["password"]);
