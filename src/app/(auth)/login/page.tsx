@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
+import { useState } from "react";
 
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -13,13 +15,15 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from "@/lib/components/ui/form";
 import { Input } from "@/lib/components/ui/input";
 import { loginSchema } from "@/schemas/authSchema";
 
-const Register: React.FC = () => {
+const Login: React.FC = () => {
   const formSchema = loginSchema;
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -27,16 +31,39 @@ const Register: React.FC = () => {
       email: "",
       password: "",
     },
+    mode: "onChange",
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const res = await fetch("/api/auth/login", {
-      method: "post",
-      body: JSON.stringify(values),
-    });
+    setIsLoading(true);
+    try {
+      console.log("Submitting login:", { email: values.email }); // Debug log
+      
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
 
-    if (res.status === 200) router.push("/");
-    else swal("Erro ao fazer login", "Por favor tenta novamente.", "error");
+      const data = await res.json();
+      console.log("Login response:", { status: res.status, data }); // Debug log
+
+      if (res.ok) {
+        toast.success("Login realizado com sucesso!");
+        console.log("Redirecting to home..."); // Debug log
+        // Force a full page refresh to ensure cookie is set
+        window.location.href = "/";
+      } else {
+        toast.error(data.error || "Erro ao fazer login");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Erro inesperado ao fazer login");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -55,6 +82,7 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Email..." {...field} />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -67,12 +95,13 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Password..." type="password" {...field} />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
         <div className="flex flex-col gap-y-2">
-          <Button className="mt-8" type="submit">
-            Entrar
+          <Button className="mt-8" type="submit" disabled={isLoading}>
+            {isLoading ? "A entrar..." : "Entrar"}
           </Button>
           <Link className="text-sm underline" href="/register">
             Ainda não tens conta? Regista-te!
@@ -83,4 +112,4 @@ const Register: React.FC = () => {
   );
 };
 
-export default Register;
+export default Login;

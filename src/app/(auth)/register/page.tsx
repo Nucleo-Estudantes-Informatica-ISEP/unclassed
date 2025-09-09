@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
 
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -28,21 +29,33 @@ const Register: React.FC = () => {
     defaultValues: {
       name: "",
       email: "",
+      phone: "",
       password: "",
     },
+    mode: "onChange",
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const res = await fetch("/api/auth/register", {
-      method: "post",
-      body: JSON.stringify(values),
-    });
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
 
-    if (res.status === 201) {
-      // TODO FIX      swal("Conta criada com sucesso!", "Agora podes fazer login.", "success");
-      router.push("/login");
-    } else {
-      // TODO FIX      swal("Erro ao criar conta", "Por favor tenta novamente.", "error");
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success("Conta criada com sucesso! Agora podes fazer login.");
+        router.push("/login");
+      } else {
+        toast.error(data.error || "Erro ao criar conta");
+      }
+    } catch (error) {
+      console.error("Register error:", error);
+      toast.error("Erro inesperado ao criar conta");
     }
   }
 
