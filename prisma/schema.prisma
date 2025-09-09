@@ -14,16 +14,175 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  email     String   @unique
-  password  String
-  phone     String?
-  createdAt DateTime @default(now())
-  role      Role     @default(USER)
+  id                  String              @id @default(auto()) @map("_id") @db.ObjectId
+  name                String
+  email               String              @unique
+  password            String
+  phone               String?
+  createdAt           DateTime            @default(now())
+  role                Role                @default(USER)
+  singleSwapRequests  SingleSwapRequest[]
+  bundleSwapRequests  BundleSwapRequest[]
+}
+
+model Subject {
+  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
+  code               String              @unique // ALGAN, APROG, etc.
+  name               String
+  year               Int                 // 1, 2, 3, 4, 5, 6
+  semester           Int                 // 1 or 2
+  singleSwapRequests SingleSwapRequest[]
+}
+
+model Class {
+  id                        String              @id @default(auto()) @map("_id") @db.ObjectId
+  name                      String              @unique // "1DA", "1DB", "2DA", etc.
+  year                      Int                 // 1, 2, 3, 4, 5, 6
+  currentSingleSwaps        SingleSwapRequest[] @relation("CurrentClass")
+  currentBundleSwaps        BundleSwapRequest[] @relation("CurrentBundleClass")
+}
+
+model SingleSwapRequest {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String    @db.ObjectId
+  subjectId        String    @db.ObjectId
+  currentClassId   String    @db.ObjectId
+  preferredClassIds String[] @db.ObjectId
+  preferenceOrderMatters Boolean @default(true) // Whether class order matters for satisfaction
+  ticketType       TicketType @default(SPECIFIC_CLASS)
+  status           RequestStatus @default(ACTIVE)
+  priority         Int       @default(1) // 1=highest, 3=lowest
+  satisfactionScore Float?   // Calculated satisfaction with current match
+  provisionalMatchId String? @db.ObjectId // For provisional matching
+  provisionalUntil DateTime? // When provisional match expires
+  graphPartition   String    // For graph partitioning (classId or "all")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastProcessed    DateTime?
+  
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject          Subject   @relation(fields: [subjectId], references: [id])
+  currentClass     Class     @relation("CurrentClass", fields: [currentClassId], references: [id])
+  
+  @@index([status])
+  @@index([createdAt])
+  @@index([subjectId])
+  @@index([currentClassId])
+  @@index([ticketType])
+  @@index([graphPartition])
+  @@index([priority])
+  @@index([provisionalUntil])
+}
+
+model BundleSwapRequest {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  currentClassId    String    @db.ObjectId
+  preferredClassIds String[]  @db.ObjectId
+  preferenceOrderMatters Boolean @default(true) // Whether class order matters for satisfaction
+  ticketType        TicketType @default(ALL_CLASSES)
+  status            RequestStatus @default(ACTIVE)
+  priority          Int       @default(1) // 1=highest, 3=lowest
+  satisfactionScore Float?    // Calculated satisfaction with current match
+  provisionalMatchId String?  @db.ObjectId // For provisional matching
+  provisionalUntil  DateTime? // When provisional match expires
+  graphPartition    String    // For graph partitioning (year-based)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastProcessed     DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentClass      Class     @relation("CurrentBundleClass", fields: [currentClassId], references: [id])
+  
+  @@index([status])
+  @@index([createdAt])
+  @@index([currentClassId])
+  @@index([ticketType])
+  @@index([graphPartition])
+  @@index([priority])
+  @@index([provisionalUntil])
+}
+
+model Match {
+  id                    String              @id @default(auto()) @map("_id") @db.ObjectId
+  matchType             MatchType
+  swapPattern           SwapPattern
+  status                MatchStatus         @default(PROPOSED)
+  isProvisional         Boolean             @default(false)
+  provisionalUntil      DateTime?
+  satisfactionScore     Float?              // Overall match satisfaction
+  processingTime        Int?                // Time taken to find match (ms)
+  graphPartition        String              // Which graph partition this came from
+  participants          Json[]              // Array of participant objects with userId, fromClass, toClass
+  singleSwapRequestIds  String[]            @db.ObjectId
+  bundleSwapRequestIds  String[]            @db.ObjectId
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  @@index([status])
+  @@index([matchType])
+  @@index([isProvisional])
+  @@index([provisionalUntil])
+  @@index([graphPartition])
+  @@index([satisfactionScore])
 }
 
 enum Role {
   USER
   ADMIN
+}
+
+enum RequestStatus {
+  ACTIVE
+  MATCHED
+  CANCELLED
+  EXPIRED
+}
+
+enum MatchType {
+  SINGLE
+  BUNDLE
+}
+
+enum SwapPattern {
+  DIRECT      // A ↔ B
+  THREE_WAY   // A → B → C → A
+  MULTI_WAY   // Complex multi-participant swaps
+}
+
+model GraphPartition {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  partitionKey      String    @unique // "subject-{subjectId}" or "year-{year}"
+  ticketType        TicketType
+  subjectId         String?   @db.ObjectId // For SPECIFIC_CLASS graphs
+  year              Int?      // For ALL_CLASSES graphs
+  activeRequests    Int       @default(0)
+  lastProcessed     DateTime?
+  avgProcessingTime Int?      // Average processing time in ms
+  successRate       Float?    // Match success rate (0.0 - 1.0)
+  priority          Int       @default(1) // Processing priority
+  isLocked          Boolean   @default(false) // Prevent concurrent processing
+  lockedAt          DateTime?
+  lockedBy          String?   // Process/worker ID
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([ticketType])
+  @@index([lastProcessed])
+  @@index([priority])
+  @@index([isLocked])
+}
+
+enum TicketType {
+  SPECIFIC_CLASS // Single subject, specific class preferences
+  ALL_CLASSES    // Bundle swap, any class in year
+}
+
+enum MatchStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  PROVISIONAL    // Temporary match, can be upgraded
+  UPGRADED       // Was provisional, now replaced with better match
 }
