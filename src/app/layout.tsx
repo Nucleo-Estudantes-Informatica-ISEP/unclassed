@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "@/lib/components/ui/sonner";
 
 import { cn } from "@/lib/utils";
 import Topbar from "@/components/Topbar";
@@ -27,9 +28,10 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Topbar />
-          <main className="flex size-full min-h-screen items-center justify-center py-4">
+          <main className="size-full min-h-screen pt-[12vh] p-4">
             {children}
           </main>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
