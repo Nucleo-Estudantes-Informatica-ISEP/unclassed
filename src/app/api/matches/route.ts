@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import getServerSession from "@/services/getServerSession";
+
 import prisma from "@/lib/prisma";
+import getServerSession from "@/services/getServerSession";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,28 +17,28 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: any = {};
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     if (matchType) {
       where.matchType = matchType;
     }
 
     const matches = await prisma.match.findMany({
       where,
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     // Filter matches that involve the user (if not admin)
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
-      filteredMatches = matches.filter(match => 
+      filteredMatches = matches.filter((match) =>
         (match.participants as any[]).some((p: any) => p.userId === session.id)
       );
     } else if (userId) {
-      filteredMatches = matches.filter(match => 
+      filteredMatches = matches.filter((match) =>
         (match.participants as any[]).some((p: any) => p.userId === userId)
       );
     }
@@ -46,45 +47,59 @@ export async function GET(request: NextRequest) {
     const enrichedMatches = await Promise.all(
       filteredMatches.map(async (match) => {
         const participants = match.participants as any[];
-        
+
         // Get user information for participants
-        const userIds = participants.map(p => p.userId);
+        const userIds = participants.map((p) => p.userId);
         const users = await prisma.user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, name: true, email: true, phone: true, sharePhoneOnMatch: true }
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            sharePhoneOnMatch: true,
+          },
         });
-        
         // Get class information
         const classIds = [
-          ...participants.map(p => p.fromClass),
-          ...participants.map(p => p.toClass)
+          ...participants.map((p) => p.fromClass),
+          ...participants.map((p) => p.toClass),
         ];
         const classes = await prisma.class.findMany({
           where: { id: { in: classIds } },
-          select: { id: true, name: true, year: true }
+          select: { id: true, name: true, year: true },
         });
-        
-        const enrichedParticipants = participants.map(p => {
-          const user = users.find(u => u.id === p.userId);
-          const fromClass = classes.find(c => c.id === p.fromClass);
-          const toClass = classes.find(c => c.id === p.toClass);
-          
+
+        const enrichedParticipants = participants.map((p) => {
+          const user = users.find((u) => u.id === p.userId);
+          const fromClass = classes.find((c) => c.id === p.fromClass);
+          const toClass = classes.find((c) => c.id === p.toClass);
+
           return {
             ...p,
             user,
             fromClass,
-            toClass
+            toClass,
           };
         });
-        
-        return {
+
+        const result = {
           ...match,
-          participants: enrichedParticipants
+          participants: enrichedParticipants,
         };
+        return result;
       })
     );
 
-    return NextResponse.json(enrichedMatches);
+    const response = NextResponse.json(enrichedMatches);
+    // Prevent caching to ensure fresh data
+    response.headers.set(
+      "Cache-Control",
+      "no-cache, no-store, must-revalidate"
+    );
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+    return response;
   } catch (error) {
     console.error("Error fetching matches:", error);
     return NextResponse.json(

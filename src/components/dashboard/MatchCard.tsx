@@ -3,16 +3,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
 import { Badge } from "@/lib/components/ui/badge";
 import { Button } from "@/lib/components/ui/button";
-import { 
-  ArrowLeftRight, 
-  Package2, 
+import {
+  ArrowLeftRight,
+  Package2,
   Users,
   Calendar,
   ArrowRight,
   CheckCircle,
   Clock,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Phone,
+  PhoneOff,
+  Mail
 } from "lucide-react";
 import { ClientDate } from "@/components/ClientDate";
 
@@ -50,7 +53,7 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
     };
 
     const config = patternConfig[pattern as keyof typeof patternConfig] || patternConfig.DIRECT;
-    
+
     return (
       <Badge className={config.color} title={config.description}>
         {config.label}
@@ -101,7 +104,7 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {/* Current User Involvement */}
         {isCurrentUserInvolved(match.participants) && currentUserParticipation && (
@@ -128,11 +131,11 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
               Participantes ({match.participants.length})
             </p>
           </div>
-          
+
           <div className="space-y-2">
             {match.participants.map((participant: any, index: number) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`flex items-center justify-between p-3 rounded-lg border ${
                   participant.userId === currentUserId 
                     ? 'bg-primary/5 border-primary/20' 
@@ -150,9 +153,45 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
                       )}
                     </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {participant.user?.email}
-                  </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-3 w-3" />
+                      <span>{participant.user?.email}</span>
+                    </div>
+
+                    {participant.user?.phone ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-3 w-3" />
+                        <span>{participant.user.phone}</span>
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                          Share: {String(participant.user.sharePhoneOnMatch)}
+                        </Badge>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-red-500">
+                        No phone: {JSON.stringify(participant.user)}
+                      </div>
+                    )}
+
+                    {/* Show phone preference indicator for other users - only if phone is not already shown */}
+                    {participant.userId !== currentUserId && !(
+                      participant.user?.phone && participant.user?.sharePhoneOnMatch
+                    ) && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {participant.user?.sharePhoneOnMatch ? (
+                          <>
+                            <Phone className="h-3 w-3 text-green-600" />
+                            <span className="text-green-600">Partilha telefone (sem número)</span>
+                          </>
+                        ) : (
+                          <>
+                            <PhoneOff className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-400">Não partilha telefone</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-2 text-sm">
