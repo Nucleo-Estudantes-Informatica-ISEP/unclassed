@@ -8,7 +8,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
     <div className="flex size-full items-center justify-center">
       <div className="mx-8 grid min-h-[480px] max-w-4xl flex-1 grid-cols-1 flex-col items-center justify-center rounded-lg bg-white shadow-md dark:bg-zinc-900 md:grid-cols-2 lg:flex-row">
-        <div className="relative mx-auto mt-4 size-16 md:m-8 md:size-32">
+        <div className="relative mx-auto mt-8 size-32 md:mt-12 md:size-48 flex justify-center items-center">
           <Image
             aria-hidden="true"
             className="block dark:hidden"

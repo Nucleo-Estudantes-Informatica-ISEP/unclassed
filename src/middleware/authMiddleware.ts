@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import getServerSession from "@/services/getServerSession";
 
 export interface AuthenticatedRequest extends NextRequest {
@@ -29,7 +30,7 @@ export async function withAuth(
       requireAuth = true,
       requireAdmin = false,
       allowCronSecret = false,
-      rateLimitKey
+      rateLimitKey,
     } = options;
 
     try {
@@ -38,7 +39,10 @@ export async function withAuth(
         const rateLimitResult = await checkRateLimit(request, rateLimitKey);
         if (!rateLimitResult.allowed) {
           return NextResponse.json(
-            { error: "Rate limit exceeded", retryAfter: rateLimitResult.retryAfter },
+            {
+              error: "Rate limit exceeded",
+              retryAfter: rateLimitResult.retryAfter,
+            },
             { status: 429 }
           );
         }
@@ -47,8 +51,8 @@ export async function withAuth(
       // Check for cron secret authentication
       if (allowCronSecret) {
         const cronSecret = process.env.CRON_SECRET;
-        const authHeader = request.headers.get('authorization');
-        
+        const authHeader = request.headers.get("authorization");
+
         if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
           // Cron authentication successful, proceed without user auth
           return await handler(request as AuthenticatedRequest);
@@ -62,7 +66,7 @@ export async function withAuth(
 
       // Get user session
       const session = await getServerSession();
-      
+
       if (!session) {
         return NextResponse.json(
           { error: "Authentication required" },
@@ -84,11 +88,10 @@ export async function withAuth(
         id: session.id,
         email: session.email,
         name: session.name,
-        role: session.role as "USER" | "ADMIN"
+        role: session.role as "USER" | "ADMIN",
       };
 
       return await handler(authenticatedRequest);
-
     } catch (error) {
       console.error("Authentication middleware error:", error);
       return NextResponse.json(
@@ -105,7 +108,10 @@ export async function withAuth(
  */
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-async function checkRateLimit(request: NextRequest, key: string): Promise<{
+async function checkRateLimit(
+  request: NextRequest,
+  key: string
+): Promise<{
   allowed: boolean;
   retryAfter?: number;
 }> {
@@ -121,7 +127,7 @@ async function checkRateLimit(request: NextRequest, key: string): Promise<{
     // Reset or first request
     rateLimitStore.set(rateLimitKey, {
       count: 1,
-      resetTime: now + windowSize
+      resetTime: now + windowSize,
     });
     return { allowed: true };
   }
@@ -135,32 +141,32 @@ async function checkRateLimit(request: NextRequest, key: string): Promise<{
   // Increment counter
   current.count++;
   rateLimitStore.set(rateLimitKey, current);
-  
+
   return { allowed: true };
 }
 
 function getClientIdentifier(request: NextRequest): string {
   // Try to get real IP from various headers
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  
+  const forwarded = request.headers.get("x-forwarded-for");
+  const realIP = request.headers.get("x-real-ip");
+  const cfConnectingIP = request.headers.get("cf-connecting-ip");
+
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    return forwarded.split(",")[0].trim();
   }
-  
-  return realIP || cfConnectingIP || 'unknown';
+
+  return realIP || cfConnectingIP || "unknown";
 }
 
 function getMaxRequestsForKey(key: string): number {
   const limits: Record<string, number> = {
-    'matching': 10,      // 10 requests per minute for matching
-    'batch': 2,          // 2 requests per minute for batch processing
-    'stats': 30,         // 30 requests per minute for statistics
-    'create': 5,         // 5 requests per minute for creating swap requests
-    'default': 60        // Default rate limit
+    matching: 10, // 10 requests per minute for matching
+    batch: 2, // 2 requests per minute for batch processing
+    stats: 30, // 30 requests per minute for statistics
+    create: 5, // 5 requests per minute for creating swap requests
+    default: 60, // Default rate limit
   };
-  
+
   return limits[key] || limits.default;
 }
 
@@ -180,22 +186,28 @@ setInterval(() => {
  * Helper function to validate request origin
  */
 export function validateOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-  
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+
   // Allow requests from the same domain
   const allowedOrigins = [
     process.env.NEXTAUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000'
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
   ].filter(Boolean);
 
-  if (origin && allowedOrigins.some(allowed => allowed && origin.startsWith(allowed))) {
+  if (
+    origin &&
+    allowedOrigins.some((allowed) => allowed && origin.startsWith(allowed))
+  ) {
     return true;
   }
 
-  if (referer && allowedOrigins.some(allowed => allowed && referer.startsWith(allowed))) {
+  if (
+    referer &&
+    allowedOrigins.some((allowed) => allowed && referer.startsWith(allowed))
+  ) {
     return true;
   }
 
@@ -211,7 +223,10 @@ export async function withCSRF(
 ) {
   return async (request: AuthenticatedRequest): Promise<NextResponse> => {
     // Skip CSRF for GET requests and cron jobs
-    if (request.method === 'GET' || request.headers.get('user-agent')?.includes('cron')) {
+    if (
+      request.method === "GET" ||
+      request.headers.get("user-agent")?.includes("cron")
+    ) {
       return await handler(request);
     }
 

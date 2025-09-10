@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 
 interface MatchParticipant {
   userId: string;
-  fromClass: string;
-  toClass: string;
+  fromClass: string | { id: string; name: string; year: number };
+  toClass: string | { id: string; name: string; year: number };
   requestId: string;
   requestType: 'single' | 'bundle';
   satisfactionScore: number;
   status?: 'pending' | 'accepted' | 'rejected' | 'completed';
+  user?: { id: string; name: string; email: string; phone?: string | null; sharePhoneOnMatch?: boolean };
 }
 
 interface Match {
@@ -38,11 +39,11 @@ interface MatchListClientProps {
   badgeColor?: string;
 }
 
-export function MatchListClient({ 
-  matches, 
-  currentUserId, 
-  title, 
-  emptyMessage, 
+export function MatchListClient({
+  matches,
+  currentUserId,
+  title,
+  emptyMessage,
   showIcon = true,
   iconEmoji = "⚡",
   badgeColor = "blue"
@@ -76,7 +77,7 @@ export function MatchListClient({
         bg: 'bg-blue-100 text-blue-800'
       },
       green: {
-        text: 'text-green-600', 
+        text: 'text-green-600',
         bg: 'bg-green-100 text-green-800'
       },
       yellow: {

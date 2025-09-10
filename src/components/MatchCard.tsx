@@ -15,7 +15,7 @@ interface MatchParticipant {
   requestType: 'single' | 'bundle';
   satisfactionScore: number;
   status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  user?: { id: string; name: string; email: string; phone?: string; sharePhoneOnMatch?: boolean };
+  user?: { id: string; name: string; email: string; phone?: string | null; sharePhoneOnMatch?: boolean };
 }
 
 interface Match {
@@ -39,10 +39,10 @@ interface MatchCardProps {
 
 export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProps) {
   const [loading, setLoading] = useState(false);
-  
+
   const userParticipant = match.participants.find(p => p.userId === currentUserId);
   const isUserParticipant = !!userParticipant;
-  
+
   // Calculate time remaining for revocation
   const provisionalUntil = match.provisionalUntil ? new Date(match.provisionalUntil) : null;
   const now = new Date();
@@ -58,7 +58,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
     }
 
     setLoading(true);
-    
+
     try {
       const response = await fetch(`/api/matches/${match.id}`, {
         method: 'PATCH',
@@ -75,10 +75,10 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       }
 
       const result = await response.json();
-      
+
       toast.success(result.message);
       onMatchUpdate(match.id);
-      
+
     } catch (error) {
       console.error('Match action error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update match');
@@ -90,25 +90,25 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
   const getStatusBadge = () => {
     const statusClasses = {
       'PROPOSED': 'bg-gray-100 text-gray-800',
-      'PROVISIONAL': 'bg-yellow-100 text-yellow-800', 
+      'PROVISIONAL': 'bg-yellow-100 text-yellow-800',
       'ACCEPTED': 'bg-blue-100 text-blue-800',
       'COMPLETED': 'bg-green-100 text-green-800',
       'REJECTED': 'bg-red-100 text-red-800',
       'UPGRADED': 'bg-purple-100 text-purple-800'
     };
-    
+
     const statusText = {
       'PROPOSED': '📋 Proposto',
-      'PROVISIONAL': '⏳ Provisório', 
+      'PROVISIONAL': '⏳ Provisório',
       'ACCEPTED': '✅ Aceite',
       'COMPLETED': '🎉 Completo',
       'REJECTED': '❌ Rejeitado',
       'UPGRADED': '⬆️ Atualizado'
     };
-    
+
     const className = statusClasses[match.status as keyof typeof statusClasses] || 'bg-gray-100 text-gray-800';
     const text = statusText[match.status as keyof typeof statusText] || match.status;
-    
+
     return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>{text}</span>;
   };
 
@@ -126,9 +126,10 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
   };
 
   const renderParticipants = () => {
+    console.log(match.participants);
     return match.participants.map((participant, index) => {
       const isCurrentUser = participant.userId === currentUserId;
-      
+
       return (
         <div
           key={index}
@@ -190,7 +191,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
 
   const renderActionButtons = () => {
     if (!isUserParticipant) return null;
-    
+
     const userStatus = userParticipant?.status || 'pending';
 
     switch (match.status) {
@@ -293,7 +294,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
             {getPatternIcon()}
             <div>
               <h3 className="text-lg font-semibold">
-                {match.swapPattern === 'DIRECT' ? 'Permuta Direta' : 
+                {match.swapPattern === 'DIRECT' ? 'Permuta Direta' :
                  match.swapPattern === 'THREE_WAY' ? 'Permuta 3-Vias' :
                  match.swapPattern === 'MULTI_WAY' ? 'Permuta Múltipla' : match.swapPattern} {match.matchType === 'SINGLE' ? 'disciplina individual' : 'completa'}
               </h3>
@@ -308,22 +309,22 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
         </div>
         <div className="flex items-center justify-between mt-2">
           <span className="text-sm text-gray-600">
-            {match.participants.length} participantes • 
+            {match.participants.length} participantes •
             {Math.round(match.satisfactionScore * 100)}% satisfação
           </span>
-          <ClientDate 
-            date={match.createdAt} 
-            format="short" 
-            className="text-xs text-gray-500" 
+          <ClientDate
+            date={match.createdAt}
+            format="short"
+            className="text-xs text-gray-500"
           />
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-3">
           {renderParticipants()}
         </div>
-        
+
         {match.isProvisional && (
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-2 text-sm text-blue-800 mb-2">
@@ -348,7 +349,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           </div>
         )}
       </CardContent>
-      
+
       <CardFooter>
         {renderActionButtons()}
       </CardFooter>

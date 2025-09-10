@@ -29,12 +29,12 @@ const Home: React.FC = async () => {
             <span>Instituto Superior de Engenharia do Porto</span>
           </div>
         </div>
-        
+
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/login">
               <Button size="lg" className="w-full sm:w-auto">
-                Fazer Login
+                 Login
               </Button>
             </Link>
             <Link href="/register">
@@ -44,7 +44,7 @@ const Home: React.FC = async () => {
             </Link>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 max-w-4xl">
           <div className="text-center p-6">
             <div className="text-4xl mb-4">🔄</div>
