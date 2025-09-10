@@ -105,7 +105,7 @@ events {
 }
 
 http {
-    upstream unclassed_backend {
+    upstream app_backend {
 EOF
     
     for i in $(seq 1 $count); do
@@ -132,7 +132,7 @@ EOF
 
     server {
         listen 80;
-        server_name localhost;
+        server_name _; # Accept any server name
 
         # Basic security headers
         add_header X-Frame-Options DENY;
@@ -150,7 +150,7 @@ EOF
         location /api/ {
             limit_req zone=api burst=20 nodelay;
             
-            proxy_pass http://unclassed_backend;
+            proxy_pass http://app_backend;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection 'upgrade';
@@ -167,13 +167,13 @@ EOF
 
         # Static assets with caching
         location /static/ {
-            proxy_pass http://unclassed_backend;
+            proxy_pass http://app_backend;
             proxy_cache_valid 200 1d;
             add_header Cache-Control "public, immutable";
         }
 
         location /_next/static/ {
-            proxy_pass http://unclassed_backend;
+            proxy_pass http://app_backend;
             proxy_cache_valid 200 1y;
             add_header Cache-Control "public, immutable";
         }
@@ -182,7 +182,7 @@ EOF
         location / {
             limit_req zone=general burst=50 nodelay;
             
-            proxy_pass http://unclassed_backend;
+            proxy_pass http://app_backend;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection 'upgrade';
@@ -205,7 +205,7 @@ EOF
 
     echo -e "${GREEN}✅ Deployment completed!${NC}"
     echo "==============================================="
-    echo -e "🌐 Application: ${GREEN}http://localhost${NC}"
+    echo "🌐 Application: http://localhost:8080"
     echo -e "📊 Instances: ${GREEN}${count}${NC}"
     echo -e "🔧 Management: ${BLUE}docker-compose logs -f${NC}"
 }
