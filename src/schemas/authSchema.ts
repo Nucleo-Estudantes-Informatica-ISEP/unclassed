@@ -13,6 +13,7 @@ export const registerSchema = z.object({
   password: z.string().min(8, {
     message: "A password deve ter pelo menos 8 caracteres.",
   }),
+  sharePhoneOnMatch: z.boolean().default(false),
 });
 
 export const loginSchema = z.object({

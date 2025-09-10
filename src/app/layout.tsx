@@ -4,6 +4,7 @@ import { Toaster } from "@/lib/components/ui/sonner";
 
 import { cn } from "@/lib/utils";
 import Topbar from "@/components/Topbar";
+import { Footer } from "@/components/Footer";
 import { ThemeProvider } from "@/context/ThemeContext";
 
 import "./globals.css";
@@ -27,10 +28,13 @@ export default function RootLayout({
         className={cn("bg-background font-sans antialiased", inter.variable)}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Topbar />
-          <main className="size-full min-h-screen pt-[12vh] p-4">
-            {children}
-          </main>
+          <div className="flex flex-col min-h-screen">
+            <Topbar />
+            <main className="flex-grow pt-[12vh] p-4">
+              {children}
+            </main>
+            <Footer />
+          </div>
           <Toaster />
         </ThemeProvider>
       </body>

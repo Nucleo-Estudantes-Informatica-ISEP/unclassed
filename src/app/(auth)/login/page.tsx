@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -24,6 +25,16 @@ const Login: React.FC = () => {
   const formSchema = loginSchema;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message === 'email_verified') {
+      toast.success('✅ Email verificado com sucesso! Já podes fazer login.');
+    } else if (message === 'already_verified') {
+      toast.info('ℹ️ Email já estava verificado. Podes fazer login.');
+    }
+  }, [searchParams]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

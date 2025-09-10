@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         const userIds = participants.map(p => p.userId);
         const users = await prisma.user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true, phone: true, sharePhoneOnMatch: true }
         });
         
         // Get class information

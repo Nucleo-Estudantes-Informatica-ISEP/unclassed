@@ -21,6 +21,13 @@ const Home: React.FC = async () => {
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl">
             A plataforma que simplifica o processo de permutas de turma nos cursos de Informática do ISEP.
           </p>
+          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-2">
+            <span>🎓</span>
+            <span>Uma iniciativa do</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">NEI-ISEP</span>
+            <span>•</span>
+            <span>Instituto Superior de Engenharia do Porto</span>
+          </div>
         </div>
         
         <div className="space-y-4">

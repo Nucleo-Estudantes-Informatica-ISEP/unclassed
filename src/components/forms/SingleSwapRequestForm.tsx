@@ -51,7 +51,7 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
   const { data: classes, loading: classesLoading, error: classesError } = useClasses(selectedYear);
 
   // Get unique years from subjects
-  const years = subjects ? [...new Set(subjects.map(s => s.year))].sort() : [];
+  const years = subjects ? Array.from(new Set(subjects.map(s => s.year))).sort() : [];
 
   // Filter subjects by selected year
   const filteredSubjects = subjects?.filter(s => selectedYear ? s.year === selectedYear : true) || [];

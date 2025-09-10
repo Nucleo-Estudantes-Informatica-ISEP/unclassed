@@ -19,10 +19,17 @@ model User {
   email               String              @unique
   password            String
   phone               String?
+  emailVerified       Boolean             @default(false)
+  verificationToken   String?
+  verificationTokenExpiry DateTime?
+  emailNotifications  Boolean             @default(true) // Match notifications
+  sharePhoneOnMatch   Boolean             @default(false) // Share phone number with match partners
   createdAt           DateTime            @default(now())
   role                Role                @default(USER)
   singleSwapRequests  SingleSwapRequest[]
   bundleSwapRequests  BundleSwapRequest[]
+  
+  @@index([verificationToken])
 }
 
 model Subject {
@@ -137,6 +144,7 @@ enum RequestStatus {
   MATCHED
   CANCELLED
   EXPIRED
+  COMPLETED
 }
 
 enum MatchType {
@@ -185,4 +193,31 @@ enum MatchStatus {
   COMPLETED
   PROVISIONAL    // Temporary match, can be upgraded
   UPGRADED       // Was provisional, now replaced with better match
+}
+
+model CronExecution {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  jobId                 String    // Job identifier from CronScheduler
+  jobName               String    // Human-readable job name
+  startedAt             DateTime  @default(now())
+  completedAt           DateTime?
+  duration              Int?      // Duration in milliseconds
+  status                CronStatus @default(RUNNING)
+  processedPartitions   Int       @default(0)
+  matchesFound          Int       @default(0)
+  expiredMatches        Int       @default(0)
+  totalActiveRequests   Int       @default(0)
+  errors                String[]  @default([])
+  metadata              Json?     // Additional execution metadata
+  
+  @@index([startedAt])
+  @@index([status])
+  @@index([jobId])
+}
+
+enum CronStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  TIMEOUT
 }

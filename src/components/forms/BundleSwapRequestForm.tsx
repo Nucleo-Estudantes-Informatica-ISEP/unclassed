@@ -49,12 +49,12 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
   });
 
   const { data: allClasses, loading: classesLoading, error: classesError } = useClasses();
-  
+
   // Filter classes by selected year
   const classes = allClasses?.filter(c => selectedYear ? c.year === selectedYear : true) || [];
-  
+
   // Get unique years from classes
-  const years = allClasses ? [...new Set(allClasses.map(c => c.year))].sort() : [];
+  const years = allClasses ? Array.from(new Set(allClasses.map(c => c.year))).sort() : [];
 
   // Convert classes to options for ClassRankingSelector
   const classOptions = classes?.map(cls => ({
@@ -81,12 +81,12 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
 
       toast.success("Pedido de permuta completa criado com sucesso! Redirecionando para os matches...");
       form.reset();
-      
+
       // Redirect to matches page after a short delay to show the toast
       setTimeout(() => {
         router.push('/matches');
       }, 1500);
-      
+
       onSuccess?.();
     } catch (error) {
       console.error("Error creating bundle swap request:", error);
@@ -111,15 +111,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-            ℹ️ Sobre Permutas Completas
-          </h4>
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            Uma permuta completa permite-te trocar de turma em todas as disciplinas do ano académico. 
-            Isto é útil quando queres mudar completamente para uma turma diferente.
-          </p>
-        </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -160,8 +151,8 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Turma Atual</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
+                  <Select
+                    onValueChange={field.onChange}
                     value={field.value}
                     disabled={classesLoading || !selectedYear}
                   >
@@ -251,7 +242,7 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                   );
                 }
 
-                // Show no other classes message  
+                // Show no other classes message
                 if (currentClassId && availableClassOptions.length === 0) {
                   return (
                     <FormItem>
@@ -280,14 +271,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                         placeholder="Seleciona as turmas para as quais gostarias de mudar completamente"
                       />
                     </FormControl>
-                    <FormDescription>
-                      <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
-                        <p className="text-sm text-purple-800 dark:text-purple-200">
-                          <strong>💡 Permuta Completa:</strong> Mudará todas as tuas disciplinas para a turma selecionada.
-                          Ideal quando queres mudar completamente de horário ou ambiente de turma.
-                        </p>
-                      </div>
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 );
@@ -310,17 +293,17 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
 
             {/* Submit Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isSubmitting || classesLoading || !selectedYear}
                 className="flex-1"
               >
                 {isSubmitting ? "A criar..." : "Criar Pedido Completo"}
               </Button>
               {onCancel && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={onCancel}
                   disabled={isSubmitting}
                   className="flex-1 sm:flex-none"

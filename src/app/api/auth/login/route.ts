@@ -29,11 +29,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if email is verified
+    if (!found.emailVerified) {
+      return NextResponse.json(
+        { 
+          error: "Por favor verifica o teu email antes de fazer login.",
+          emailVerificationRequired: true,
+          email: found.email
+        },
+        { status: 401 }
+      );
+    }
+
     const { id, role } = found;
     const token = signJwt({ id, role });
     setCookie(token);
 
-    const sanitizedUser = exclude(found, ["password"]);
+    const sanitizedUser = exclude(found, ["password", "verificationToken"]);
 
     return NextResponse.json(sanitizedUser, { status: 200 });
   } catch (e) {

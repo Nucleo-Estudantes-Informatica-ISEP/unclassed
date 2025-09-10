@@ -6,17 +6,17 @@ import { Button } from '@/lib/components/ui/button';
 import { Card, CardContent } from '@/lib/components/ui/card';
 import { Switch } from '@/lib/components/ui/switch';
 import { Label } from '@/lib/components/ui/label';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/lib/components/ui/select';
-import { 
-  GripVertical, 
-  Plus, 
-  X, 
+import {
+  GripVertical,
+  Plus,
+  X,
   Shuffle,
   Trophy,
   Medal,
@@ -82,19 +82,19 @@ export function ClassRankingSelector({
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
-    
+
     if (draggedIndex === null || draggedIndex === dropIndex) return;
 
     const newValue = [...value];
     const draggedItem = newValue[draggedIndex];
-    
+
     // Remove dragged item
     newValue.splice(draggedIndex, 1);
-    
+
     // Insert at new position
     const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
     newValue.splice(insertIndex, 0, draggedItem);
-    
+
     onChange(newValue);
     setDraggedIndex(null);
     setDragOverIndex(null);
@@ -112,7 +112,7 @@ export function ClassRankingSelector({
 
   const getRankIcon = (index: number) => {
     if (!orderMatters) return <Shuffle className="h-4 w-4" />;
-    
+
     switch (index) {
       case 0: return <Trophy className="h-4 w-4 text-yellow-500" />;
       case 1: return <Medal className="h-4 w-4 text-gray-400" />;
@@ -123,12 +123,12 @@ export function ClassRankingSelector({
 
   const getRankText = (index: number) => {
     if (!orderMatters) return "Qualquer ordem";
-    
+
     switch (index) {
-      case 0: return "1ª Escolha - 100% satisfação";
-      case 1: return "2ª Escolha - 85% satisfação";
-      case 2: return "3ª Escolha - 70% satisfação";
-      default: return `${index + 1}ª Escolha - ${Math.max(40, 70 - (index - 2) * 10)}% satisfação`;
+      case 0: return "1ª Escolha";
+      case 1: return "2ª Escolha";
+      case 2: return "3ª Escolha";
+      default: return `${index + 1}ª Escolha`;
     }
   };
 
@@ -147,8 +147,8 @@ export function ClassRankingSelector({
             A ordem de preferência importa
           </Label>
           <p className="text-xs text-muted-foreground">
-            {orderMatters 
-              ? "As turmas serão priorizadas pela ordem que escolheres" 
+            {orderMatters
+              ? "As turmas serão priorizadas pela ordem que escolheres"
               : "Todas as turmas têm igual prioridade - qualquer uma serve"
             }
           </p>
@@ -194,7 +194,7 @@ export function ClassRankingSelector({
               {selectedOptions.length} turma{selectedOptions.length !== 1 ? 's' : ''}
             </Badge>
           </div>
-          
+
           <div className="space-y-2">
             {selectedOptions.map((option, index) => (
               <Card
@@ -220,12 +220,12 @@ export function ClassRankingSelector({
                     )}
                     {getRankIcon(index)}
                   </div>
-                  
+
                   {/* Class Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-lg">{option.name}</span>
-                      <Badge 
+                      <Badge
                         variant={orderMatters ? (index === 0 ? "default" : "secondary") : "outline"}
                         className="text-xs"
                       >
@@ -233,7 +233,7 @@ export function ClassRankingSelector({
                       </Badge>
                     </div>
                   </div>
-                  
+
                   {/* Remove Button */}
                   <Button
                     variant="ghost"

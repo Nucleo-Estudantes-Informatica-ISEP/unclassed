@@ -20,6 +20,11 @@ export default function UserMenu({ user }: UserMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
 
+  const handleProfile = () => {
+    setShowMenu(false);
+    router.push("/profile");
+  };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     
@@ -73,7 +78,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           <span className="text-xs text-muted-foreground">{user.email}</span>
         </div>
         {user.role === "ADMIN" && (
-          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+          <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-2 py-1 rounded-full">
             Admin
           </span>
         )}
@@ -81,15 +86,15 @@ export default function UserMenu({ user }: UserMenuProps) {
       
       {/* Simple Dropdown Menu */}
       {showMenu && (
-        <div className="absolute right-0 top-12 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          <div className="p-3 border-b">
+        <div className="absolute right-0 top-12 w-64 bg-background border border-border rounded-lg shadow-lg z-50">
+          <div className="p-3 border-b border-border">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{user.name}</p>
+              <p className="text-sm font-medium leading-none text-foreground">{user.name}</p>
               <p className="text-xs leading-none text-muted-foreground">
                 {user.email}
               </p>
               {user.role === "ADMIN" && (
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full w-fit">
+                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-2 py-1 rounded-full w-fit">
                   Admin
                 </span>
               )}
@@ -97,7 +102,10 @@ export default function UserMenu({ user }: UserMenuProps) {
           </div>
           
           <div className="p-2">
-            <button className="flex items-center w-full px-2 py-2 text-sm hover:bg-gray-100 rounded cursor-pointer">
+            <button 
+              onClick={handleProfile}
+              className="flex items-center w-full px-2 py-2 text-sm text-foreground hover:bg-muted rounded cursor-pointer"
+            >
               <User className="mr-2 h-4 w-4" />
               <span>Perfil</span>
             </button>
@@ -105,7 +113,7 @@ export default function UserMenu({ user }: UserMenuProps) {
             <button 
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="flex items-center w-full px-2 py-2 text-sm text-red-600 hover:bg-red-50 rounded cursor-pointer"
+              className="flex items-center w-full px-2 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded cursor-pointer"
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>{isLoggingOut ? "A sair..." : "Sair"}</span>

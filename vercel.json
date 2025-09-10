@@ -4,16 +4,6 @@
       "maxDuration": 300
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/batch-matching",
-      "schedule": "*/15 8-22 * * 1-5"
-    },
-    {
-      "path": "/api/cron/batch-matching",
-      "schedule": "0 10,14,18 * * 6,0"
-    }
-  ],
   "env": {
     "CRON_SECRET": "@cron-secret"
   }

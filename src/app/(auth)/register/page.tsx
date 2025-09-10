@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from "@/lib/components/ui/form";
 import { Input } from "@/lib/components/ui/input";
+import { Checkbox } from "@/lib/components/ui/checkbox";
 import { registerSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
@@ -31,6 +32,7 @@ const Register: React.FC = () => {
       email: "",
       phone: "",
       password: "",
+      sharePhoneOnMatch: false,
     },
     mode: "onChange",
   });
@@ -48,7 +50,11 @@ const Register: React.FC = () => {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Conta criada com sucesso! Agora podes fazer login.");
+        if (data.message) {
+          toast.success(data.message);
+        } else {
+          toast.success("Conta criada com sucesso! Verifica o teu email para ativar a conta.");
+        }
         router.push("/login");
       } else {
         toast.error(data.error || "Erro ao criar conta");
@@ -129,6 +135,28 @@ const Register: React.FC = () => {
                 A tua password deve ter pelo menos 8 caracteres.
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="sharePhoneOnMatch"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Partilhar número de telemóvel quando há match
+                </FormLabel>
+                <FormDescription>
+                  Consentes que o teu número de telemóvel seja partilhado com outros estudantes quando há um match para facilitar a comunicação. Esta opção pode ser alterada no teu perfil.
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />
