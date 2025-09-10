@@ -1,4 +1,6 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
+import { PrismaClient } from "@prisma/client";
+import { getCache, CacheKeys } from "./cache";
 
 interface ScheduledJob {
   id: string;
@@ -20,6 +22,20 @@ export class CronScheduler {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private isStarted = false;
   private matchingService = new AdvancedMatchingService();
+  private prisma = new PrismaClient();
+
+  /**
+   * Invalidate admin cron cache when job states change
+   */
+  private invalidateAdminCache() {
+    try {
+      const cache = getCache();
+      cache.deletePattern('admin:cron:.*');
+      console.log('🗑️ Invalidated admin cron cache after job execution');
+    } catch (error) {
+      console.warn('Failed to invalidate admin cache:', error);
+    }
+  }
 
   constructor() {
     this.registerDefaultJobs();
@@ -72,45 +88,45 @@ export class CronScheduler {
    * Register default matching jobs
    */
   private registerDefaultJobs() {
-    // High frequency batch processing (weekdays 8-22)
+    // Get schedules from environment variables with fallbacks
+    const batchSchedule = process.env.CRON_BATCH_MATCHING || '*/5 * * * *';
+    const cleanupSchedule = process.env.CRON_PROVISIONAL_CLEANUP || '*/30 * * * *';
+    const healthCheckSchedule = process.env.CRON_HEALTH_CHECK || '0 * * * *';
+
+    // Batch processing
     this.addJob({
-      id: 'batch-matching-high-freq',
-      name: 'Batch Matching (High Frequency)',
-      schedule: '*/15 8-22 * * 1-5', // Every 15 minutes, 8AM-10PM, Mon-Fri
+      id: 'batch-matching',
+      name: 'Batch Matching',
+      schedule: batchSchedule,
       handler: this.runBatchMatching.bind(this),
       enabled: true,
       isRunning: false
     });
 
-    // Low frequency batch processing (weekends)
-    this.addJob({
-      id: 'batch-matching-low-freq',
-      name: 'Batch Matching (Low Frequency)',
-      schedule: '0 10,14,18 * * 6,0', // 10AM, 2PM, 6PM on weekends
-      handler: this.runBatchMatching.bind(this),
-      enabled: true,
-      isRunning: false
-    });
-
-    // Provisional match cleanup (every 30 minutes)
+    // Provisional match cleanup
     this.addJob({
       id: 'provisional-cleanup',
       name: 'Provisional Match Cleanup',
-      schedule: '*/30 * * * *', // Every 30 minutes
+      schedule: cleanupSchedule,
       handler: this.cleanupProvisionalMatches.bind(this),
       enabled: true,
       isRunning: false
     });
 
-    // System health check (every hour)
+    // System health check
     this.addJob({
       id: 'health-check',
       name: 'System Health Check',
-      schedule: '0 * * * *', // Every hour
+      schedule: healthCheckSchedule,
       handler: this.runHealthCheck.bind(this),
       enabled: true,
       isRunning: false
     });
+
+    console.log(`🕐 Cron schedules configured:`);
+    console.log(`  - Batch Matching: ${batchSchedule}`);
+    console.log(`  - Provisional Cleanup: ${cleanupSchedule}`);
+    console.log(`  - Health Check: ${healthCheckSchedule}`);
   }
 
   /**
@@ -193,13 +209,55 @@ export class CronScheduler {
     
     console.log(`🔄 Running job: ${job.name}`);
     const startTime = Date.now();
+    
+    // Create execution record
+    let executionRecord;
+    try {
+      executionRecord = await this.prisma.cronExecution.create({
+        data: {
+          jobId: job.id,
+          jobName: job.name,
+          startedAt: new Date(),
+          status: 'RUNNING'
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to create cron execution record:', error);
+    }
 
     try {
-      await job.handler();
+      const result = await job.handler();
       const duration = Date.now() - startTime;
       console.log(`✅ Job '${job.name}' completed in ${duration}ms`);
+      
+      // Update execution record with success
+      if (executionRecord) {
+        await this.updateExecutionRecord(executionRecord.id, {
+          completedAt: new Date(),
+          duration,
+          status: 'COMPLETED',
+          ...(result || {})
+        });
+      }
+      
+      // Invalidate admin cache after successful job completion
+      this.invalidateAdminCache();
     } catch (error) {
+      const duration = Date.now() - startTime;
       console.error(`❌ Job '${job.name}' failed:`, error);
+      
+      // Update execution record with failure
+      if (executionRecord) {
+        await this.updateExecutionRecord(executionRecord.id, {
+          completedAt: new Date(),
+          duration,
+          status: 'FAILED',
+          errors: [error instanceof Error ? error.message : String(error)]
+        });
+      }
+      
+      // Invalidate admin cache after job failure too
+      this.invalidateAdminCache();
     } finally {
       job.isRunning = false;
     }
@@ -216,14 +274,9 @@ export class CronScheduler {
     // Simple implementation for common patterns
     // For a full implementation, use a library like 'node-cron'
     
-    if (cronExpression === '*/15 8-22 * * 1-5') {
-      // Every 15 minutes, 8AM-10PM, Mon-Fri
-      return this.getNextWeekdayRun(now, [8, 22], 15);
-    }
-    
-    if (cronExpression === '0 10,14,18 * * 6,0') {
-      // 10AM, 2PM, 6PM on weekends
-      return this.getNextWeekendRun(now, [10, 14, 18]);
+    if (cronExpression === '*/5 * * * *') {
+      // Every 5 minutes
+      return this.getNextInterval(now, 5);
     }
     
     if (cronExpression === '*/30 * * * *') {
@@ -323,49 +376,105 @@ export class CronScheduler {
   }
 
   /**
+   * Helper method to update execution record
+   */
+  private async updateExecutionRecord(executionId: string, data: any) {
+    try {
+      await this.prisma.cronExecution.update({
+        where: { id: executionId },
+        data
+      });
+    } catch (error) {
+      console.warn('Failed to update cron execution record:', error);
+    }
+  }
+
+  /**
    * Job handlers
    */
-  private async runBatchMatching(): Promise<void> {
+  private async runBatchMatching(): Promise<any> {
     try {
+      // Get initial active request count
+      const totalActiveRequests = await this.prisma.singleSwapRequest.count({ where: { status: 'ACTIVE' } }) +
+                                  await this.prisma.bundleSwapRequest.count({ where: { status: 'ACTIVE' } });
+      
       const results = await this.matchingService.runBatchProcessing();
       console.log(`🔄 Batch matching completed: ${results.matchesFound} matches found, ${results.processedPartitions} partitions processed`);
       
       if (results.errors.length > 0) {
         console.warn("⚠️ Batch matching errors:", results.errors);
       }
+      
+      // Return execution statistics
+      return {
+        processedPartitions: results.processedPartitions,
+        matchesFound: results.matchesFound,
+        expiredMatches: 0, // Will be updated by cleanup job
+        totalActiveRequests,
+        errors: results.errors
+      };
     } catch (error) {
       console.error("❌ Batch matching failed:", error);
       throw error;
     }
   }
 
-  private async cleanupProvisionalMatches(): Promise<void> {
+  private async cleanupProvisionalMatches(): Promise<any> {
     try {
       const expiredCount = await this.matchingService.expireProvisionalMatches();
       if (expiredCount > 0) {
         console.log(`🧹 Expired ${expiredCount} provisional matches`);
       }
+      
+      return {
+        processedPartitions: 0,
+        matchesFound: 0,
+        expiredMatches: expiredCount,
+        totalActiveRequests: await this.prisma.singleSwapRequest.count({ where: { status: 'ACTIVE' } }) +
+                            await this.prisma.bundleSwapRequest.count({ where: { status: 'ACTIVE' } }),
+        errors: []
+      };
     } catch (error) {
       console.error("❌ Provisional cleanup failed:", error);
       throw error;
     }
   }
 
-  private async runHealthCheck(): Promise<void> {
+  private async runHealthCheck(): Promise<any> {
     try {
       const stats = await this.matchingService.getAdvancedStats();
       console.log(`💓 Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`);
       
+      const warnings = [];
+      
       // Log warnings for concerning metrics
       if (stats.averageProcessingTime > 10000) {
-        console.warn(`⚠️ High processing time: ${stats.averageProcessingTime}ms`);
+        const warning = `High processing time: ${stats.averageProcessingTime}ms`;
+        console.warn(`⚠️ ${warning}`);
+        warnings.push(warning);
       }
       
       if (stats.averageSatisfactionScore < 0.5) {
-        console.warn(`⚠️ Low satisfaction score: ${stats.averageSatisfactionScore}`);
+        const warning = `Low satisfaction score: ${stats.averageSatisfactionScore}`;
+        console.warn(`⚠️ ${warning}`);
+        warnings.push(warning);
       }
+      
+      return {
+        processedPartitions: stats.activePartitions,
+        matchesFound: 0,
+        expiredMatches: 0,
+        totalActiveRequests: stats.totalActiveRequests,
+        errors: warnings,
+        metadata: {
+          averageProcessingTime: stats.averageProcessingTime,
+          averageSatisfactionScore: stats.averageSatisfactionScore,
+          totalPartitions: stats.partitions
+        }
+      };
     } catch (error) {
       console.error("❌ Health check failed:", error);
+      throw error;
     }
   }
 
@@ -377,6 +486,94 @@ export class CronScheduler {
     }, 3600000); // 1 hour
 
     this.intervals.set('cleanup', cleanupInterval);
+  }
+
+  /**
+   * Get cron execution history
+   */
+  async getExecutionHistory(limit: number = 50): Promise<any[]> {
+    try {
+      return await this.prisma.cronExecution.findMany({
+        orderBy: { startedAt: 'desc' },
+        take: limit
+      });
+    } catch (error) {
+      console.error('Failed to get execution history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get cron statistics
+   */
+  async getCronStats(): Promise<any> {
+    try {
+      const now = new Date();
+      const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [recentExecutions, last24hExecutions, lastWeekExecutions, lastExecution] = await Promise.all([
+        this.prisma.cronExecution.findMany({
+          where: { startedAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) } }, // Last hour
+          orderBy: { startedAt: 'desc' }
+        }),
+        this.prisma.cronExecution.findMany({
+          where: { startedAt: { gte: last24Hours } }
+        }),
+        this.prisma.cronExecution.findMany({
+          where: { startedAt: { gte: lastWeek } }
+        }),
+        this.prisma.cronExecution.findFirst({
+          where: { status: 'COMPLETED' },
+          orderBy: { completedAt: 'desc' }
+        })
+      ]);
+
+      const completedLast24h = last24hExecutions.filter(e => e.status === 'COMPLETED');
+      const failedLast24h = last24hExecutions.filter(e => e.status === 'FAILED');
+
+      const totalMatches24h = completedLast24h.reduce((sum, e) => sum + e.matchesFound, 0);
+      const totalExpired24h = completedLast24h.reduce((sum, e) => sum + e.expiredMatches, 0);
+      const avgDuration = completedLast24h.length > 0 
+        ? completedLast24h.reduce((sum, e) => sum + (e.duration || 0), 0) / completedLast24h.length 
+        : 0;
+
+      return {
+        lastRunTime: lastExecution?.completedAt || lastExecution?.startedAt,
+        totalExecutions24h: last24hExecutions.length,
+        successfulExecutions24h: completedLast24h.length,
+        failedExecutions24h: failedLast24h.length,
+        totalMatchesFound24h: totalMatches24h,
+        totalExpiredMatches24h: totalExpired24h,
+        averageExecutionTime: Math.round(avgDuration),
+        successRate24h: last24hExecutions.length > 0 ? (completedLast24h.length / last24hExecutions.length) : 0,
+        recentExecutions: recentExecutions.slice(0, 10),
+        isRunning: recentExecutions.some(e => e.status === 'RUNNING'),
+        schedulerStatus: this.isStarted ? 'RUNNING' : 'STOPPED',
+        activeJobs: Array.from(this.jobs.values()).filter(j => j.enabled).length,
+        nextScheduledRuns: Array.from(this.jobs.values())
+          .filter(j => j.enabled && j.nextRun)
+          .map(j => ({ jobName: j.name, nextRun: j.nextRun }))
+          .sort((a, b) => (a.nextRun?.getTime() || 0) - (b.nextRun?.getTime() || 0))
+      };
+    } catch (error) {
+      console.error('Failed to get cron stats:', error);
+      return {
+        lastRunTime: null,
+        totalExecutions24h: 0,
+        successfulExecutions24h: 0,
+        failedExecutions24h: 0,
+        totalMatchesFound24h: 0,
+        totalExpiredMatches24h: 0,
+        averageExecutionTime: 0,
+        successRate24h: 0,
+        recentExecutions: [],
+        isRunning: false,
+        schedulerStatus: this.isStarted ? 'RUNNING' : 'STOPPED',
+        activeJobs: 0,
+        nextScheduledRuns: []
+      };
+    }
   }
 
   /**
