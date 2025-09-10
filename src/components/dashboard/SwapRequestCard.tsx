@@ -119,7 +119,7 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
               {type === 'single' ? (
                 <ArrowLeftRight className={`h-5 w-5 ${type === 'single' ? 'text-blue-600' : 'text-green-600'}`} />
               ) : (
-                <Package2 className={`h-5 w-5 ${type === 'single' ? 'text-blue-600' : 'text-green-600'}`} />
+                <Package2 className={`h-5 w-5 ${type === 'bundle' ? 'text-green-600' : 'text-blue-600'}`} />
               )}
             </div>
             <div>

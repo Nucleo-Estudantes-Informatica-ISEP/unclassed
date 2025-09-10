@@ -15,16 +15,16 @@ interface MatchParticipant {
   requestType: 'single' | 'bundle';
   satisfactionScore: number;
   status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  user?: { id: string; name: string; email: string };
+  user?: { id: string; name: string; email: string; phone?: string; sharePhoneOnMatch?: boolean };
 }
 
 interface Match {
   id: string;
   matchType: 'SINGLE' | 'BUNDLE';
   swapPattern: 'DIRECT' | 'THREE_WAY' | 'MULTI_WAY';
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'PROVISIONAL';
+  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'PROVISIONAL' | 'UPGRADED';
   isProvisional: boolean;
-  provisionalUntil?: string;
+  provisionalUntil?: string | null;
   satisfactionScore: number;
   participants: MatchParticipant[];
   createdAt: string;
@@ -93,7 +93,8 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       'PROVISIONAL': 'bg-yellow-100 text-yellow-800', 
       'ACCEPTED': 'bg-blue-100 text-blue-800',
       'COMPLETED': 'bg-green-100 text-green-800',
-      'REJECTED': 'bg-red-100 text-red-800'
+      'REJECTED': 'bg-red-100 text-red-800',
+      'UPGRADED': 'bg-purple-100 text-purple-800'
     };
     
     const statusText = {
@@ -101,7 +102,8 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       'PROVISIONAL': '⏳ Provisório', 
       'ACCEPTED': '✅ Aceite',
       'COMPLETED': '🎉 Completo',
-      'REJECTED': '❌ Rejeitado'
+      'REJECTED': '❌ Rejeitado',
+      'UPGRADED': '⬆️ Atualizado'
     };
     
     const className = statusClasses[match.status as keyof typeof statusClasses] || 'bg-gray-100 text-gray-800';
@@ -130,11 +132,11 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       return (
         <div
           key={index}
-          className={`p-4 rounded-lg border ${isCurrentUser ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}
+          className={`p-4 rounded-lg border ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-muted border-border'}`}
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="font-semibold text-base text-gray-900">
+              <p className="font-semibold text-base text-foreground">
                 {participant.user?.name || `Utilizador ${participant.userId.slice(-4)}`}
               </p>
               {participant.status && (
@@ -143,22 +145,43 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-600">
-              <span className="bg-white px-2 py-1 rounded border">
-                De: <span className="font-medium text-gray-800">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="bg-background px-2 py-1 rounded border border-border">
+                De: <span className="font-medium text-foreground">
                   {typeof participant.fromClass === 'object' ? participant.fromClass.name : participant.fromClass}
                 </span>
               </span>
-              <span className="text-gray-400">→</span>
-              <span className="bg-white px-2 py-1 rounded border">
-                Para: <span className="font-medium text-gray-800">
+              <span className="text-muted-foreground">→</span>
+              <span className="bg-background px-2 py-1 rounded border border-border">
+                Para: <span className="font-medium text-foreground">
                   {typeof participant.toClass === 'object' ? participant.toClass.name : participant.toClass}
                 </span>
               </span>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Satisfação: {Math.round(participant.satisfactionScore * 100)}%
             </p>
+            {/* Contact Information */}
+            {!isCurrentUser && participant.user && match.status === 'ACCEPTED' && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-xs font-medium text-foreground mb-1">📞 Contacto:</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    📧 {participant.user.email}
+                  </p>
+                  {participant.user.sharePhoneOnMatch && participant.user.phone && (
+                    <p className="text-xs text-muted-foreground">
+                      📱 {participant.user.phone}
+                    </p>
+                  )}
+                  {!participant.user.sharePhoneOnMatch && (
+                    <p className="text-xs text-muted-foreground italic">
+                      📱 Telemóvel não partilhado
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

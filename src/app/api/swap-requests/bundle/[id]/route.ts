@@ -109,7 +109,7 @@ export async function PUT(
 
       // Verify all classes are from the same year as current class
       const allClasses = [existingRequest.currentClass, ...preferredClasses];
-      const years = [...new Set(allClasses.map(c => c.year))];
+      const years = Array.from(new Set(allClasses.map(c => c.year)));
       if (years.length > 1) {
         return NextResponse.json(
           { error: "All classes must be from the same academic year" },

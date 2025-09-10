@@ -169,7 +169,7 @@ function getMaxRequestsForKey(key: string): number {
  */
 setInterval(() => {
   const now = Date.now();
-  for (const [key, value] of rateLimitStore.entries()) {
+  for (const [key, value] of Array.from(rateLimitStore.entries())) {
     if (now > value.resetTime) {
       rateLimitStore.delete(key);
     }
@@ -191,11 +191,11 @@ export function validateOrigin(request: NextRequest): boolean {
     'http://127.0.0.1:3000'
   ].filter(Boolean);
 
-  if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+  if (origin && allowedOrigins.some(allowed => allowed && origin.startsWith(allowed))) {
     return true;
   }
 
-  if (referer && allowedOrigins.some(allowed => referer.startsWith(allowed))) {
+  if (referer && allowedOrigins.some(allowed => allowed && referer.startsWith(allowed))) {
     return true;
   }
 

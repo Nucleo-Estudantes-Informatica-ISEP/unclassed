@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import getServerSession from '@/services/getServerSession';
 import { AdvancedMatchingService } from '@/services/advancedMatchingService';
 import prisma from '@/lib/prisma';
+import { emailService } from '@/services/emailService';
 
 /**
  * GET /api/matches/[matchId]
@@ -25,10 +26,7 @@ export async function GET(
     }
 
     const match = await prisma.match.findUnique({
-      where: { id: params.matchId },
-      include: {
-        // Get participant details
-      }
+      where: { id: params.matchId }
     });
 
     if (!match) {
@@ -163,6 +161,9 @@ async function handleMatchAccept(match: any, userId: string) {
 
   console.log(`✅ User ${userId} accepted match ${match.id}`);
   
+  // Send notification to other participants
+  await notifyMatchStatusUpdate(match, 'accept', userId);
+  
   if (allAccepted) {
     console.log(`🎉 All participants accepted match ${match.id} - moving to ACCEPTED status`);
   }
@@ -190,6 +191,9 @@ async function handleMatchReject(match: any, userId: string, matchingService: Ad
     }
   });
 
+  // Send notification to other participants
+  await notifyMatchStatusUpdate(match, 'reject', userId);
+  
   // CRITICAL: Reactivate all participant requests
   await reactivateRequestsFromMatch(match);
   
@@ -226,6 +230,9 @@ async function handleMatchComplete(match: any, userId: string, matchingService: 
     }
   });
 
+  // Send notification to other participants
+  await notifyMatchStatusUpdate(match, 'complete', userId);
+  
   if (allCompleted) {
     console.log(`🎊 Match ${match.id} fully completed - removing from graph permanently`);
     
@@ -278,6 +285,9 @@ async function handleMatchRevoke(match: any, userId: string, matchingService: Ad
     }
   });
 
+  // Send notification to other participants
+  await notifyMatchStatusUpdate(match, 'revoke', userId);
+  
   // CRITICAL: Reactivate all participant requests
   await reactivateRequestsFromMatch(match);
   
@@ -363,7 +373,7 @@ async function updateGraphPartitionsFromMatch(match: any, matchingService: Advan
   const affectedPartitions = new Set([match.graphPartition]);
   
   // Update request counts for affected partitions
-  for (const partitionKey of affectedPartitions) {
+  for (const partitionKey of Array.from(affectedPartitions)) {
     await updatePartitionRequestCount(partitionKey);
   }
 }
@@ -410,5 +420,50 @@ function getActionMessage(action: string): string {
       return '🔄 Match revoked. Your request is active again.';
     default:
       return 'Action completed.';
+  }
+}
+
+/**
+ * Send status update emails to all participants
+ */
+async function notifyMatchStatusUpdate(match: any, action: string, userId: string) {
+  try {
+    // Get all participant user details
+    const participantIds = match.participants.map((p: any) => p.userId);
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: participantIds },
+        emailVerified: true,
+        emailNotifications: true
+      }
+    });
+    
+    const actionUser = users.find(u => u.id === userId);
+    const actionUserName = actionUser ? actionUser.name : 'Um utilizador';
+    
+    const statusMessages = {
+      'accept': `${actionUserName} aceitou o match`,
+      'reject': `${actionUserName} rejeitou o match`,
+      'complete': `${actionUserName} completou o match`,
+      'revoke': `${actionUserName} cancelou o match`
+    };
+    
+    const statusDetails = statusMessages[action as keyof typeof statusMessages] || 'Estado do match atualizado';
+    
+    // Send notification to other participants (not the one who performed the action)
+    for (const user of users) {
+      if (user.id !== userId) {
+        await emailService.sendMatchStatusUpdate(
+          user.email,
+          user.name,
+          match.id,
+          action.toUpperCase(),
+          statusDetails
+        );
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error sending match status notifications:', error);
   }
 }

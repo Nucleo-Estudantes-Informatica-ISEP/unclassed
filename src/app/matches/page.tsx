@@ -127,6 +127,8 @@ export default async function MatchesPage() {
               <MatchListClient
                 matches={activeMatches.map((match) => ({
                   ...match,
+                  satisfactionScore: match.satisfactionScore ?? 0,
+                  subject: match.subject || undefined,
                   createdAt: match.createdAt.toISOString(),
                   updatedAt: match.updatedAt.toISOString(),
                   provisionalUntil: match.provisionalUntil?.toISOString() || null
@@ -146,6 +148,8 @@ export default async function MatchesPage() {
               <MatchListClient
                 matches={completedMatches.map((match) => ({
                   ...match,
+                  satisfactionScore: match.satisfactionScore ?? 0,
+                  subject: match.subject || undefined,
                   createdAt: match.createdAt.toISOString(),
                   updatedAt: match.updatedAt.toISOString(),
                   provisionalUntil: match.provisionalUntil?.toISOString() || null
