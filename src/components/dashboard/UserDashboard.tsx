@@ -21,6 +21,7 @@ import {
   Users
 } from "lucide-react";
 import { ClientDate } from "@/components/ClientDate";
+import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
 
 import { useSingleSwapRequests, useBundleSwapRequests, useMatches } from "@/hooks/useApi";
 
@@ -205,10 +206,13 @@ export default function UserDashboard({ userId, userRole }: UserDashboardProps) 
         </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${userRole === 'ADMIN' ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="requests">Pedidos</TabsTrigger>
             <TabsTrigger value="matches">Matches</TabsTrigger>
+            {userRole === 'ADMIN' && (
+              <TabsTrigger value="admin">Admin Dashboard</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -546,6 +550,13 @@ export default function UserDashboard({ userId, userRole }: UserDashboardProps) 
               </Card>
             )}
           </TabsContent>
+
+          {/* Admin Dashboard Tab */}
+          {userRole === 'ADMIN' && (
+            <TabsContent value="admin" className="space-y-6">
+              <AdvancedMatchingDashboard />
+            </TabsContent>
+          )}
 
         </Tabs>
       </div>

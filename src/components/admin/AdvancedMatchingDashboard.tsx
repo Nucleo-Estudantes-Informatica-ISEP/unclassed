@@ -19,8 +19,8 @@ import {
   Play,
   Pause,
   Settings,
-  BarChart3,
-  Timer
+  ArrowLeftRight,
+  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,8 +53,41 @@ interface BatchResult {
   message: string;
 }
 
+interface CronStats {
+  lastRunTime: string | null;
+  totalExecutions24h: number;
+  successfulExecutions24h: number;
+  failedExecutions24h: number;
+  totalMatchesFound24h: number;
+  totalExpiredMatches24h: number;
+  averageExecutionTime: number;
+  successRate24h: number;
+  recentExecutions: CronExecution[];
+  isRunning: boolean;
+  schedulerStatus: string;
+  activeJobs: number;
+  nextScheduledRuns: { jobName: string; nextRun: Date | null }[];
+}
+
+interface CronExecution {
+  id: string;
+  jobId: string;
+  jobName: string;
+  startedAt: string;
+  completedAt: string | null;
+  duration: number | null;
+  status: string;
+  processedPartitions: number;
+  matchesFound: number;
+  expiredMatches: number;
+  totalActiveRequests: number;
+  errors: string[];
+}
+
 export default function AdvancedMatchingDashboard() {
   const [stats, setStats] = useState<MatchingStats | null>(null);
+  const [cronStats, setCronStats] = useState<CronStats | null>(null);
+  const [cronHistory, setCronHistory] = useState<CronExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningBatch, setRunningBatch] = useState(false);
   const [lastBatchResult, setLastBatchResult] = useState<BatchResult | null>(null);
@@ -79,17 +112,29 @@ export default function AdvancedMatchingDashboard() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/matching');
-      const data = await response.json();
+      const [matchingResponse, cronResponse] = await Promise.all([
+        fetch('/api/matching'),
+        fetch('/api/admin/cron')
+      ]);
       
-      if (data.success) {
-        setStats(data);
+      const matchingData = await matchingResponse.json();
+      const cronData = await cronResponse.json();
+      
+      if (matchingData.success) {
+        setStats(matchingData);
       } else {
         toast.error('Failed to load matching statistics');
       }
+      
+      if (cronData.success) {
+        setCronStats(cronData.cronStats);
+        setCronHistory(cronData.executionHistory);
+      } else {
+        console.warn('Failed to load cron statistics:', cronData.error);
+      }
     } catch (error) {
       console.error('Error loading stats:', error);
-      toast.error('Error loading matching statistics');
+      toast.error('Error loading statistics');
     } finally {
       setLoading(false);
     }
@@ -185,8 +230,9 @@ export default function AdvancedMatchingDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="cron">Cron Monitor</TabsTrigger>
             <TabsTrigger value="partitions">Graph Partitions</TabsTrigger>
             <TabsTrigger value="batch">Batch Processing</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -297,6 +343,235 @@ export default function AdvancedMatchingDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Cron Monitor Tab */}
+          <TabsContent value="cron" className="space-y-6">
+            {cronStats && (
+              <>
+                {/* Cron Status Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Scheduler Status
+                      </CardTitle>
+                      <Activity className={`h-4 w-4 ${
+                        cronStats.schedulerStatus === 'RUNNING' 
+                          ? 'text-green-500' 
+                          : 'text-red-500'
+                      }`} />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {cronStats.schedulerStatus}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {cronStats.activeJobs} active jobs
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Last Run
+                      </CardTitle>
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {cronStats.lastRunTime 
+                          ? new Date(cronStats.lastRunTime).toLocaleTimeString()
+                          : 'Never'
+                        }
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {cronStats.lastRunTime 
+                          ? new Date(cronStats.lastRunTime).toLocaleDateString()
+                          : 'No executions yet'
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Matches Found (24h)
+                      </CardTitle>
+                      <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        {cronStats.totalMatchesFound24h}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        From {cronStats.totalExecutions24h} executions
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Success Rate (24h)
+                      </CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {(cronStats.successRate24h * 100).toFixed(1)}%
+                      </div>
+                      <Progress value={cronStats.successRate24h * 100} className="mt-2" />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Execution Performance */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5" />
+                      Execution Performance (24h)
+                    </CardTitle>
+                    <CardDescription>
+                      Performance metrics for cron job executions in the last 24 hours
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Total Executions</span>
+                          <span>{cronStats.totalExecutions24h}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Successful</span>
+                          <span className="text-green-600">{cronStats.successfulExecutions24h}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Failed</span>
+                          <span className="text-red-600">{cronStats.failedExecutions24h}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Avg Execution Time</span>
+                          <span>{cronStats.averageExecutionTime}ms</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Expired Matches</span>
+                          <span className="text-orange-600">{cronStats.totalExpiredMatches24h}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Currently Running</span>
+                          <span className={cronStats.isRunning ? 'text-blue-600' : 'text-gray-600'}>
+                            {cronStats.isRunning ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Next Scheduled Runs:</h4>
+                        {cronStats.nextScheduledRuns.slice(0, 3).map((run, index) => (
+                          <div key={index} className="text-xs">
+                            <span className="font-medium">{run.jobName}:</span>
+                            <br />
+                            <span className="text-muted-foreground">
+                              {run.nextRun ? new Date(run.nextRun).toLocaleString() : 'Not scheduled'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Recent Execution History */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Recent Execution History
+                    </CardTitle>
+                    <CardDescription>
+                      Latest cron job executions with detailed results
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {cronHistory.slice(0, 10).map((execution) => (
+                        <div key={execution.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-semibold">{execution.jobName}</h4>
+                                <Badge variant={
+                                  execution.status === 'COMPLETED' ? 'default' :
+                                  execution.status === 'FAILED' ? 'destructive' :
+                                  execution.status === 'RUNNING' ? 'secondary' :
+                                  'outline'
+                                }>
+                                  {execution.status}
+                                </Badge>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">Started</p>
+                                  <p className="font-medium">
+                                    {new Date(execution.startedAt).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                
+                                {execution.duration && (
+                                  <div>
+                                    <p className="text-muted-foreground">Duration</p>
+                                    <p className="font-medium">{execution.duration}ms</p>
+                                  </div>
+                                )}
+                                
+                                <div>
+                                  <p className="text-muted-foreground">Matches Found</p>
+                                  <p className="font-medium text-green-600">
+                                    {execution.matchesFound}
+                                  </p>
+                                </div>
+                                
+                                <div>
+                                  <p className="text-muted-foreground">Active Requests</p>
+                                  <p className="font-medium">{execution.totalActiveRequests}</p>
+                                </div>
+                              </div>
+                              
+                              {execution.errors.length > 0 && (
+                                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded">
+                                  <p className="text-sm font-medium text-red-800 mb-1">Errors:</p>
+                                  <ul className="text-xs text-red-700 space-y-1">
+                                    {execution.errors.map((error, idx) => (
+                                      <li key={idx}>• {error}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {cronHistory.length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Clock className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                          <p>No cron execution history available</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
 
           {/* Partitions Tab */}
@@ -410,7 +685,7 @@ export default function AdvancedMatchingDashboard() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Timer className="h-4 w-4" />
+                        <Clock className="h-4 w-4" />
                         Last Batch Processing Result
                       </CardTitle>
                     </CardHeader>
