@@ -1,0 +1,64 @@
+version: '3.8'
+services:
+  nginx:
+    depends_on:
+      - app1
+      - app2
+      - app3
+  app1:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - ENABLE_CRON_SCHEDULER=true
+      - INSTANCE_ID=app1
+      - CRON_BATCH_MATCHING=${CRON_BATCH_MATCHING:-*/5 * * * *}
+      - CRON_PROVISIONAL_CLEANUP=${CRON_PROVISIONAL_CLEANUP:-*/30 * * * *}
+    restart: unless-stopped
+    networks:
+      - unclassed-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  app2:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - ENABLE_CRON_SCHEDULER=true
+      - INSTANCE_ID=app2
+      - CRON_BATCH_MATCHING=${CRON_BATCH_MATCHING:-*/5 * * * *}
+      - CRON_PROVISIONAL_CLEANUP=${CRON_PROVISIONAL_CLEANUP:-*/30 * * * *}
+    restart: unless-stopped
+    networks:
+      - unclassed-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  app3:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - ENABLE_CRON_SCHEDULER=true
+      - INSTANCE_ID=app3
+      - CRON_BATCH_MATCHING=${CRON_BATCH_MATCHING:-*/5 * * * *}
+      - CRON_PROVISIONAL_CLEANUP=${CRON_PROVISIONAL_CLEANUP:-*/30 * * * *}
+    restart: unless-stopped
+    networks:
+      - unclassed-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
