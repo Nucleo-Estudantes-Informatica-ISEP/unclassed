@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { emailService, MatchNotificationData } from "@/services/emailService";
 
 // ===== INTERFACES =====
 
@@ -11,6 +12,7 @@ interface GraphNode {
   requestType: "single" | "bundle";
   priority: number;
   createdAt: Date;
+  subjectId?: string; // For single swap requests
 }
 
 interface GraphEdge {
@@ -51,13 +53,13 @@ interface GraphPartition {
   id: string;
   partitionKey: string;
   ticketType: "SPECIFIC_CLASS" | "ALL_CLASSES";
-  subjectId?: string;
-  year?: number;
+  subjectId?: string | null;
+  year?: number | null;
   activeRequests: number;
   priority: number;
-  lastProcessed?: Date;
-  avgProcessingTime?: number;
-  successRate?: number;
+  lastProcessed?: Date | null;
+  avgProcessingTime?: number | null;
+  successRate?: number | null;
 }
 
 // ===== MAIN SERVICE =====
@@ -93,7 +95,7 @@ export class AdvancedMatchingService {
         // Before creating new matches, check if we can upgrade existing provisional ones
         await this.upgradeProvisionalMatches(matches);
         
-        return await this.createMatches(matches, true); // isProvisional = true
+        return await this.createMatches(matches); // Use the calculated isProvisional from matches
       }
 
       console.log(`⏳ No immediate matches found for ${requestId}`);
@@ -298,7 +300,7 @@ export class AdvancedMatchingService {
     const matches: MatchResult[] = [];
     const processed = new Set<string>();
 
-    for (const [nodeId, edges] of graph.entries()) {
+    for (const [nodeId, edges] of Array.from(graph.entries())) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
         console.log(`⏱️ Batch processing timeout reached`);
@@ -342,8 +344,20 @@ export class AdvancedMatchingService {
         const improvementThreshold = 0.05;
         const satisfactionDiff = newMatch.satisfactionScore - (existing.satisfactionScore || 0);
         
-        if (satisfactionDiff > improvementThreshold) {
-          console.log(`⬆️ Upgrading provisional match ${existing.id}: ${Math.round(existing.satisfactionScore * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
+        // Check if both matches are perfect (100% satisfaction)
+        const newIsPerfect = newMatch.satisfactionScore >= 0.99; // Allow for floating point precision
+        const existingIsPerfect = (existing.satisfactionScore || 0) >= 0.99;
+        
+        // Upgrade if satisfaction is significantly better OR if both are perfect matches
+        const shouldUpgrade = satisfactionDiff > improvementThreshold || 
+                             (newIsPerfect && existingIsPerfect);
+        
+        if (shouldUpgrade) {
+          if (newIsPerfect && existingIsPerfect) {
+            console.log(`⬆️ Upgrading perfect match ${existing.id} with another perfect match (both 100% satisfaction)`);
+          } else {
+            console.log(`⬆️ Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
+          }
           
           // Mark old match as upgraded and reactivate its requests
           await prisma.match.update({
@@ -354,11 +368,15 @@ export class AdvancedMatchingService {
           // Reactivate requests from the old match
           await this.reactivateRequestsFromMatch(existing);
 
-          // Create new match as provisional (still allow further upgrades)
-          newMatch.isProvisional = true;
-          newMatch.provisionalUntil = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6 hours
+          // For perfect matches, don't make them provisional unless the existing was also provisional
+          if (newIsPerfect && !existing.isProvisional) {
+            newMatch.isProvisional = false;
+          } else {
+            // Create new match as provisional (still allow further upgrades)
+            newMatch.isProvisional = true;
+          }
         } else {
-          console.log(`⏳ New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round(existing.satisfactionScore * 100)}%)`);
+          console.log(`⏳ New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`);
         }
       }
     }
@@ -682,11 +700,88 @@ export class AdvancedMatchingService {
     });
   }
 
-  private async createMatches(matches: MatchResult[], isProvisional: boolean): Promise<MatchResult[]> {
+  private async sendMatchNotifications(matchId: string, match: MatchResult): Promise<void> {
+    try {
+      console.log(`📧 Sending match notifications for match ${matchId}`);
+      
+      // Get detailed user information for all participants
+      const userIds = match.participants.map(p => p.userId);
+      const users = await prisma.user.findMany({
+        where: {
+          id: { in: userIds },
+          emailVerified: true,
+          emailNotifications: true
+        }
+      });
+      
+      // Get subject information if it's a single swap match
+      let subjects: string[] = [];
+      if (match.singleSwapRequestIds.length > 0) {
+        const subjectData = await prisma.singleSwapRequest.findMany({
+          where: { id: { in: match.singleSwapRequestIds } },
+          include: { subject: true }
+        });
+        subjects = Array.from(new Set(subjectData.map(r => r.subject.name)));
+      }
+      
+      // Get class names
+      const allClassIds = Array.from(new Set([
+        ...match.participants.map(p => p.fromClass),
+        ...match.participants.map(p => p.toClass)
+      ]));
+      const classes = await prisma.class.findMany({
+        where: { id: { in: allClassIds } }
+      });
+      const classMap = new Map(classes.map(c => [c.id, c.name]));
+      
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      
+      // Send notification to each participant
+      for (const participant of match.participants) {
+        const user = users.find(u => u.id === participant.userId);
+        if (!user) {
+          console.log(`⚠️ User ${participant.userId} not found or notifications disabled`);
+          continue;
+        }
+        
+        const otherParticipants = match.participants
+          .filter(p => p.userId !== participant.userId)
+          .map(p => {
+            const otherUser = users.find(u => u.id === p.userId);
+            return otherUser ? otherUser.name : 'Utilizador';
+          });
+        
+        const notificationData: MatchNotificationData = {
+          userName: user.name,
+          matchType: match.singleSwapRequestIds.length > 0 ? 'Troca de Disciplina' : 'Troca de Turma Completa',
+          subjects,
+          fromClass: classMap.get(participant.fromClass) || participant.fromClass,
+          toClass: classMap.get(participant.toClass) || participant.toClass,
+          otherParticipants,
+          matchId,
+          dashboardUrl: baseUrl
+        };
+        
+        const emailSent = await emailService.sendMatchNotification(user.email, notificationData);
+        if (emailSent) {
+          console.log(`✅ Match notification sent to ${user.email}`);
+        } else {
+          console.log(`❌ Failed to send notification to ${user.email}`);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error sending match notifications:', error);
+    }
+  }
+
+  private async createMatches(matches: MatchResult[], globalIsProvisional?: boolean): Promise<MatchResult[]> {
     const createdMatches: MatchResult[] = [];
 
     for (const match of matches) {
       try {
+        // Use individual match isProvisional value, or fallback to global parameter
+        const isProvisional = globalIsProvisional !== undefined ? globalIsProvisional : match.isProvisional;
         const provisionalUntil = isProvisional 
           ? new Date(Date.now() + 6 * 60 * 60 * 1000) // 6 hours
           : undefined;
@@ -701,7 +796,7 @@ export class AdvancedMatchingService {
             satisfactionScore: match.satisfactionScore,
             processingTime: match.processingTime,
             graphPartition: match.graphPartition,
-            participants: match.participants,
+            participants: match.participants as any,
             singleSwapRequestIds: match.singleSwapRequestIds,
             bundleSwapRequestIds: match.bundleSwapRequestIds
           }
@@ -712,7 +807,7 @@ export class AdvancedMatchingService {
           await prisma.singleSwapRequest.updateMany({
             where: { id: { in: match.singleSwapRequestIds } },
             data: { 
-              status: match.isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
+              status: isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
               provisionalMatchId: createdMatch.id,
               provisionalUntil
             }
@@ -723,7 +818,7 @@ export class AdvancedMatchingService {
           await prisma.bundleSwapRequest.updateMany({
             where: { id: { in: match.bundleSwapRequestIds } },
             data: { 
-              status: match.isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
+              status: isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
               provisionalMatchId: createdMatch.id,
               provisionalUntil
             }
@@ -732,13 +827,16 @@ export class AdvancedMatchingService {
 
         createdMatches.push(match);
         
+        // Send email notifications to all participants
+        await this.sendMatchNotifications(createdMatch.id, match);
+        
       } catch (error) {
         console.error(`Error creating match:`, error);
       }
     }
 
     // Update partition active request counts after creating matches
-    const affectedPartitions = [...new Set(matches.map(m => m.graphPartition))];
+    const affectedPartitions = Array.from(new Set(matches.map(m => m.graphPartition)));
     await Promise.all(
       affectedPartitions.map(partitionKey => 
         this.updatePartitionRequestCount(partitionKey)
