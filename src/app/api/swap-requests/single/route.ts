@@ -177,10 +177,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Trigger immediate matching in background (don't await to avoid blocking)
-    const baseUrl = process.env.NEXTAUTH_URL || 
-                   (request.headers.get('host') ? 
-                    `http://${request.headers.get('host')}` : 
-                    'http://localhost:3000');
+    // For internal requests, use 127.0.0.1:3000 to avoid IPv6 resolution issues in Docker
+    const baseUrl = 'http://127.0.0.1:3000';
     fetch(`${baseUrl}/api/matching`, {
       method: 'POST',
       headers: {
