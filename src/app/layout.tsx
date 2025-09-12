@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description:
     "Uma plataforma para simplificar o processo de permutas de turma nos cursos de Informática do ISEP. By: NEI-ISEP",
   icons: {
-    icon: "/public/logo/svg/icon-light.svg",
+    icon: "/icon.svg",
   },
 };
 
@@ -50,7 +50,7 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="flex min-h-screen flex-col">
             <Topbar user={userSession} />
-            <main className="grow pt-[2vh]">{children}</main>
+            <main className="grow pt-[0vh]">{children}</main>
             <Footer />
           </div>
           <Toaster />

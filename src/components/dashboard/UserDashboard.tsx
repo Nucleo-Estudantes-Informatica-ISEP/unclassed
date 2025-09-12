@@ -262,13 +262,13 @@ export default function UserDashboard({
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <Link href="/swap-requests" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-[#101010] text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90">
                   <Plus className="mr-2 h-4 w-4" />
                   Criar Pedido
                 </Button>
               </Link>
               <Link href="/matches" className="w-full sm:w-auto">
-                <Button variant="outline" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto text-[#101010] dark:text-[#CFCFCF]">
                   <Eye className="mr-2 h-4 w-4" />
                   Ver Todos os Matches
                 </Button>

@@ -9,7 +9,7 @@ const PrivacyPolicy: React.FC = () => {
         <section>
           <h2 className="text-2xl font-semibold mb-4">1. Introdução</h2>
           <p>
-            A presente Política de Privacidade tem por objetivo informar os utilizadores sobre a forma como a plataforma UNCLASSED recolhe, 
+            A presente Política de Privacidade tem por objetivo informar os utilizadores sobre a forma como a plataforma Unclassed recolhe, 
             trata e protege os dados pessoais dos seus utilizadores, em conformidade com o Regulamento Geral sobre a Proteção de Dados (RGPD) 
             e demais legislação aplicável.
           </p>

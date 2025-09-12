@@ -91,7 +91,7 @@ const Home: React.FC = async () => {
             alt="Lightning"
             width={140}
             height={315}
-            className="-z-5 absolute left-2 top-24 hidden rotate-[10deg] scale-[.5] animate-float opacity-100 sm:block md:left-[-40px] md:top-[20%] md:scale-110"
+            className="-z-5 absolute left-2 top-24 hidden rotate-[10deg] scale-[.5] animate-float opacity-100 sm:block md:left-[30px] md:top-[20%] md:scale-110"
             priority
           />
           <h2 className="relative z-10 text-center text-2xl font-semibold text-foreground dark:text-[#CFCFCF] sm:text-4xl">

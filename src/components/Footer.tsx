@@ -8,7 +8,7 @@ export function Footer() {
       <div className="border-t border-[#101010]/[0.17] dark:border-white/10">
         <div className="container mx-auto px-4 py-6">
           <p className="mx-auto max-w-[1066px] text-center text-xs md:text-sm text-[#101010]/40 dark:text-white/40">
-A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para te ajudar a encontrar matches e trocar de turma. Para suporte ou esclarecimento de dúvidas técnicas, entra em contacto através do e-mail info@nei-isep.org.          </p>
+A Unclassed é uma plataforma desenvolvida pelo NEI-ISEP para te ajudar a encontrar matches e trocar de turma. Para suporte ou esclarecimento de dúvidas técnicas, entra em contacto através do e-mail info@nei-isep.org.          </p>
         </div>
       </div>
 
@@ -18,14 +18,14 @@ A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para te ajudar a encont
           <div className="flex items-center gap-3">
             <Image
               src="/images/unclassed-black.svg"
-              alt="UNCLASSED"
+              alt="Unclassed"
               width={166}
               height={34}
               className="h-[34px] w-auto dark:hidden"
             />
             <Image
               src="/images/unclassed-white.svg"
-              alt="UNCLASSED"
+              alt="Unclassed"
               width={166}
               height={34}
               className="h-[34px] w-auto hidden dark:block"
