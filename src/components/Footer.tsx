@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export function Footer() {
   return (
@@ -30,8 +31,19 @@ A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para simplificar o proc
               className="h-[34px] w-auto hidden dark:block"
             />
           </div>
-          <div className="text-right text-sm">
-            V1.0 Copyright © {new Date().getFullYear()}. All rights reserved to NEI-ISEP
+          <div className="text-right">
+            <div className="text-sm mb-1">
+              V1.0 Copyright © {new Date().getFullYear()}. All rights reserved to NEI-ISEP
+            </div>
+            <div className="flex justify-end gap-4 text-xs text-[#101010]/60 dark:text-white/60">
+              <Link href="/privacy-policy" className="hover:text-[#101010] dark:hover:text-white transition-colors">
+                Política de Privacidade
+              </Link>
+              <span>•</span>
+              <Link href="/cookie-policy" className="hover:text-[#101010] dark:hover:text-white transition-colors">
+                Política de Cookies
+              </Link>
+            </div>
           </div>
         </div>
       </div>
