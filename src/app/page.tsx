@@ -159,7 +159,7 @@ const Home: React.FC = async () => {
             className="relative flex min-h-[180px] flex-col items-center rounded-[18px] border border-white/20 bg-[#D9D9D9]/[0.14] p-6 md:min-h-[240px] md:p-8"
           >
             <span
-              className="absolute bottom-0 right-4 top-0 z-0 select-none text-[320px] font-extrabold leading-none md:bottom-0 md:right-8 md:top-0 md:text-[325px]"
+              className="absolute bottom-0 right-4 top-0 z-0 select-none text-[320px] font-extrabold leading-none md:bottom-0 md:right-8 md:top-0 md:text-[300px]"
               style={{
                 color: "#CFCFCF",
                 opacity: 0.22,
@@ -168,7 +168,7 @@ const Home: React.FC = async () => {
             >
               {item.n}
             </span>
-            <p className="relative z-[1] text-center text-[40px] font-semibold leading-[1.05] md:text-[56px] md:leading-[1.05]">
+            <p className="relative z-[1] text-center text-[40px] font-semibold leading-[1.05] md:text-[40px] md:leading-[1.05]">
               <span className="text-[#1BAED9]">{item.bold}</span>
               <span className="text-white">{item.rest}</span>
             </p>
