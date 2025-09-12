@@ -6,8 +6,8 @@ interface AuthLayoutProps {
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
-    <div className="flex size-full items-center justify-center">
-      <div className="mx-8 grid min-h-[480px] max-w-4xl flex-1 grid-cols-1 flex-col items-center justify-center rounded-lg bg-white shadow-md dark:bg-zinc-900 md:grid-cols-2 lg:flex-row">
+    <div className="flex size-full items-center justify-center py-16">
+      <div className="mx-8 grid min-h-[480px] max-w-4xl flex-1 grid-cols-1 flex-col items-center justify-center rounded-lg bg-white/50 shadow-md dark:bg-zinc-900/50 md:grid-cols-2 lg:flex-row md:gap-8">
         <div className="relative mx-auto mt-8 size-32 md:mt-12 md:size-48 flex justify-center items-center">
           <Image
             aria-hidden="true"
@@ -24,7 +24,9 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
             fill
           />
         </div>
-        {children}
+        <div className="mt-8 md:mt-0">
+          {children}
+        </div>
       </div>
     </div>
   );

@@ -4,8 +4,8 @@
  
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 0 0% 81%;
+    --foreground: 0 0% 6%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
@@ -31,7 +31,7 @@
   }
 
   .dark {
-    --background: 240 10% 3.5%;
+    --background: 0 0% 6%;
     --foreground: 0 0% 98%;
     --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
@@ -59,8 +59,22 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-color: #CFCFCF;
     background-attachment: fixed;
   }
+  .dark body {
+    background-color: #101010;
+  }
+}
+
+/* Exemplo para um rodapé com a classe .footer */
+.footer {
+  background-color: #CFCFCF;
+  color: #101010;
+}
+.dark .footer {
+  background-color: #101010;
+  color: #CFCFCF;
 }
 
 /* Utilities for the landing background and glass surfaces */

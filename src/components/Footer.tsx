@@ -2,26 +2,32 @@ import Image from "next/image";
 
 export function Footer() {
   return (
-    <footer className="bg-[#101010] text-[#CFCFCF]">
+    <footer className="footer bg-[#CFCFCF] text-[#101010] dark:bg-[#101010] dark:text-[#CFCFCF]">
       {/* Info band */}
-      <div className="border-t border-white/10">
+      <div className="border-t border-[#101010]/[0.17] dark:border-white/10">
         <div className="container mx-auto px-4 py-6">
-          <p className="mx-auto max-w-[1066px] text-center text-sm md:text-base text-white/40">
-            A UNCLASSED é uma plataforma (não oficial) desenvolvida pelo NEI-ISEP para simplificar o processo de permutas de turma da LEI-ISEP. Para suporte ou esclarecimento de dúvidas técnicas, pode entrar em contacto através do e-mail info@nei-isep.org.
-          </p>
+          <p className="mx-auto max-w-[1066px] text-center text-xs md:text-sm text-[#101010]/40 dark:text-white/40">
+A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para simplificar o processo de permutas de turma nos cursos de Informática do Instituto Superior de Engenharia do Porto, construída especificamente de acordo com os métodos de funcionamento da Licenciatura em Engenharia Informática. Para suporte ou esclarecimento de dúvidas técnicas, pode entrar em contacto através do e-mail info@nei-isep.org.          </p>
         </div>
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/10">
+      <div className="border-t border-[#101010]/[0.17] dark:border-white/10">
         <div className="container mx-auto flex items-center justify-between px-4 py-8">
           <div className="flex items-center gap-3">
+            <Image
+              src="/images/unclassed-black.svg"
+              alt="UNCLASSED"
+              width={166}
+              height={34}
+              className="h-[34px] w-auto dark:hidden"
+            />
             <Image
               src="/images/unclassed-white.svg"
               alt="UNCLASSED"
               width={166}
               height={34}
-              className="h-[34px] w-auto"
+              className="h-[34px] w-auto hidden dark:block"
             />
           </div>
           <div className="text-right text-sm">

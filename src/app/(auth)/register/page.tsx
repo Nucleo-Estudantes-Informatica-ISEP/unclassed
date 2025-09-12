@@ -32,7 +32,9 @@ const Register: React.FC = () => {
       email: "",
       phone: "",
       password: "",
+      confirmPassword: "",
       sharePhoneOnMatch: false,
+      shareNameAndEmail: false,
     },
     mode: "onChange",
   });
@@ -81,9 +83,6 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Nome..." {...field} />
               </FormControl>
-              <FormDescription>
-                O teu nome será mostrado a quem te quiser contactar.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -97,10 +96,6 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Email..." {...field} />
               </FormControl>
-              <FormDescription>
-                O teu email vai servir para os outros alunos te poderem
-                contactar.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -114,10 +109,6 @@ const Register: React.FC = () => {
               <FormControl>
                 <Input placeholder="Número de telemóvel..." {...field} />
               </FormControl>
-              <FormDescription>
-                O teu telemóvel vai servir para os outros alunos te poderem
-                contactar.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -140,9 +131,45 @@ const Register: React.FC = () => {
         />
         <FormField
           control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Repetir Password</FormLabel>
+              <FormControl>
+                <Input placeholder="Repetir Password..." type="password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="shareNameAndEmail"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-[#101010]/[0.17] dark:border-[#CFCFCF]/[0.17] p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Partilhar nome e email registado
+                </FormLabel>
+                <FormDescription>
+                  Consentes em mostrar o teu nome e email a outros estudantes quando há um match.
+                </FormDescription>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name="sharePhoneOnMatch"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-[#101010]/[0.17] dark:border-[#CFCFCF]/[0.17] p-4">
               <FormControl>
                 <Checkbox
                   checked={field.value}

@@ -34,7 +34,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="flex flex-col min-h-screen">
             <Topbar />
-            <main className="flex-grow pt-[12vh] p-4">
+            <main className="flex-grow pt-[12vh]">
               {children}
             </main>
             <Footer />

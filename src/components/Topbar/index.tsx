@@ -39,31 +39,33 @@ const Topbar: React.FC = async () => {
           <>
             <Link
               href="/dashboard"
-              className={buttonVariants({ variant: "outline" })}
+              className={buttonVariants({ variant: "outline" }) + " bg-[#101010] text-[#CFCFCF] dark:bg-[#CFCFCF] dark:text-[#101010] border-none"}
             >
               Dashboard
             </Link>
             <Link
               href="/swap-requests"
-              className={buttonVariants({ variant: "outline" })}
+              className={buttonVariants({ variant: "outline" }) + " bg-[#101010] text-[#CFCFCF] dark:bg-[#CFCFCF] dark:text-[#101010] border-none"}
             >
               Criar Pedido
             </Link>
             <Link
               href="/matches"
-              className={buttonVariants({ variant: "outline" })}
+              className={buttonVariants({ variant: "outline" }) + " bg-[#101010] text-[#CFCFCF] dark:bg-[#CFCFCF] dark:text-[#101010] border-none"}
             >
               Meus Matches
             </Link>
             <UserMenu user={session} />
           </>
         ) : (
-          <Link
+            <Link
             href="/login"
-            className={buttonVariants({ variant: "secondary" })}
-          >
-            Login
-          </Link>
+            className={
+              "px-4 py-2 rounded-md font-medium bg-[#101010] text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90 border-none"
+            }
+            >
+            Entrar
+            </Link>
         )}
       </div>
     </nav>
