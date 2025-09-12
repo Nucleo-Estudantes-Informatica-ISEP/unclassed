@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+
 import { Toaster } from "@/lib/components/ui/sonner";
 
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
 import { cn } from "@/lib/utils";
-import Topbar from "@/components/Topbar";
-import { Footer } from "@/components/Footer";
-import { ThemeProvider } from "@/context/ThemeContext";
 import getServerSession from "@/services/getServerSession";
+import { Footer } from "@/components/Footer";
+import Topbar from "@/components/Topbar";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 // Auto-initialize application services (cron scheduler, etc.)
 import "@/lib/startup";
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Unclassed",
@@ -31,17 +31,26 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerSession();
+
+  // Convert the Prisma user object to the Session type expected by Topbar
+  const userSession = session
+    ? {
+        id: session.id,
+        name: session.name,
+        email: session.email,
+        role: session.role,
+      }
+    : undefined;
+
   return (
     <html lang="pt">
       <body
         className={cn("bg-background font-sans antialiased", inter.variable)}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="flex flex-col min-h-screen">
-            <Topbar user={session} />
-            <main className="flex-grow pt-[12vh]">
-              {children}
-            </main>
+          <div className="flex min-h-screen flex-col">
+            <Topbar user={userSession} />
+            <main className="grow pt-[2vh]">{children}</main>
             <Footer />
           </div>
           <Toaster />
