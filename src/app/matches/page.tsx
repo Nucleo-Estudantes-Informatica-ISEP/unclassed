@@ -117,24 +117,26 @@ export default async function MatchesPage() {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Os Meus Matches</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-2xl sm:text-3xl font-bold">Os Meus Matches</h1>
+            <p className="mt-2 text-gray-600 text-sm sm:text-base">
               Gira os seus matches de permuta e acompanha o progresso
             </p>
           </div>
-          <RefreshButton />
+          <div className="self-start sm:self-auto">
+            <RefreshButton />
+          </div>
         </div>
       </div>
 
       {activeMatches.length === 0 && completedMatches.length === 0 ? (
-        <div className="py-12 text-center">
-          <div className="mb-4 text-6xl">🔍</div>
-          <h3 className="mb-2 text-xl font-semibold">
+        <div className="py-12 text-center px-2">
+          <div className="mb-4 text-5xl sm:text-6xl">🔍</div>
+          <h3 className="mb-2 text-lg sm:text-xl font-semibold">
             Ainda não encontramos um match para ti...
           </h3>
-          <h2 className="mb-2 text-xl font-semibold">
+          <h2 className="mb-2 text-base sm:text-xl font-semibold">
             Assim que um match for detetado vais receber um email!
           </h2>
         </div>

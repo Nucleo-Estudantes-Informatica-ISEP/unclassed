@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/lib/components/ui/c
 import { Clock, CheckCircle, XCircle, AlertTriangle, Users, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
+import { useRouter } from "next/navigation";
 
 interface MatchParticipant {
   userId: string;
@@ -34,11 +35,11 @@ interface Match {
 interface MatchCardProps {
   match: Match;
   currentUserId: string;
-  onMatchUpdate: (matchId: string) => void;
 }
 
-export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProps) {
+export function MatchCard({ match, currentUserId }: MatchCardProps) {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const userParticipant = match.participants.find(p => p.userId === currentUserId);
   const isUserParticipant = !!userParticipant;
@@ -77,7 +78,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       const result = await response.json();
 
       toast.success(result.message);
-      onMatchUpdate(match.id);
+      router.refresh();
 
     } catch (error) {
       console.error('Match action error:', error);
@@ -109,7 +110,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
     const className = statusClasses[match.status as keyof typeof statusClasses] || 'bg-gray-100 text-gray-800';
     const text = statusText[match.status as keyof typeof statusText] || match.status;
 
-    return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>{text}</span>;
+    return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className} shrink-0`}>{text}</span>;
   };
 
   const getPatternIcon = () => {
@@ -126,7 +127,6 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
   };
 
   const renderParticipants = () => {
-    console.log(match.participants);
     return match.participants.map((participant, index) => {
       const isCurrentUser = participant.userId === currentUserId;
 
@@ -136,24 +136,24 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           className={`p-4 rounded-lg border ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-muted border-border'}`}
         >
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-base text-foreground">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-semibold text-base text-foreground break-words">
                 {participant.user?.name || `Utilizador ${participant.userId.slice(-4)}`}
               </p>
               {participant.status && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 self-start sm:self-auto">
                   {participant.status}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="bg-background px-2 py-1 rounded border border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-2 text-sm text-muted-foreground">
+              <span className="bg-background px-2 py-1 rounded border border-border w-full sm:w-auto">
                 De: <span className="font-medium text-foreground">
                   {typeof participant.fromClass === 'object' ? participant.fromClass.name : participant.fromClass}
                 </span>
               </span>
-              <span className="text-muted-foreground">→</span>
-              <span className="bg-background px-2 py-1 rounded border border-border">
+              <span className="hidden sm:inline text-muted-foreground">→</span>
+              <span className="bg-background px-2 py-1 rounded border border-border w-full sm:w-auto">
                 Para: <span className="font-medium text-foreground">
                   {typeof participant.toClass === 'object' ? participant.toClass.name : participant.toClass}
                 </span>
@@ -166,7 +166,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
             {!isCurrentUser && participant.user && match.status === 'ACCEPTED' && (
               <div className="mt-3 pt-3 border-t border-border">
                 <p className="text-xs font-medium text-foreground mb-1">📞 Contacto:</p>
-                <div className="space-y-1">
+                <div className="space-y-1 break-words">
                   <p className="text-xs text-muted-foreground">
                     📧 {participant.user.email}
                   </p>
@@ -199,11 +199,11 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
       case 'PROVISIONAL':
         if (userStatus === 'pending') {
           return (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full">
               <Button
                 onClick={() => handleMatchAction('accept')}
                 disabled={loading}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Aceitar Match
@@ -212,7 +212,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
                 onClick={() => handleMatchAction('reject')}
                 disabled={loading}
                 variant="destructive"
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 <XCircle className="h-4 w-4 mr-1" />
                 Rejeitar
@@ -221,7 +221,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           );
         } else if (userStatus === 'accepted' && canRevoke) {
           return (
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <div className="flex items-center gap-2 text-sm text-amber-600">
                 <Clock className="h-4 w-4" />
                 <span>
@@ -241,7 +241,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           );
         } else if (userStatus === 'accepted') {
           return (
-            <div className="text-center text-sm text-gray-600">
+            <div className="text-center text-sm text-gray-600 w-full">
               ✅ Aceitou este match. A aguardar pelos outros...
             </div>
           );
@@ -262,7 +262,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           );
         } else {
           return (
-            <div className="text-center text-sm text-green-600">
+            <div className="text-center text-sm text-green-600 w-full">
               ✅ Completou a sua parte. A aguardar pelos outros...
             </div>
           );
@@ -270,14 +270,14 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
 
       case 'COMPLETED':
         return (
-          <div className="text-center text-sm text-green-600 font-medium">
+          <div className="text-center text-sm text-green-600 font-medium w-full">
             🎉 Permuta concluída com sucesso!
           </div>
         );
 
       case 'REJECTED':
         return (
-          <div className="text-center text-sm text-red-600">
+          <div className="text-center text-sm text-red-600 w-full">
             ❌ Este match foi rejeitado
           </div>
         );
@@ -289,17 +289,17 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 min-w-0">
             {getPatternIcon()}
-            <div>
-              <h3 className="text-lg font-semibold">
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold break-words">
                 {match.swapPattern === 'DIRECT' ? 'Permuta Direta' :
                  match.swapPattern === 'THREE_WAY' ? 'Permuta 3-Vias' :
                  match.swapPattern === 'MULTI_WAY' ? 'Permuta Múltipla' : match.swapPattern} {match.matchType === 'SINGLE' ? 'disciplina individual' : 'completa'}
               </h3>
               {match.subject && (
-                <p className="text-sm text-gray-600 font-medium">
+                <p className="text-sm text-gray-600 font-medium break-words">
                   {match.subject.code} - {match.subject.name}
                 </p>
               )}
@@ -307,7 +307,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
           </div>
           {getStatusBadge()}
         </div>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mt-2">
           <span className="text-sm text-gray-600">
             {match.participants.length} participantes •
             {Math.round(match.satisfactionScore * 100)}% satisfação
@@ -350,7 +350,7 @@ export function MatchCard({ match, currentUserId, onMatchUpdate }: MatchCardProp
         )}
       </CardContent>
 
-      <CardFooter>
+      <CardFooter className="w-full">
         {renderActionButtons()}
       </CardFooter>
     </Card>

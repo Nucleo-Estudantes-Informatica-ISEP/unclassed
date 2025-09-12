@@ -106,9 +106,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
           Criar Pedido de Permuta Completa
           <Badge variant="secondary">Bundle</Badge>
         </CardTitle>
-        <CardDescription>
-          Cria um pedido para trocar de turma em todas as disciplinas (mudança completa de turma).
-        </CardDescription>
       </CardHeader>
       <CardContent>
 
@@ -128,7 +125,7 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                   });
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleciona o ano académico" />
                 </SelectTrigger>
                 <SelectContent>
@@ -139,9 +136,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                Só podes fazer permutas completas dentro do mesmo ano académico.
-              </p>
             </div>
 
             {/* Current Class Selection */}
@@ -157,7 +151,7 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                     disabled={classesLoading || !selectedYear}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleciona a tua turma atual" />
                       </SelectTrigger>
                     </FormControl>
@@ -169,9 +163,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    A turma em que estás atualmente inscrito para todas as disciplinas.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -182,14 +173,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
               control={form.control}
               name="preferredClassIds"
               render={({ field }) => {
-                console.log('DEBUG preferredClassIds:', {
-                  classOptions,
-                  availableClassOptions,
-                  currentClassId,
-                  selectedYear,
-                  fieldValue: field.value
-                });
-
                 // Show error message if needed
                 if (classesError) {
                   return (
@@ -278,25 +261,13 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
             />
 
             {/* Additional Info */}
-            {currentClassId && form.watch("preferredClassIds").length > 0 && (
-              <div className="p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800">
-                <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                  ✅ Pedido Configurado
-                </h4>
-                <p className="text-sm text-green-800 dark:text-green-200">
-                  Vais criar um pedido para mudar da turma{" "}
-                  <strong>{classes?.find(c => c.id === currentClassId)?.name}</strong> para uma das turmas selecionadas.
-                  O sistema tentará encontrar alguém que queira fazer a troca oposta.
-                </p>
-              </div>
-            )}
 
             {/* Submit Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <Button
                 type="submit"
                 disabled={isSubmitting || classesLoading || !selectedYear}
-                className="flex-1"
+                className="flex-1 h-11"
               >
                 {isSubmitting ? "A criar..." : "Criar Pedido Completo"}
               </Button>
@@ -306,7 +277,7 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
                   variant="outline"
                   onClick={onCancel}
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
+                  className="flex-1 sm:flex-none h-11"
                 >
                   Cancelar
                 </Button>

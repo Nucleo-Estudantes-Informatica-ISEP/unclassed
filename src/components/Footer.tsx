@@ -8,7 +8,7 @@ export function Footer() {
       <div className="border-t border-[#101010]/[0.17] dark:border-white/10">
         <div className="container mx-auto px-4 py-6">
           <p className="mx-auto max-w-[1066px] text-center text-xs md:text-sm text-[#101010]/40 dark:text-white/40">
-A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para simplificar o processo de permutas de turma nos cursos de Informática do Instituto Superior de Engenharia do Porto, construída especificamente de acordo com os métodos de funcionamento da Licenciatura em Engenharia Informática. Para suporte ou esclarecimento de dúvidas técnicas, pode entrar em contacto através do e-mail info@nei-isep.org.          </p>
+A UNCLASSED é uma plataforma desenvolvida pelo NEI-ISEP para te ajudar a encontrar matches e trocar de turma. Para suporte ou esclarecimento de dúvidas técnicas, entra em contacto através do e-mail info@nei-isep.org.          </p>
         </div>
       </div>
 

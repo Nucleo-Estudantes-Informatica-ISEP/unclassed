@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { MatchCard } from "./MatchCard";
-import { useRouter } from "next/navigation";
 
 interface MatchParticipant {
   userId: string;
@@ -46,21 +44,8 @@ export function MatchListClient({
   emptyMessage,
   showIcon = true,
   iconEmoji = "⚡",
-  badgeColor = "blue"
+  badgeColor = "blue",
 }: MatchListClientProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-
-  const handleMatchUpdate = async (matchId: string) => {
-    setIsLoading(true);
-    try {
-      // Refresh the page to show updated match data
-      router.refresh();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   if (matches.length === 0) {
     return (
       <div className="text-center py-8 text-gray-600">
@@ -96,20 +81,19 @@ export function MatchListClient({
 
   return (
     <section className="mb-8">
-      <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+      <h2 className="text-2xl font-semibold mb-4 flex flex-wrap items-center gap-2">
         {showIcon && <span className={badgeClasses.text}>{iconEmoji}</span>}
-        {title}
-        <span className={`text-sm px-2 py-1 rounded-full ${badgeClasses.bg}`}>
+        <span className="min-w-0 break-words">{title}</span>
+        <span className={`text-sm px-2 py-1 rounded-full ${badgeClasses.bg} shrink-0`}>
           {matches.length}
         </span>
       </h2>
-      <div className={`space-y-4 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+      <div className="space-y-4">
         {matches.map((match) => (
           <MatchCard
             key={match.id}
             match={match}
             currentUserId={currentUserId}
-            onMatchUpdate={handleMatchUpdate}
           />
         ))}
       </div>

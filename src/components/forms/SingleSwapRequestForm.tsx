@@ -51,25 +51,17 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
   const { data: classes, loading: classesLoading, error: classesError } = useClasses(selectedYear);
 
   // Get unique years from subjects
-  const years = subjects ? Array.from(new Set(subjects.map(s => s.year))).sort() : [];
+  const years = subjects ? Array.from(new Set(subjects.map((s) => s.year))).sort() : [];
 
   // Filter subjects by selected year
-  const filteredSubjects = subjects?.filter(s => selectedYear ? s.year === selectedYear : true) || [];
+  const filteredSubjects = subjects?.filter((s) => (selectedYear ? s.year === selectedYear : true)) || [];
 
   // Convert classes to options for ClassRankingSelector
-  const classOptions = classes?.map(cls => ({
-    id: cls.id,
-    name: cls.name,
-  })) || [];
-
-  // Debug logging
-  console.log('SingleSwapRequestForm Debug:', {
-    selectedYear,
-    classes,
-    classesLoading,
-    classesError,
-    classOptions: classOptions.length
-  });
+  const classOptions =
+    classes?.map((cls) => ({
+      id: cls.id,
+      name: cls.name,
+    })) || [];
 
   const onSubmit = async (data: FormType) => {
     setIsSubmitting(true);
@@ -91,12 +83,12 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
 
       toast.success("Pedido de permuta criado com sucesso! Redirecionando para os matches...");
       form.reset();
-      
+
       // Redirect to matches page after a short delay to show the toast
       setTimeout(() => {
-        router.push('/matches');
+        router.push("/matches");
       }, 1500);
-      
+
       onSuccess?.();
     } catch (error) {
       console.error("Error creating swap request:", error);
@@ -107,15 +99,12 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
   };
 
   const currentClassId = form.watch("currentClassId");
-  const availableClassOptions = classOptions.filter(option => option.id !== currentClassId);
+  const availableClassOptions = classOptions.filter((option) => option.id !== currentClassId);
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Criar Pedido de Permuta Individual</CardTitle>
-        <CardDescription>
-          Cria um pedido para trocar de turma numa disciplina específica.
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -127,7 +116,6 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
                 value={selectedYear?.toString() || ""}
                 onValueChange={(value) => {
                   const parsed = value ? parseInt(value, 10) : undefined;
-                  console.log('Year select changed:', { value, parsed });
                   setSelectedYear(parsed);
                   // Reset form when year changes, including currentClassId and subjectId
                   form.reset({
@@ -138,7 +126,7 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
                   });
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleciona o ano académico" />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,9 +137,6 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                Seleciona o ano académico para ver as turmas disponíveis.
-              </p>
             </div>
 
             {/* Subject Selection */}
@@ -161,13 +146,9 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Disciplina</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                    disabled={subjectsLoading}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value} disabled={subjectsLoading}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleciona a disciplina" />
                       </SelectTrigger>
                     </FormControl>
@@ -179,9 +160,6 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    Escolhe a disciplina para a qual queres trocar de turma.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -194,13 +172,9 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Turma Atual</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                    disabled={classesLoading || !selectedYear}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value} disabled={classesLoading || !selectedYear}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleciona a tua turma atual" />
                       </SelectTrigger>
                     </FormControl>
@@ -212,9 +186,6 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    A turma em que estás atualmente inscrito.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -225,14 +196,6 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
               control={form.control}
               name="preferredClassIds"
               render={({ field }) => {
-                console.log('DEBUG preferredClassIds:', {
-                  classOptions,
-                  availableClassOptions,
-                  currentClassId,
-                  selectedYear,
-                  fieldValue: field.value
-                });
-
                 // Show error message if needed
                 if (classesError) {
                   return (
@@ -322,20 +285,16 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
 
             {/* Submit Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button 
-                type="submit" 
-                disabled={isSubmitting || subjectsLoading || classesLoading}
-                className="flex-1"
-              >
+              <Button type="submit" disabled={isSubmitting || subjectsLoading || classesLoading} className="flex-1 h-11">
                 {isSubmitting ? "A criar..." : "Criar Pedido"}
               </Button>
               {onCancel && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={onCancel}
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
+                  className="flex-1 sm:flex-none h-11"
                 >
                   Cancelar
                 </Button>

@@ -105,7 +105,7 @@ class EmailService {
               <p>Se não criaste uma conta na Unclassed, podes ignorar este email.</p>
             </div>
             <div class="footer">
-              <p>© 2024 Unclassed - Instituto Superior de Engenharia do Porto</p>
+              <p>© 2025 Unclassed - NEI-ISEP</p>
             </div>
           </div>
         </body>
@@ -163,7 +163,7 @@ class EmailService {
               <p>Podes ver todos os detalhes e aceitar/rejeitar esta troca na tua dashboard.</p>
             </div>
             <div class="footer">
-              <p>© 2024 Unclassed - Instituto Superior de Engenharia do Porto</p>
+              <p>© 2025 Unclassed - NEI-ISEP</p>
             </div>
           </div>
         </body>
@@ -190,11 +190,11 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Verification email sent:', result.messageId);
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('🔗 Preview URL:', nodemailer.getTestMessageUrl(result));
       }
-      
+
       return true;
     } catch (error) {
       console.error('❌ Failed to send verification email:', error);
@@ -218,11 +218,11 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log('✅ Match notification sent:', result.messageId);
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log('🔗 Preview URL:', nodemailer.getTestMessageUrl(result));
       }
-      
+
       return true;
     } catch (error) {
       console.error('❌ Failed to send match notification:', error);
@@ -238,7 +238,7 @@ class EmailService {
 
     const statusEmoji = {
       'ACCEPTED': '✅',
-      'REJECTED': '❌', 
+      'REJECTED': '❌',
       'COMPLETED': '🎉',
       'CANCELLED': '⚠️'
     };
@@ -247,7 +247,7 @@ class EmailService {
 
     try {
       const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      
+
       const mailOptions = {
         from: this.fromEmail,
         to: userEmail,
