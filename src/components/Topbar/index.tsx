@@ -16,9 +16,22 @@ const Topbar: React.FC = async () => {
   return (
     <nav className="absolute top-0 flex h-[12vh] w-full items-center justify-between px-8">
       <Link href={session ? "/dashboard" : "/"} className="flex items-center gap-x-2">
-        <h2 className="font-poppins text-lg font-black uppercase md:text-xl">
-          Unclassed
-        </h2>
+        <Image
+          src="/images/unclassed-black.svg"
+          alt="Unclassed Logo"
+          width={120}
+          height={32}
+          className="block dark:hidden"
+          priority
+        />
+        <Image
+          src="/images/unclassed-white.svg"
+          alt="Unclassed Logo"
+          width={120}
+          height={32}
+          className="hidden dark:block"
+          priority
+        />
       </Link>
       <div className="flex items-center justify-center gap-x-4">
         <DarkModeToggle />

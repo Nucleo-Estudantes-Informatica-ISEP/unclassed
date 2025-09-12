@@ -24,14 +24,18 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+    /* Accent hues for gradients */
+    --accent-blue: 221 83% 53%;
+    --accent-violet: 258 90% 66%;
+    --accent-pink: 330 81% 60%;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 240 10% 3.5%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 240 10% 6%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 240 10% 6%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
@@ -55,5 +59,41 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-attachment: fixed;
+  }
+}
+
+/* Utilities for the landing background and glass surfaces */
+@layer utilities {
+  .bg-radial {
+    background-image:
+      radial-gradient(1200px 600px at 20% -10%, hsl(var(--accent-blue) / 0.18), transparent 60%),
+      radial-gradient(1000px 600px at 80% 0%, hsl(var(--accent-pink) / 0.15), transparent 60%),
+      radial-gradient(800px 600px at 50% 100%, hsl(var(--accent-violet) / 0.14), transparent 60%);
+  }
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.08) 1px, transparent 1px);
+  }
+  .glass {
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.65),
+      hsl(var(--card) / 0.35)
+    );
+    border: 1px solid hsl(var(--border) / 0.45);
+  }
+  .text-gradient {
+    background: linear-gradient(90deg, hsl(var(--accent-blue)), hsl(var(--accent-violet)), hsl(var(--accent-pink)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glow-blue {
+    box-shadow: 0 0 250px rgba(27, 174, 217, 0.25);
   }
 }

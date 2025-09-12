@@ -69,14 +69,41 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        float: {
+          "0%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-16px)" },
+          "100%": { transform: "translateY(0px)" },
+        },
+        drift: {
+          "0%": { transform: "translateX(0px) rotate(0deg)" },
+          "50%": { transform: "translateX(10px) rotate(2deg)" },
+          "100%": { transform: "translateX(0px) rotate(0deg)" },
+        },
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 0px rgba(99,102,241,0.0)" },
+          "50%": { boxShadow: "0 0 28px rgba(99,102,241,0.45)" },
+        },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
-        poppins: ["var(--font-poppins)", "Poppins", ...fontFamily.sans],
+        sans: ["Inter", ...fontFamily.sans],
+        poppins: ["Poppins", ...fontFamily.sans],
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        float: "float 6s ease-in-out infinite",
+        drift: "drift 10s ease-in-out infinite",
+        "spin-slow": "spin-slow 18s linear infinite",
+        "fade-in": "fade-in 600ms ease-out both",
+        "pulse-glow": "pulse-glow 3s ease-in-out infinite",
       },
     },
   },
