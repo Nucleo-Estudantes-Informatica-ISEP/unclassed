@@ -182,21 +182,33 @@ export class AdvancedMatchingService {
     try {
       console.log(`🚀 Starting immediate processing for request ${requestId}`);
 
-      const matches = await this.findDirectMatches(requestId, context);
-
-      if (matches.length > 0) {
-        console.log(
-          `✅ Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`
-        );
-
-        // Before creating new matches, check if we can upgrade existing provisional ones
-        await this.upgradeProvisionalMatches(matches);
-
-        return await this.createMatches(matches); // Use the calculated isProvisional from matches
+      // Acquire partition lock for immediate processing to prevent race conditions
+      const lockAcquired = await this.lockPartition(context.partition.id, context.processId);
+      if (!lockAcquired) {
+        console.log(`🔒 Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`);
+        return [];
       }
 
-      console.log(`⏳ No immediate matches found for ${requestId}`);
-      return [];
+      try {
+        const matches = await this.findDirectMatches(requestId, context);
+
+        if (matches.length > 0) {
+          console.log(
+            `✅ Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`
+          );
+
+          // Before creating new matches, check if we can upgrade existing provisional ones
+          await this.upgradeProvisionalMatches(matches);
+
+          return await this.createMatches(matches); // Use the calculated isProvisional from matches
+        }
+
+        console.log(`⏳ No immediate matches found for ${requestId}`);
+        return [];
+      } finally {
+        // Always unlock the partition
+        await this.unlockPartition(context.partition.id, context.processId);
+      }
     } catch (error) {
       console.error(`❌ Immediate processing failed for ${requestId}:`, error);
       return [];
@@ -1268,76 +1280,86 @@ export class AdvancedMatchingService {
           }
         }
 
-        // Pre-flight lock check: all involved requests must still be ACTIVE at this moment
-        if (match.singleSwapRequestIds.length > 0) {
-          const singles = await prisma.singleSwapRequest.findMany({
-            where: { id: { in: match.singleSwapRequestIds } },
-            select: { id: true, status: true, provisionalMatchId: true },
-          });
-          const allActive = singles.every((s) => s.status === "ACTIVE" && !s.provisionalMatchId);
-          if (!allActive) {
-            console.log(`⛔ Skipping match creation: single request already locked or not ACTIVE`);
-            continue;
+        // Use atomic transaction to prevent race conditions between multiple machines
+        const result = await prisma.$transaction(async (tx) => {
+          // Final check that requests are still ACTIVE (within transaction lock)
+          if (match.singleSwapRequestIds.length > 0) {
+            const singles = await tx.singleSwapRequest.findMany({
+              where: { id: { in: match.singleSwapRequestIds } },
+              select: { id: true, status: true, provisionalMatchId: true },
+            });
+            const allActive = singles.every((s) => s.status === "ACTIVE" && !s.provisionalMatchId);
+            if (!allActive) {
+              throw new Error('Single swap requests no longer active - race condition detected');
+            }
           }
-        }
-        if (match.bundleSwapRequestIds.length > 0) {
-          const bundles = await prisma.bundleSwapRequest.findMany({
-            where: { id: { in: match.bundleSwapRequestIds } },
-            select: { id: true, status: true, provisionalMatchId: true },
-          });
-          const allActive = bundles.every((b) => b.status === "ACTIVE" && !b.provisionalMatchId);
-          if (!allActive) {
-            console.log(`⛔ Skipping match creation: bundle request already locked or not ACTIVE`);
-            continue;
+          
+          if (match.bundleSwapRequestIds.length > 0) {
+            const bundles = await tx.bundleSwapRequest.findMany({
+              where: { id: { in: match.bundleSwapRequestIds } },
+              select: { id: true, status: true, provisionalMatchId: true },
+            });
+            const allActive = bundles.every((b) => b.status === "ACTIVE" && !b.provisionalMatchId);
+            if (!allActive) {
+              throw new Error('Bundle swap requests no longer active - race condition detected');
+            }
           }
-        }
 
-        const createdMatch = await prisma.match.create({
-          data: {
-            matchType:
-              match.singleSwapRequestIds.length > 0 ? "SINGLE" : "BUNDLE",
-            swapPattern: match.pattern,
-            status: "PROPOSED",
-            isProvisional,
-            provisionalUntil,
-            satisfactionScore: match.satisfactionScore,
-            processingTime: match.processingTime,
-            graphPartition: match.graphPartition,
-            participants: match.participants as unknown as Prisma.InputJsonValue[],
-            singleSwapRequestIds: match.singleSwapRequestIds,
-            bundleSwapRequestIds: match.bundleSwapRequestIds,
-          },
+          // Create the match atomically
+          const createdMatch = await tx.match.create({
+            data: {
+              matchType:
+                match.singleSwapRequestIds.length > 0 ? "SINGLE" : "BUNDLE",
+              swapPattern: match.pattern,
+              status: "PROPOSED",
+              isProvisional,
+              provisionalUntil,
+              satisfactionScore: match.satisfactionScore,
+              processingTime: match.processingTime,
+              graphPartition: match.graphPartition,
+              participants: match.participants as unknown as Prisma.InputJsonValue[],
+              singleSwapRequestIds: match.singleSwapRequestIds,
+              bundleSwapRequestIds: match.bundleSwapRequestIds,
+            },
+          });
+
+          // Update request statuses atomically in same transaction
+          if (match.singleSwapRequestIds.length > 0) {
+            await tx.singleSwapRequest.updateMany({
+              where: { id: { in: match.singleSwapRequestIds } },
+              data: {
+                status: "MATCHED", // Lock request while match is proposed (provisional or not)
+                provisionalMatchId: createdMatch.id,
+                provisionalUntil,
+              },
+            });
+          }
+
+          if (match.bundleSwapRequestIds.length > 0) {
+            await tx.bundleSwapRequest.updateMany({
+              where: { id: { in: match.bundleSwapRequestIds } },
+              data: {
+                status: "MATCHED", // Lock request while match is proposed (provisional or not)
+                provisionalMatchId: createdMatch.id,
+                provisionalUntil,
+              },
+            });
+          }
+
+          return { createdMatch, match };
         });
 
-        // Update request statuses
-        if (match.singleSwapRequestIds.length > 0) {
-          await prisma.singleSwapRequest.updateMany({
-            where: { id: { in: match.singleSwapRequestIds } },
-            data: {
-              status: "MATCHED", // Lock request while match is proposed (provisional or not)
-              provisionalMatchId: createdMatch.id,
-              provisionalUntil,
-            },
-          });
-        }
+        createdMatches.push(result.match);
 
-        if (match.bundleSwapRequestIds.length > 0) {
-          await prisma.bundleSwapRequest.updateMany({
-            where: { id: { in: match.bundleSwapRequestIds } },
-            data: {
-              status: "MATCHED", // Lock request while match is proposed (provisional or not)
-              provisionalMatchId: createdMatch.id,
-              provisionalUntil,
-            },
-          });
-        }
-
-        createdMatches.push(match);
-
-        // Send email notifications to all participants
-        await this.sendMatchNotifications(createdMatch.id, match);
+        // Send email notifications to all participants (outside transaction)
+        await this.sendMatchNotifications(result.createdMatch.id, result.match);
+        
       } catch (error) {
-        console.error(`Error creating match:`, error);
+        if (error instanceof Error && error.message.includes('race condition detected')) {
+          console.log(`⚡ Race condition detected for match - skipping (another machine already processed these requests)`);
+        } else {
+          console.error(`❌ Error creating match:`, error);
+        }
       }
     }
 
