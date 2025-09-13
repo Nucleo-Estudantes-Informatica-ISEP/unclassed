@@ -397,8 +397,14 @@ export class AdvancedMatchingService {
     };
 
     try {
-      // Lock partition for processing
-      await this.lockPartition(partition.id, context.processId);
+      // Lock partition for processing (distributed lock)
+      const acquired = await this.lockPartition(partition.id, context.processId);
+      if (!acquired) {
+        console.log(
+          `🔒 Skipping partition ${partition.partitionKey}: lock already held by another worker`
+        );
+        return;
+      }
 
       console.log(
         `🔧 Processing partition ${partition.partitionKey} (${partition.activeRequests} active requests)`
@@ -436,7 +442,7 @@ export class AdvancedMatchingService {
       );
     } finally {
       // Always unlock partition
-      await this.unlockPartition(partition.id);
+      await this.unlockPartition(partition.id, context.processId);
     }
   }
 
@@ -842,20 +848,23 @@ export class AdvancedMatchingService {
   private async lockPartition(
     partitionId: string,
     processId: string
-  ): Promise<void> {
-    await prisma.graphPartition.update({
-      where: { id: partitionId },
+  ): Promise<boolean> {
+    // Attempt to acquire the lock only if not already locked
+    const res = await prisma.graphPartition.updateMany({
+      where: { id: partitionId, isLocked: false },
       data: {
         isLocked: true,
         lockedAt: new Date(),
         lockedBy: processId,
       },
     });
+    return res.count === 1;
   }
 
-  private async unlockPartition(partitionId: string): Promise<void> {
-    await prisma.graphPartition.update({
-      where: { id: partitionId },
+  private async unlockPartition(partitionId: string, processId?: string): Promise<void> {
+    // Release lock only if held by this process (if provided)
+    await prisma.graphPartition.updateMany({
+      where: processId ? { id: partitionId, lockedBy: processId } : { id: partitionId },
       data: {
         isLocked: false,
         lockedAt: null,
