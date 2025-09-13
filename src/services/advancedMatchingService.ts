@@ -548,22 +548,29 @@ export class AdvancedMatchingService {
    * Expire old provisional matches
    */
   async expireProvisionalMatches(): Promise<number> {
-    const expired = await prisma.match.updateMany({
-      where: {
-        isProvisional: true,
-        provisionalUntil: { lte: new Date() },
-      },
-      data: {
-        status: "REJECTED",
-        isProvisional: false,
-      },
+    const now = new Date();
+    const toExpire = (await prisma.match.findMany({
+      where: { isProvisional: true, provisionalUntil: { lte: now } },
+    })) as unknown as StoredMatch[];
+
+    if (toExpire.length === 0) return 0;
+
+    await prisma.match.updateMany({
+      where: { id: { in: toExpire.map((m) => m.id) } },
+      data: { status: "REJECTED", isProvisional: false },
     });
 
-    if (expired.count > 0) {
-      console.log(`⌛ Expired ${expired.count} provisional matches`);
+    // Reactivate all requests involved in the expired provisional matches
+    for (const m of toExpire) {
+      try {
+        await this.reactivateRequestsFromMatch(m);
+      } catch (e) {
+        console.warn(`Failed to reactivate requests for expired match ${m.id}:`, e);
+      }
     }
 
-    return expired.count;
+    console.log(`⌛ Expired ${toExpire.length} provisional matches`);
+    return toExpire.length;
   }
 
   // ===== GRAPH MANAGEMENT =====
@@ -867,6 +874,174 @@ export class AdvancedMatchingService {
     });
   }
 
+  /**
+   * Public: Return a snapshot of the graph for a given partitionKey
+   * Includes nodes (requests) and directed edges (preferences) with weights/satisfaction
+   */
+  async getGraphSnapshot(partitionKey: string): Promise<{
+    partition: GraphPartition | null;
+    partitionLabel?: string;
+    nodes: Array<{
+      id: string;
+      userId: string;
+      userName?: string;
+      currentClassId: string;
+      currentClassName?: string;
+      preferredClassIds: string[];
+      requestType: "single" | "bundle";
+      priority: number;
+      createdAt: Date;
+      subjectId?: string;
+      subjectName?: string;
+    }>;
+    edges: Array<{
+      from: string;
+      to: string;
+      weight: number;
+      satisfactionScore: number;
+      fromClassId: string;
+      fromClassName?: string;
+      toClassId: string;
+      toClassName?: string;
+    }>;
+  }> {
+    // Find partition
+    const partition = await prisma.graphPartition.findUnique({
+      where: { partitionKey },
+    });
+
+    if (!partition) {
+      return { partition: null, nodes: [], edges: [] };
+    }
+
+    // Build the list of active requests (nodes) mirroring buildPartitionGraph
+    let requests: GraphNode[] = [];
+
+    if (partition.ticketType === "SPECIFIC_CLASS") {
+      const singleRequests = (await prisma.singleSwapRequest.findMany({
+        where: {
+          graphPartition: partition.partitionKey,
+          status: "ACTIVE",
+        },
+        include: { subject: true },
+      })) as unknown as SingleSwapRequestRecord[];
+
+      const filtered = await this.filterUsersWithAcceptedMatches(singleRequests);
+
+      requests = filtered.map((r: SingleSwapRequestRecord): GraphNode => ({
+        requestId: r.id,
+        userId: r.userId,
+        currentClassId: r.currentClassId,
+        preferredClassIds: r.preferredClassIds,
+        requestType: "single",
+        priority: r.priority,
+        createdAt: r.createdAt,
+        subjectId: r.subjectId,
+      }));
+    } else {
+      const bundleRequests = (await prisma.bundleSwapRequest.findMany({
+        where: {
+          graphPartition: partition.partitionKey,
+          status: "ACTIVE",
+        },
+      })) as unknown as BundleSwapRequestRecord[];
+
+      const filtered = await this.filterUsersWithAcceptedMatches(bundleRequests);
+
+      requests = filtered.map((r: BundleSwapRequestRecord): GraphNode => ({
+        requestId: r.id,
+        userId: r.userId,
+        currentClassId: r.currentClassId,
+        preferredClassIds: r.preferredClassIds,
+        requestType: "bundle",
+        priority: r.priority,
+        createdAt: r.createdAt,
+      }));
+    }
+
+    // Build edges
+    const edges: Array<{
+      from: string;
+      to: string;
+      weight: number;
+      satisfactionScore: number;
+      fromClassId: string;
+      fromClassName?: string;
+      toClassId: string;
+      toClassName?: string;
+    }> = [];
+
+    for (const request of requests) {
+      for (const other of requests) {
+        if (request.requestId === other.requestId) continue;
+        if (request.preferredClassIds.includes(other.currentClassId)) {
+          const weight = this.calculateEdgeWeight(request, other);
+          const satisfactionScore = this.getIndividualSatisfaction(
+            request,
+            other.currentClassId
+          );
+          edges.push({
+            from: request.requestId,
+            to: other.requestId,
+            weight,
+            satisfactionScore,
+            fromClassId: request.currentClassId,
+            toClassId: other.currentClassId,
+          });
+        }
+      }
+    }
+
+    // Enrich with names
+    const nodeUserIds = Array.from(new Set(requests.map((r) => r.userId)));
+    const classIds = new Set<string>();
+    requests.forEach((r) => classIds.add(r.currentClassId));
+    edges.forEach((e) => { classIds.add(e.fromClassId); classIds.add(e.toClassId); });
+    const subjectIds = Array.from(new Set(requests.map((r) => r.subjectId).filter(Boolean))) as string[];
+
+    const [users, classes, subjects] = await Promise.all([
+      nodeUserIds.length > 0
+        ? prisma.user.findMany({ where: { id: { in: nodeUserIds } }, select: { id: true, name: true } })
+        : Promise.resolve([] as { id: string; name: string }[]),
+      classIds.size > 0
+        ? prisma.class.findMany({ where: { id: { in: Array.from(classIds) } }, select: { id: true, name: true } })
+        : Promise.resolve([] as { id: string; name: string }[]),
+      subjectIds.length > 0
+        ? prisma.subject.findMany({ where: { id: { in: subjectIds } }, select: { id: true, name: true } })
+        : Promise.resolve([] as { id: string; name: string }[]),
+    ]);
+
+    const userMap = new Map(users.map((u) => [u.id, u.name]));
+    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
+
+    const nodes = requests.map((r) => ({
+      id: r.requestId,
+      userId: r.userId,
+      userName: userMap.get(r.userId),
+      currentClassId: r.currentClassId,
+      currentClassName: classMap.get(r.currentClassId),
+      preferredClassIds: r.preferredClassIds,
+      requestType: r.requestType,
+      priority: r.priority,
+      createdAt: r.createdAt,
+      subjectId: r.subjectId,
+      subjectName: r.subjectId ? subjectMap.get(r.subjectId) : undefined,
+    }));
+
+    const edgesWithNames = edges.map((e) => ({
+      ...e,
+      fromClassName: classMap.get(e.fromClassId),
+      toClassName: classMap.get(e.toClassId),
+    }));
+
+    const partitionLabel = partition.ticketType === "SPECIFIC_CLASS"
+      ? `Subject ${partition.subjectId || ""}`
+      : `Year ${partition.year ?? ""}`;
+
+    return { partition, partitionLabel, nodes, edges: edgesWithNames };
+  }
+
   private async updatePartitionRequestCount(
     partitionKey: string
   ): Promise<void> {
@@ -1016,13 +1191,97 @@ export class AdvancedMatchingService {
     for (const match of matches) {
       try {
         // Use individual match isProvisional value, or fallback to global parameter
-        const isProvisional =
+        let isProvisional =
           globalIsProvisional !== undefined
             ? globalIsProvisional
             : match.isProvisional;
         const provisionalUntil = isProvisional
           ? new Date(Date.now() + 6 * 60 * 60 * 1000) // 6 hours
           : undefined;
+
+        // Guard: prevent duplicate provisional proposals for same participants
+        const userIds = match.participants.map((p: MatchParticipant) => p.userId);
+        const existingForUsers = await this.findProvisionalMatchesForUsers(userIds);
+
+        if (existingForUsers.length > 0) {
+          // If there is any existing non-provisional PROPOSED/ACCEPTED match for any participant,
+          // we lock out creation entirely (strict locking)
+          const hasCommitted = existingForUsers.some(
+            (m) => !m.isProvisional && ["PROPOSED", "ACCEPTED"].includes(m.status as string)
+          );
+          if (hasCommitted) {
+            console.log(
+              `⛔ Skipping match creation: users already in committed match (PROPOSED/ACCEPTED)`
+            );
+            continue;
+          }
+
+          if (!isProvisional) {
+            // New permanent (non-provisional) match should supersede older provisional matches
+            for (const existing of existingForUsers) {
+              try {
+                await prisma.match.update({ where: { id: existing.id }, data: { status: "UPGRADED" } });
+                await this.reactivateRequestsFromMatch(existing);
+              } catch (e) {
+                console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
+              }
+            }
+          } else {
+            // New provisional: only create if it is strictly better than ALL existing overlapping ones
+            let canCreate = false;
+            for (const existing of existingForUsers) {
+              const improvementThreshold = 0.05;
+              const satisfactionDiff = match.satisfactionScore - (existing.satisfactionScore || 0);
+              const newIsPerfect = match.satisfactionScore >= 0.99;
+              const existingIsPerfect = (existing.satisfactionScore || 0) >= 0.99;
+              const shouldUpgrade =
+                satisfactionDiff > improvementThreshold || (newIsPerfect && existingIsPerfect);
+              if (shouldUpgrade) {
+                // Upgrade old and allow creation
+                try {
+                  await prisma.match.update({ where: { id: existing.id }, data: { status: "UPGRADED" } });
+                  await this.reactivateRequestsFromMatch(existing);
+                } catch (e) {
+                  console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
+                }
+                canCreate = true;
+              }
+            }
+            if (!canCreate) {
+              // Skip creating this provisional match as it doesn't improve upon existing ones
+              console.log(
+                `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
+              );
+              continue;
+            }
+            // Ensure created match remains provisional
+            isProvisional = true;
+          }
+        }
+
+        // Pre-flight lock check: all involved requests must still be ACTIVE at this moment
+        if (match.singleSwapRequestIds.length > 0) {
+          const singles = await prisma.singleSwapRequest.findMany({
+            where: { id: { in: match.singleSwapRequestIds } },
+            select: { id: true, status: true, provisionalMatchId: true },
+          });
+          const allActive = singles.every((s) => s.status === "ACTIVE" && !s.provisionalMatchId);
+          if (!allActive) {
+            console.log(`⛔ Skipping match creation: single request already locked or not ACTIVE`);
+            continue;
+          }
+        }
+        if (match.bundleSwapRequestIds.length > 0) {
+          const bundles = await prisma.bundleSwapRequest.findMany({
+            where: { id: { in: match.bundleSwapRequestIds } },
+            select: { id: true, status: true, provisionalMatchId: true },
+          });
+          const allActive = bundles.every((b) => b.status === "ACTIVE" && !b.provisionalMatchId);
+          if (!allActive) {
+            console.log(`⛔ Skipping match creation: bundle request already locked or not ACTIVE`);
+            continue;
+          }
+        }
 
         const createdMatch = await prisma.match.create({
           data: {
@@ -1046,7 +1305,7 @@ export class AdvancedMatchingService {
           await prisma.singleSwapRequest.updateMany({
             where: { id: { in: match.singleSwapRequestIds } },
             data: {
-              status: isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
+              status: "MATCHED", // Lock request while match is proposed (provisional or not)
               provisionalMatchId: createdMatch.id,
               provisionalUntil,
             },
@@ -1057,7 +1316,7 @@ export class AdvancedMatchingService {
           await prisma.bundleSwapRequest.updateMany({
             where: { id: { in: match.bundleSwapRequestIds } },
             data: {
-              status: isProvisional ? "ACTIVE" : "MATCHED", // Keep ACTIVE if provisional for upgrades
+              status: "MATCHED", // Lock request while match is proposed (provisional or not)
               provisionalMatchId: createdMatch.id,
               provisionalUntil,
             },
