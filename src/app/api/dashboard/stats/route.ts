@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
  * GET /api/dashboard/stats
  * Returns actionable stats for dashboard charts
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get all classes
     const classes = await prisma.class.findMany({ select: { id: true, name: true } });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Popular classes to swap INTO
-    const intoCounts = {};
+    const intoCounts: Record<string, number> = {};
     for (const req of allActive) {
       for (const classId of req.preferredClassIds) {
         intoCounts[classId] = (intoCounts[classId] || 0) + 1;
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 10);
 
     // Popular classes to LEAVE
-    const leaveCounts = {};
+    const leaveCounts: Record<string, number> = {};
     for (const req of allActive) {
       leaveCounts[req.currentClassId] = (leaveCounts[req.currentClassId] || 0) + 1;
     }
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     }).sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0)).slice(0, 10);
 
     // Success rate and average wait time by class
-    const matchClassStats = {};
+    const matchClassStats: Record<string, { matches: number; totalWait: number; requests: number }> = {};
     for (const match of matches) {
       for (const reqId of [...(match.singleSwapRequestIds || []), ...(match.bundleSwapRequestIds || [])]) {
         // Find the request
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       if (!matchClassStats[classId]) matchClassStats[classId] = { matches: 0, totalWait: 0, requests: 0 };
       matchClassStats[classId].requests++;
     }
-    const classSuccessStats = Object.entries(matchClassStats).map(([id, stat]) => ({
+    const classSuccessStats = Object.entries(matchClassStats).map(([id, stat]: [string, { matches: number; totalWait: number; requests: number }]) => ({
       id,
       name: classMap.get(id) || id,
       successRate: stat.requests ? stat.matches / stat.requests : null,
