@@ -1,13 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -28,12 +27,12 @@ const Login: React.FC = () => {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const message = searchParams.get('message');
-    if (message === 'email_verified') {
-      toast.success('✅ Email verificado com sucesso! Já podes fazer login.');
-    } else if (message === 'already_verified') {
-      toast.info('ℹ️ Email já estava verificado. Podes fazer login.');
-    }
+    const message = searchParams.get("message");
+    if (message === "email_verified") {
+      toast.success("✅ Email verificado com sucesso! Já podes fazer login.");
+    } else if (message === "already_verified") {
+      toast.info("ℹ️ Email já estava verificado. Podes fazer login.");
+    } 
   }, [searchParams]);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -49,7 +48,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
     try {
       console.log("Submitting login:", { email: values.email }); // Debug log
-      
+
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -110,6 +109,11 @@ const Login: React.FC = () => {
             </FormItem>
           )}
         />
+        <div className="flex justify-end">
+          <Link className="text-sm underline" href="/forgot-password">
+            Esqueci-me da password
+          </Link>
+        </div>
         <div className="flex flex-col gap-y-2">
           <Button className="mt-8" type="submit" disabled={isLoading}>
             {isLoading ? "A entrar..." : "Entrar"}
