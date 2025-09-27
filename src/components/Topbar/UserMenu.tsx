@@ -14,9 +14,10 @@ interface UserMenuProps {
     email: string;
     role: string;
   };
+  isSystemUnavailable?: boolean;
 }
 
-export default function UserMenu({ user }: UserMenuProps) {
+export default function UserMenu({ user, isSystemUnavailable = false }: UserMenuProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
@@ -104,13 +105,15 @@ export default function UserMenu({ user }: UserMenuProps) {
           </div>
 
           <div className="p-2">
-            <button
-              onClick={handleProfile}
-              className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              <User className="mr-2 h-4 w-4" />
-              <span>Perfil</span>
-            </button>
+            {(!isSystemUnavailable || user.role === "ADMIN") && (
+              <button
+                onClick={handleProfile}
+                className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+              >
+                <User className="mr-2 h-4 w-4" />
+                <span>Perfil</span>
+              </button>
+            )}
 
             <button
               onClick={handleLogout}

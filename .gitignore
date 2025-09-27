@@ -45,3 +45,6 @@ cookies*.txt
 WARP.md
 pnpm-workspace.yaml
 scripts/
+.vscode/settings.json
+docker-compose.dev.yml
+pnpm-lock.yaml

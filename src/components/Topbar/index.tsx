@@ -7,6 +7,7 @@ import { useState } from "react";
 import DarkModeToggle from "../DarkModeToggle";
 import UserMenu from "./UserMenu";
 import type { Session } from "@/types/Session";
+import { useSystemStatus } from "@/context/SystemStatusContext";
 
 interface TopbarProps {
   user?: Session;
@@ -14,6 +15,7 @@ interface TopbarProps {
 
 const Topbar: React.FC<TopbarProps> = ({ user }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { isUnavailable } = useSystemStatus();
 
   return (
     <nav className="relative left-0 top-0 z-50 w-full bg-[#CFCFCF]/80 backdrop-blur-sm shadow-sm dark:bg-[#101010]/80">
@@ -45,25 +47,29 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
           <DarkModeToggle />
           {user ? (
             <>
-              <Link
-                href="/dashboard"
-                className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/swap-requests"
-                className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-              >
-                Criar Pedido
-              </Link>
-              <Link
-                href="/matches"
-                className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-              >
-                Meus Matches
-              </Link>
-              <UserMenu user={user} />
+              {(!isUnavailable || user.role === "ADMIN") && (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/swap-requests"
+                    className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                  >
+                    Criar Pedido
+                  </Link>
+                  <Link
+                    href="/matches"
+                    className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                  >
+                    Meus Matches
+                  </Link>
+                </>
+              )}
+              <UserMenu user={user} isSystemUnavailable={isUnavailable} />
             </>
           ) : (
             <Link
@@ -144,34 +150,40 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                   )}
                 </div>
 
-                <Link
-                  href="/dashboard"
-                  className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/swap-requests"
-                  className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Criar Pedido
-                </Link>
-                <Link
-                  href="/matches"
-                  className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Meus Matches
-                </Link>
-                <Link
-                  href="/profile"
-                  className="block rounded-md bg-gray-100 px-4 py-3 text-center font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Perfil
-                </Link>
+                {(!isUnavailable || user.role === "ADMIN") && (
+                  <>
+                    <Link
+                      href="/dashboard"
+                      className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/swap-requests"
+                      className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Criar Pedido
+                    </Link>
+                    <Link
+                      href="/matches"
+                      className="block rounded-md bg-[#101010] px-4 py-3 text-center font-medium text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Meus Matches
+                    </Link>
+                  </>
+                )}
+                {(!isUnavailable || user.role === "ADMIN") && (
+                  <Link
+                    href="/profile"
+                    className="block rounded-md bg-gray-100 px-4 py-3 text-center font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Perfil
+                  </Link>
+                )}
                 <button
                   onClick={async () => {
                     setMenuOpen(false);

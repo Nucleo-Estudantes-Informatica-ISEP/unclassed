@@ -10,6 +10,8 @@ import getServerSession from "@/services/getServerSession";
 import { Footer } from "@/components/Footer";
 import Topbar from "@/components/Topbar";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { SystemStatusProvider } from "@/context/SystemStatusContext";
+import RouteProtection from "@/components/RouteProtection";
 
 // Auto-initialize application services (cron scheduler, etc.)
 import "@/lib/startup";
@@ -48,11 +50,15 @@ export default async function RootLayout({
         className={cn("bg-background font-sans antialiased", inter.variable)}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="flex min-h-screen flex-col">
-            <Topbar user={userSession} />
-            <main className="grow pt-[2vh]">{children}</main>
-            <Footer />
-          </div>
+          <SystemStatusProvider>
+            <RouteProtection userRole={userSession?.role} isLoggedIn={!!userSession}>
+              <div className="flex min-h-screen flex-col">
+                <Topbar user={userSession} />
+                <main className="grow pt-[2vh]">{children}</main>
+                <Footer />
+              </div>
+            </RouteProtection>
+          </SystemStatusProvider>
           <Toaster />
         </ThemeProvider>
       </body>

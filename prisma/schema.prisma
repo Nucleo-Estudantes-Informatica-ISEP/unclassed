@@ -229,3 +229,13 @@ enum CronStatus {
   COMPLETED
   FAILED
 }
+
+model SystemSettings {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  key               String   @unique
+  value             String
+  description       String?
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?  @db.ObjectId
+  createdAt         DateTime @default(now())
+}

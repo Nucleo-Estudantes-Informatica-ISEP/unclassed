@@ -6,6 +6,7 @@ import { Button } from "@/lib/components/ui/button";
 import { Badge } from "@/lib/components/ui/badge";
 import { Progress } from "@/lib/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/lib/components/ui/tabs";
+import { Switch } from "@/lib/components/ui/switch";
 import { 
   Activity, 
   Clock, 
@@ -20,9 +21,11 @@ import {
   Pause,
   Settings,
   ArrowLeftRight,
-  XCircle
+  XCircle,
+  Power
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSystemStatus } from "@/context/SystemStatusContext";
 
 interface MatchingStats {
   partitions: number;
@@ -93,10 +96,14 @@ export default function AdvancedMatchingDashboard() {
   const [lastBatchResult, setLastBatchResult] = useState<BatchResult | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout>();
+  const [systemUnavailable, setSystemUnavailable] = useState(false);
+  const [updatingSystemStatus, setUpdatingSystemStatus] = useState(false);
+  const { refreshStatus } = useSystemStatus();
 
   // Load initial data
   useEffect(() => {
     loadStats();
+    loadSystemSettings();
   }, []);
 
   // Setup auto-refresh
@@ -140,6 +147,19 @@ export default function AdvancedMatchingDashboard() {
     }
   };
 
+  const loadSystemSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/system-settings?key=system_unavailable');
+      const data = await response.json();
+      
+      if (data.success && data.setting) {
+        setSystemUnavailable(data.setting.value === 'true');
+      }
+    } catch (error) {
+      console.error('Error loading system settings:', error);
+    }
+  };
+
   const runBatchProcessing = async () => {
     setRunningBatch(true);
     try {
@@ -164,6 +184,44 @@ export default function AdvancedMatchingDashboard() {
 
   const toggleAutoRefresh = () => {
     setAutoRefresh(!autoRefresh);
+  };
+
+  const toggleSystemUnavailable = async () => {
+    setUpdatingSystemStatus(true);
+    try {
+      const newStatus = !systemUnavailable;
+      const response = await fetch('/api/admin/system-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: 'system_unavailable',
+          value: newStatus.toString(),
+          description: 'Controls whether the system shows the unavailable landing page'
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSystemUnavailable(newStatus);
+        // Refresh the global system status
+        await refreshStatus();
+        toast.success(
+          newStatus 
+            ? 'Sistema marcado como indisponível - utilizadores serão redirecionados' 
+            : 'Sistema marcado como disponível - funcionamento normal'
+        );
+      } else {
+        toast.error('Erro ao atualizar estado do sistema');
+      }
+    } catch (error) {
+      console.error('Error updating system status:', error);
+      toast.error('Erro ao atualizar estado do sistema');
+    } finally {
+      setUpdatingSystemStatus(false);
+    }
   };
 
   if (loading) {
@@ -747,27 +805,54 @@ export default function AdvancedMatchingDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="h-5 w-5" />
-                  Dashboard Settings
+                  System Control
                 </CardTitle>
                 <CardDescription>
-                  Configure dashboard refresh and display options
+                  Control system availability and dashboard settings
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Auto-refresh</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically refresh statistics every 30 seconds
-                    </p>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-red-50 dark:bg-red-950/20">
+                  <div className="flex items-center gap-3">
+                    <Power className={`h-5 w-5 ${systemUnavailable ? 'text-red-500' : 'text-green-500'}`} />
+                    <div>
+                      <h3 className="font-medium">Sistema Indisponível</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {systemUnavailable 
+                          ? 'O sistema está indisponível - utilizadores veem página de indisponibilidade'
+                          : 'O sistema está disponível - funcionamento normal'
+                        }
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    variant={autoRefresh ? "default" : "outline"}
-                    size="sm"
-                    onClick={toggleAutoRefresh}
-                  >
-                    {autoRefresh ? "Enabled" : "Disabled"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={systemUnavailable}
+                      onCheckedChange={toggleSystemUnavailable}
+                      disabled={updatingSystemStatus}
+                    />
+                    {updatingSystemStatus && (
+                      <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Auto-refresh</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically refresh statistics every 30 seconds
+                      </p>
+                    </div>
+                    <Button
+                      variant={autoRefresh ? "default" : "outline"}
+                      size="sm"
+                      onClick={toggleAutoRefresh}
+                    >
+                      {autoRefresh ? "Enabled" : "Disabled"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="border-t pt-4">
