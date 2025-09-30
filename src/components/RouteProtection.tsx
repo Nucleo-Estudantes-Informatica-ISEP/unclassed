@@ -3,6 +3,11 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSystemStatus } from "@/context/SystemStatusContext";
+import {
+  RESTRICTED_ROUTES_WHEN_UNAVAILABLE as RESTRICTED_ROUTES,
+  ADMIN_ONLY_ROUTES_WHEN_UNAVAILABLE as ADMIN_ONLY_ROUTES,
+  ALLOWED_ROUTES_WHEN_UNAVAILABLE as ALLOWED_ROUTES,
+} from "@/config/routes";
 
 interface RouteProtectionProps {
   children: React.ReactNode;
@@ -15,50 +20,35 @@ export default function RouteProtection({ children, userRole, isLoggedIn = false
   const router = useRouter();
   const pathname = usePathname();
 
-  // Define restricted routes when system is unavailable
-  const restrictedRoutes = ['/dashboard', '/swap-requests', '/matches', '/register'];
-  const adminOnlyRoutes = ['/profile'];
-  const allowedWhenUnavailable = ['/unavailable', '/login'];
+  // Route rules loaded from centralized config
+  const restrictedRoutes = RESTRICTED_ROUTES;
+  const adminOnlyRoutes = ADMIN_ONLY_ROUTES;
+  const allowedWhenUnavailable = ALLOWED_ROUTES;
+
+  const isAdmin = () => userRole === 'ADMIN';
+  const isAllowed = () => allowedWhenUnavailable.some(route => pathname.startsWith(route));
+  const isRestricted = () => restrictedRoutes.some(route => pathname.startsWith(route));
+  const isAdminOnly = () => adminOnlyRoutes.some(route => pathname.startsWith(route));
+  const isHomepage = () => pathname === '/';
+
+  const shouldBlock = () => {
+    if (!isUnavailable) return false;
+    if (isAdmin()) return false;
+    if (isAllowed()) return false;
+    if (isRestricted()) return true;
+    if (isAdminOnly()) return true;
+    if (isHomepage()) return true;
+    return false;
+  };
 
   useEffect(() => {
-    // Always recheck status immediately on route/path changes
     refreshStatus();
   }, [pathname]);
 
   useEffect(() => {
     if (isLoading) return;
-
-    if (isUnavailable) {
-      // Admins can access everything even when system is unavailable
-      if (userRole === 'ADMIN') {
-        return;
-      }
-
-      // Allow access to unavailable page and login page only
-      if (allowedWhenUnavailable.some(route => pathname.startsWith(route))) {
-        return;
-      }
-
-      // Check if current route is restricted (includes register, dashboard, etc.)
-      const isRestrictedRoute = restrictedRoutes.some(route => pathname.startsWith(route));
-      
-      if (isRestrictedRoute) {
-        router.push('/unavailable');
-        return;
-      }
-
-      // Check if trying to access profile without admin role
-      const isAdminOnlyRoute = adminOnlyRoutes.some(route => pathname.startsWith(route));
-      if (isAdminOnlyRoute && userRole !== 'ADMIN') {
-        router.push('/unavailable');
-        return;
-      }
-
-      // For non-admin users (logged in or not), redirect from homepage to unavailable
-      if (pathname === '/' && userRole !== 'ADMIN') {
-        router.push('/unavailable');
-        return;
-      }
+    if (shouldBlock()) {
+      router.push('/unavailable');
     }
   }, [isUnavailable, isLoading, pathname, router, userRole, isLoggedIn]);
 

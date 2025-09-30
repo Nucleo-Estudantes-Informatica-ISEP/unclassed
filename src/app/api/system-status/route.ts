@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { INVALIDATE_CDN_CACHE_CONTROL_VALUE } from "@/lib/constants";
 
 // Ensure this route is always evaluated dynamically and not cached by Next.js
 export const dynamic = 'force-dynamic';
@@ -22,8 +23,7 @@ export async function GET(request: NextRequest) {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          // Prevent any intermediate caching (CDN/browser) so clients always get fresh status
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Cache-Control': INVALIDATE_CDN_CACHE_CONTROL_VALUE,
           Pragma: 'no-cache',
           Expires: '0',
         },

@@ -8,7 +8,7 @@ const UnavailablePage: React.FC = () => {
       <div className="pointer-events-none absolute inset-0 -z-30" />
 
       {/* Montage layer (Group 1814) - Desktop */}
-      <div className="pointer-events-none absolute inset-x-0 top-[-12vh] -z-20 hidden justify-center md:flex">
+      <div className="pointer-events-none absolute inset-x-0 -top-vh-12 -z-20 hidden justify-center md:flex">
         <Image
           src="/images/group-1814.png"
           alt="Geometric montage"
@@ -20,7 +20,7 @@ const UnavailablePage: React.FC = () => {
       </div>
 
       {/* Montage layer (Group 1814) - Mobile */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[-12vh] -z-20 flex justify-center md:hidden">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 -top-vh-12 -z-20 flex justify-center md:hidden">
         <Image
           src="/images/group-1814-mobile.png"
           alt="Geometric montage mobile"

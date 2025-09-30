@@ -20,6 +20,10 @@ const config = {
       },
     },
     extend: {
+      inset: {
+        // Allows classes like top-vh-12 and -top-vh-12
+        'vh-12': '12vh',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
