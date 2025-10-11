@@ -48,3 +48,5 @@ scripts/
 .vscode/settings.json
 docker-compose.dev.yml
 pnpm-lock.yaml
+docker-compose.dev.yml
+.vscode/settings.json

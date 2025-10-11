@@ -47,7 +47,6 @@ class EmailService {
         });
         console.log(`📧 Email service initialized with ${process.env.EMAIL_HOST}`);
       } else if (process.env.NODE_ENV === 'development') {
-        // For development without credentials, use Ethereal Email (test account)
         this.transporter = nodemailer.createTransport({
           host: 'smtp.ethereal.email',
           port: 587,
@@ -68,6 +67,53 @@ class EmailService {
 
   generateVerificationToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  generatePasswordResetToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  private getPasswordResetEmailTemplate(userName: string, resetUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #ffffff; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }
+            .header { background: #2563eb; color: #ffffff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; color: #333333; }
+            .button { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+            .footer { text-align: center; margin-top: 20px; font-size: 14px; color: #6b7280; }
+            h1, h2, h3 { color: #333333; }
+            p { color: #333333; }
+            code { background: #e5e7eb; padding: 2px 4px; border-radius: 3px; color: #333333; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Unclassed - ISEP</h1>
+              <p>Recuperação de Password</p>
+            </div>
+            <div class="content">
+              <h2>Olá ${userName}!</h2>
+              <p>Recebemos um pedido para recuperar a password da tua conta. Se foste tu que fizeste este pedido, clica no botão abaixo para criar uma nova password:</p>
+              <p style="text-align: center;">
+                <a href="${resetUrl}" class="button">Recuperar Password</a>
+              </p>
+              <p>Se não conseguires clicar no botão, copia e cola o seguinte link no teu navegador:</p>
+              <p><code>${resetUrl}</code></p>
+              <p><strong>Nota:</strong> Este link de recuperação expira em 1 hora.</p>
+              <p>Se não pediste para recuperar a password, podes ignorar este email em segurança.</p>
+            </div>
+            <div class="footer">
+              <p>© 2025 Unclassed - NEI-ISEP</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
   }
 
   private getVerificationEmailTemplate(userName: string, verificationUrl: string): string {
@@ -198,6 +244,37 @@ class EmailService {
       return true;
     } catch (error) {
       console.error('❌ Failed to send verification email:', error);
+      return false;
+    }
+  }
+
+  async sendPasswordResetEmail(userEmail: string, userName: string, resetToken: string): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email transporter not initialized');
+      return false;
+    }
+
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+
+      const mailOptions = {
+        from: this.fromEmail,
+        to: userEmail,
+        subject: '🔐 Recuperação de Password - Unclassed ISEP',
+        html: this.getPasswordResetEmailTemplate(userName, resetUrl)
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Password reset email sent:', result.messageId);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔗 Preview URL:', nodemailer.getTestMessageUrl(result));
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send password reset email:', error);
       return false;
     }
   }

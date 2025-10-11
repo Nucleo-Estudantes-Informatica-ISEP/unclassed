@@ -22,6 +22,8 @@ model User {
   emailVerified           Boolean             @default(false)
   verificationToken       String?
   verificationTokenExpiry DateTime?
+  passwordResetToken      String?
+  passwordResetExpiry     DateTime?
   emailNotifications      Boolean             @default(true) // Match notifications
   sharePhoneOnMatch       Boolean             @default(false) // Share phone number with match partners
   createdAt               DateTime            @default(now())
@@ -30,6 +32,7 @@ model User {
   bundleSwapRequests      BundleSwapRequest[]
 
   @@index([verificationToken])
+  @@index([passwordResetToken])
 }
 
 model Subject {
