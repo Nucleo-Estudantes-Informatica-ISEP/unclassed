@@ -33,3 +33,24 @@ export const loginSchema = z.object({
     message: "A password deve ter pelo menos 8 caracteres.",
   }),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email({
+    message: "O email deve ter um formato válido",
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, {
+    message: "Token é obrigatório",
+  }),
+  password: z.string().min(8, {
+    message: "A password deve ter pelo menos 8 caracteres.",
+  }),
+  confirmPassword: z.string().min(8, {
+    message: "A confirmação da password deve ter pelo menos 8 caracteres.",
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "As passwords não coincidem.",
+  path: ["confirmPassword"],
+});
