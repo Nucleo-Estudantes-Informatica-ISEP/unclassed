@@ -14,8 +14,3 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
-    networks:
-      - unclassed-network
-networks:
-  unclassed-network:
-    driver: bridge
