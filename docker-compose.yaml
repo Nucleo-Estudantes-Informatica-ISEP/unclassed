@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - ENABLE_CRON_SCHEDULER=true
+      - CRON_BATCH_MATCHING=${CRON_BATCH_MATCHING:-*/5 * * * *}
+      - CRON_PROVISIONAL_CLEANUP=${CRON_PROVISIONAL_CLEANUP:-*/30 * * * *}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - unclassed-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  unclassed-network:
+    driver: bridge
