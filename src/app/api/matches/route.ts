@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import {
+  buildMatchSignature,
+  compareMatchesByRecencyDesc,
+  shouldReplaceMatchByRecency,
+} from "@/lib/matchDedup";
 import prisma from "@/lib/prisma";
 import getServerSession from "@/services/getServerSession";
 
@@ -26,26 +31,17 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 }
 
 function getMatchSignature(match: MatchLike): string {
-  const requestIds = [
-    ...(match.singleSwapRequestIds || []),
-    ...(match.bundleSwapRequestIds || []),
-  ]
-    .slice()
-    .sort()
-    .join("|");
-
-  if (requestIds) {
-    return `${match.matchType}:${requestIds}`;
-  }
-
-  const participantFlow = coerceParticipants(match.participants)
-    .map(
-      (p) => `${p.userId ?? "unknown"}:${p.fromClass ?? ""}->${p.toClass ?? ""}`
-    )
-    .sort()
-    .join("|");
-
-  return `${match.matchType}:${match.swapPattern}:${participantFlow || "no-participants"}`;
+  return buildMatchSignature({
+    matchType: match.matchType,
+    swapPattern: match.swapPattern,
+    singleSwapRequestIds: match.singleSwapRequestIds,
+    bundleSwapRequestIds: match.bundleSwapRequestIds,
+    participants: coerceParticipants(match.participants).map((p) => ({
+      userId: p.userId,
+      fromClass: p.fromClass,
+      toClass: p.toClass,
+    })),
+  });
 }
 
 function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
@@ -55,14 +51,12 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
     const signature = getMatchSignature(match);
     const current = bySignature.get(signature);
 
-    if (!current || match.createdAt >= current.createdAt) {
+    if (shouldReplaceMatchByRecency(match, current)) {
       bySignature.set(signature, match);
     }
   }
 
-  return Array.from(bySignature.values()).sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
+  return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
 export async function GET(request: NextRequest) {

@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
+import {
+  buildMatchSignature,
+  compareMatchesByRecencyDesc,
+  shouldReplaceMatchByRecency,
+} from "@/lib/matchDedup";
 
 // Define the raw participant shape stored on Match.participants
 interface RawParticipant {
@@ -34,24 +39,17 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 }
 
 function getMatchSignature(match: MatchLike): string {
-  const requestIds = [
-    ...(match.singleSwapRequestIds || []),
-    ...(match.bundleSwapRequestIds || []),
-  ]
-    .slice()
-    .sort()
-    .join("|");
-
-  if (requestIds) {
-    return `${match.matchType}:${requestIds}`;
-  }
-
-  const participantFlow = coerceParticipants(match.participants)
-    .map((p) => `${p.userId}:${p.fromClass}->${p.toClass}`)
-    .sort()
-    .join("|");
-
-  return `${match.matchType}:${match.swapPattern}:${participantFlow || "no-participants"}`;
+  return buildMatchSignature({
+    matchType: match.matchType,
+    swapPattern: match.swapPattern,
+    singleSwapRequestIds: match.singleSwapRequestIds,
+    bundleSwapRequestIds: match.bundleSwapRequestIds,
+    participants: coerceParticipants(match.participants).map((p) => ({
+      userId: p.userId,
+      fromClass: p.fromClass,
+      toClass: p.toClass,
+    })),
+  });
 }
 
 function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
@@ -61,14 +59,12 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
     const signature = getMatchSignature(match);
     const current = bySignature.get(signature);
 
-    if (!current || match.createdAt >= current.createdAt) {
+    if (shouldReplaceMatchByRecency(match, current)) {
       bySignature.set(signature, match);
     }
   }
 
-  return Array.from(bySignature.values()).sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  );
+  return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
 export default async function MatchesPage() {

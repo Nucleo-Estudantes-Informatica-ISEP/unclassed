@@ -524,7 +524,7 @@ export class AdvancedMatchingService {
           // Mark old match as upgraded and reactivate its requests
           await prisma.match.update({
             where: { id: existing.id },
-            data: { status: "UPGRADED", isProvisional: false },
+            data: { status: "UPGRADED" },
           });
 
           // Reactivate requests from the old match
@@ -544,7 +544,11 @@ export class AdvancedMatchingService {
   async expireProvisionalMatches(): Promise<number> {
     const now = new Date();
     const toExpire = (await prisma.match.findMany({
-      where: { isProvisional: true, provisionalUntil: { lte: now } },
+      where: {
+        isProvisional: true,
+        status: { in: ["PROPOSED", "PROVISIONAL"] },
+        provisionalUntil: { lte: now },
+      },
     })) as unknown as StoredMatch[];
 
     if (toExpire.length === 0) return 0;
@@ -1216,7 +1220,7 @@ export class AdvancedMatchingService {
               try {
                 await prisma.match.update({
                   where: { id: existing.id },
-                  data: { status: "UPGRADED", isProvisional: false },
+                  data: { status: "UPGRADED" },
                 });
                 await this.reactivateRequestsFromMatch(existing);
               } catch (e) {
@@ -1245,7 +1249,7 @@ export class AdvancedMatchingService {
               try {
                 await prisma.match.update({
                   where: { id: existing.id },
-                  data: { status: "UPGRADED", isProvisional: false },
+                  data: { status: "UPGRADED" },
                 });
                 await this.reactivateRequestsFromMatch(existing);
               } catch (e) {

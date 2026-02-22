@@ -37,6 +37,11 @@ import {
   useMatches,
   useSingleSwapRequests,
 } from "@/hooks/useApi";
+import {
+  buildMatchSignature,
+  compareMatchesByRecencyDesc,
+  shouldReplaceMatchByRecency,
+} from "@/lib/matchDedup";
 import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
 import { ClientDate } from "@/components/ClientDate";
 
@@ -63,24 +68,17 @@ type DashboardMatch = {
 };
 
 function getMatchSignature(match: DashboardMatch): string {
-  const requestIds = [
-    ...(match.singleSwapRequestIds || []),
-    ...(match.bundleSwapRequestIds || []),
-  ]
-    .slice()
-    .sort()
-    .join("|");
-
-  if (requestIds) {
-    return `${match.matchType}:${requestIds}`;
-  }
-
-  const participantFlow = match.participants
-    .map((p) => `${p.userId ?? "unknown"}:${p.fromClass?.name ?? ""}->${p.toClass?.name ?? ""}`)
-    .sort()
-    .join("|");
-
-  return `${match.matchType}:${match.swapPattern}:${participantFlow}`;
+  return buildMatchSignature({
+    matchType: match.matchType,
+    swapPattern: match.swapPattern,
+    singleSwapRequestIds: match.singleSwapRequestIds,
+    bundleSwapRequestIds: match.bundleSwapRequestIds,
+    participants: match.participants.map((p) => ({
+      userId: p.userId,
+      fromClass: p.fromClass?.name,
+      toClass: p.toClass?.name,
+    })),
+  });
 }
 
 function dedupeMatches(matches: DashboardMatch[]): DashboardMatch[] {
@@ -95,16 +93,12 @@ function dedupeMatches(matches: DashboardMatch[]): DashboardMatch[] {
       continue;
     }
 
-    const matchTime = new Date(match.createdAt).getTime();
-    const currentTime = new Date(current.createdAt).getTime();
-    if (matchTime >= currentTime) {
+    if (shouldReplaceMatchByRecency(match, current)) {
       bySignature.set(signature, match);
     }
   }
 
-  return Array.from(bySignature.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
 export default function UserDashboard({

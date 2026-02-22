@@ -8,7 +8,7 @@ interface JobExecutionResult {
   expiredMatches: number;
   totalActiveRequests: number;
   errors: string[];
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
 }
 
 interface ScheduledRun {
@@ -268,20 +268,28 @@ export class CronScheduler {
     const expiresAt = new Date(now.getTime() + timeoutMs);
 
     try {
-      // Clear stale lock before attempting acquisition.
-      await this.prisma.cronLock.deleteMany({
+      // Reclaim stale lock atomically (no delete/create gap).
+      const reclaimed = await this.prisma.cronLock.updateMany({
         where: {
           jobId,
           expiresAt: { lte: now }
+        },
+        data: {
+          expiresAt,
+          createdAt: now
         }
       });
 
-      // Only one worker can create the unique jobId lock.
+      if (reclaimed.count > 0) {
+        return true;
+      }
+
+      // No stale lock was reclaimable; try to create a fresh one.
       await this.prisma.cronLock.create({
         data: {
           jobId,
           expiresAt,
-          createdAt: new Date()
+          createdAt: now
         }
       });
 
@@ -291,7 +299,35 @@ export class CronScheduler {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        // Unique constraint hit: another instance already holds the lock.
+        // Another instance may have raced us. Retry reclaim in case the
+        // lock became stale between the first reclaim attempt and create.
+        try {
+          const reclaimedOnRetry = await this.prisma.cronLock.updateMany({
+            where: {
+              jobId,
+              expiresAt: { lte: new Date() }
+            },
+            data: {
+              expiresAt,
+              createdAt: now
+            }
+          });
+
+          if (reclaimedOnRetry.count > 0) {
+            return true;
+          }
+
+          // Defensive visibility: with a valid unique index this should never be > 1.
+          const lockCount = await this.prisma.cronLock.count({ where: { jobId } });
+          if (lockCount > 1) {
+            console.error(
+              `Lock invariant violation for job ${jobId}: found ${lockCount} lock rows`
+            );
+          }
+        } catch (retryError) {
+          console.warn(`Failed to retry lock reclaim for job ${jobId}:`, retryError);
+        }
+
         return false;
       }
 
@@ -682,7 +718,7 @@ export class CronScheduler {
         : 0;
 
       return {
-        lastRunTime: lastExecution?.completedAt || lastExecution?.startedAt,
+        lastRunTime: lastExecution?.completedAt ?? lastExecution?.startedAt ?? null,
         totalExecutions24h: last24hExecutions.length,
         successfulExecutions24h: completedLast24h.length,
         failedExecutions24h: failedLast24h.length,
