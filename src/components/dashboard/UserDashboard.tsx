@@ -561,7 +561,7 @@ export default function UserDashboard({
                               </p>
                               <p className="text-sm text-muted-foreground break-words">
                                 <strong>Turmas preferidas:</strong> {request.preferredClasses
-                                  ?.map((cls: any) => cls.name)
+                                  ?.map((cls: { name: string }) => cls.name)
                                   .join(", ")}
                               </p>
                               <p className="mt-2 text-xs text-muted-foreground">
@@ -621,7 +621,7 @@ export default function UserDashboard({
                               </p>
                               <p className="text-sm text-muted-foreground break-words">
                                 <strong>Turmas preferidas:</strong> {request.preferredClasses
-                                  ?.map((cls: any) => cls.name)
+                                  ?.map((cls: { name: string }) => cls.name)
                                   .join(", ")}
                               </p>
                               <p className="mt-2 text-xs text-muted-foreground">
@@ -682,7 +682,7 @@ export default function UserDashboard({
               <div className="space-y-4">
                 {visibleMatches.map((match) => {
                   const currentUserParticipant = match.participants.find(
-                    (participant: any) => participant.userId === userId
+                    (participant) => participant.userId === userId
                   );
                   const currentUserStatus = currentUserParticipant?.status || "pending";
                   const canRespond =
@@ -716,7 +716,7 @@ export default function UserDashboard({
                     <CardContent>
                       <div className="space-y-3">
                         <h4 className="font-medium">Participantes:</h4>
-                        {match.participants.map((participant: any, index: number) => (
+                        {match.participants.map((participant, index: number) => (
                           <div
                             key={index}
                             className="flex flex-col gap-2 rounded-lg bg-muted p-3 sm:flex-row sm:items-center sm:justify-between"

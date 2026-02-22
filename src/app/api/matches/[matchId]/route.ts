@@ -11,6 +11,36 @@ import { AdvancedMatchingService } from '@/services/advancedMatchingService';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/emailService';
 
+interface MatchParticipant {
+  userId: string;
+  fromClass?: string;
+  toClass?: string;
+  requestId?: string;
+  requestType?: string;
+  satisfactionScore?: number;
+  status?: string;
+  acceptedAt?: Date | string | null;
+  rejectedAt?: Date | string | null;
+  completedAt?: Date | string | null;
+  revokedAt?: Date | string | null;
+}
+
+interface MatchRecord {
+  id: string;
+  status: string;
+  isProvisional: boolean;
+  provisionalUntil: Date | string | null;
+  graphPartition: string;
+  participants: unknown;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+}
+
+function coerceParticipants(value: unknown): MatchParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as MatchParticipant[];
+}
+
 /**
  * GET /api/matches/[matchId]
  * Get match details
@@ -25,18 +55,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: params.matchId }
-    });
+    })) as MatchRecord | null;
 
     if (!match) {
       return NextResponse.json({ error: 'Match not found' }, { status: 404 });
     }
 
     // Check if user is participant
-    const isParticipant = match.participants.some(
-      (p: any) => p.userId === session.id
-    );
+    const participants = coerceParticipants(match.participants);
+    const isParticipant = participants.some((p) => p.userId === session.id);
 
     if (!isParticipant && session.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -73,18 +102,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: params.matchId }
-    });
+    })) as MatchRecord | null;
 
     if (!match) {
       return NextResponse.json({ error: 'Match not found' }, { status: 404 });
     }
 
     // Check if user is participant
-    const userParticipation = match.participants.find(
-      (p: any) => p.userId === session.id
-    );
+    const participants = coerceParticipants(match.participants);
+    const userParticipation = participants.find((p) => p.userId === session.id);
 
     if (!userParticipation && session.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -136,9 +164,9 @@ export async function PATCH(
 /**
  * Handle match acceptance - user confirms they want this match
  */
-async function handleMatchAccept(match: any, userId: string) {
+async function handleMatchAccept(match: MatchRecord, userId: string) {
   // Update participant status
-  const updatedParticipants = match.participants.map((p: any) => {
+  const updatedParticipants = coerceParticipants(match.participants).map((p) => {
     if (p.userId === userId) {
       return { ...p, status: 'accepted', acceptedAt: new Date() };
     }
@@ -147,7 +175,7 @@ async function handleMatchAccept(match: any, userId: string) {
 
   // Check if all participants have accepted
   const allAccepted = updatedParticipants.every(
-    (p: any) => p.status === 'accepted'
+    (p) => p.status === 'accepted'
   );
 
   const updatedMatch = await prisma.match.update({
@@ -174,7 +202,7 @@ async function handleMatchAccept(match: any, userId: string) {
 /**
  * Handle match rejection - clean up graph and reactivate requests
  */
-async function handleMatchReject(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchReject(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   console.log(`❌ User ${userId} rejected match ${match.id} - cleaning up graph`);
 
   // Mark match as rejected
@@ -183,7 +211,7 @@ async function handleMatchReject(match: any, userId: string, matchingService: Ad
     data: {
       status: 'REJECTED',
       isProvisional: false,
-      participants: match.participants.map((p: any) => ({
+      participants: coerceParticipants(match.participants).map((p) => ({
         ...p,
         status: p.userId === userId ? 'rejected' : p.status,
         rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
@@ -206,11 +234,11 @@ async function handleMatchReject(match: any, userId: string, matchingService: Ad
 /**
  * Handle match completion - finalize the swap
  */
-async function handleMatchComplete(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchComplete(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   console.log(`🏁 User ${userId} completed match ${match.id} - finalizing swap`);
 
   // Update participant status
-  const updatedParticipants = match.participants.map((p: any) => {
+  const updatedParticipants = coerceParticipants(match.participants).map((p) => {
     if (p.userId === userId) {
       return { ...p, status: 'completed', completedAt: new Date() };
     }
@@ -219,7 +247,7 @@ async function handleMatchComplete(match: any, userId: string, matchingService: 
 
   // Check if all participants have completed
   const allCompleted = updatedParticipants.every(
-    (p: any) => p.status === 'completed'
+    (p) => p.status === 'completed'
   );
 
   const updatedMatch = await prisma.match.update({
@@ -261,7 +289,7 @@ async function handleMatchComplete(match: any, userId: string, matchingService: 
 /**
  * Handle match revocation - user changes mind within 6-hour window
  */
-async function handleMatchRevoke(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchRevoke(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   // Check if revocation is still allowed (within 6 hours)
   const provisionalUntil = match.provisionalUntil ? new Date(match.provisionalUntil) : null;
   const now = new Date();
@@ -277,7 +305,7 @@ async function handleMatchRevoke(match: any, userId: string, matchingService: Ad
     where: { id: match.id },
     data: {
       status: 'REJECTED',
-      participants: match.participants.map((p: any) => ({
+      participants: coerceParticipants(match.participants).map((p) => ({
         ...p,
         status: p.userId === userId ? 'revoked' : p.status,
         revokedAt: p.userId === userId ? new Date() : p.revokedAt
@@ -304,7 +332,7 @@ async function handleMatchRevoke(match: any, userId: string, matchingService: Ad
 /**
  * Reactivate requests from a cancelled/rejected match
  */
-async function reactivateRequestsFromMatch(match: any) {
+async function reactivateRequestsFromMatch(match: MatchRecord) {
   console.log(`🔄 Reactivating requests from cancelled match ${match.id}`);
 
   // Reactivate single swap requests
@@ -341,7 +369,7 @@ async function reactivateRequestsFromMatch(match: any) {
 /**
  * Remove completed requests from graph entirely
  */
-async function removeRequestsFromGraph(match: any) {
+async function removeRequestsFromGraph(match: MatchRecord) {
   console.log(`🗑️ Removing completed requests from graph for match ${match.id}`);
 
   // Delete single swap requests (they're completed)
@@ -366,7 +394,7 @@ async function removeRequestsFromGraph(match: any) {
 /**
  * Update graph partition counts after match changes
  */
-async function updateGraphPartitionsFromMatch(match: any, matchingService: AdvancedMatchingService) {
+async function updateGraphPartitionsFromMatch(match: MatchRecord, matchingService: AdvancedMatchingService) {
   console.log(`📊 Updating graph partitions affected by match ${match.id}`);
 
   // Get unique graph partitions affected
@@ -426,10 +454,10 @@ function getActionMessage(action: string): string {
 /**
  * Send status update emails to all participants
  */
-async function notifyMatchStatusUpdate(match: any, action: string, userId: string) {
+async function notifyMatchStatusUpdate(match: MatchRecord, action: string, userId: string) {
   try {
     // Get all participant user details
-    const participantIds = match.participants.map((p: any) => p.userId);
+    const participantIds = coerceParticipants(match.participants).map((p) => p.userId);
     const users = await prisma.user.findMany({
       where: {
         id: { in: participantIds },

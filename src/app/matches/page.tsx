@@ -18,9 +18,11 @@ interface RawParticipant {
 interface MatchLike {
   id: string;
   matchType: "SINGLE" | "BUNDLE";
+  swapPattern: string;
   status: string;
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
+  participants: unknown;
   createdAt: Date;
 }
 
@@ -40,7 +42,16 @@ function getMatchSignature(match: MatchLike): string {
     .sort()
     .join("|");
 
-  return `${match.matchType}:${requestIds}`;
+  if (requestIds) {
+    return `${match.matchType}:${requestIds}`;
+  }
+
+  const participantFlow = coerceParticipants(match.participants)
+    .map((p) => `${p.userId}:${p.fromClass}->${p.toClass}`)
+    .sort()
+    .join("|");
+
+  return `${match.matchType}:${match.swapPattern}:${participantFlow || "no-participants"}`;
 }
 
 function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
 import prisma from "@/lib/prisma";
 import getServerSession from "@/services/getServerSession";
@@ -6,10 +7,22 @@ import getServerSession from "@/services/getServerSession";
 interface MatchLike {
   id: string;
   matchType: string;
+  swapPattern: string;
   createdAt: Date;
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
   participants: unknown;
+}
+
+interface RawParticipant {
+  userId?: string;
+  fromClass?: string;
+  toClass?: string;
+}
+
+function coerceParticipants(value: unknown): RawParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as RawParticipant[];
 }
 
 function getMatchSignature(match: MatchLike): string {
@@ -21,7 +34,18 @@ function getMatchSignature(match: MatchLike): string {
     .sort()
     .join("|");
 
-  return `${match.matchType}:${requestIds}`;
+  if (requestIds) {
+    return `${match.matchType}:${requestIds}`;
+  }
+
+  const participantFlow = coerceParticipants(match.participants)
+    .map(
+      (p) => `${p.userId ?? "unknown"}:${p.fromClass ?? ""}->${p.toClass ?? ""}`
+    )
+    .sort()
+    .join("|");
+
+  return `${match.matchType}:${match.swapPattern}:${participantFlow || "no-participants"}`;
 }
 
 function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
@@ -54,7 +78,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.MatchWhereInput = {};
 
     if (status) {
       where.status = status;
@@ -77,20 +101,22 @@ export async function GET(request: NextRequest) {
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
-        (match.participants as any[]).some((p: any) => p.userId === session.id)
+        coerceParticipants(match.participants).some((p) => p.userId === session.id)
       );
     } else if (userId) {
       filteredMatches = matches.filter((match) =>
-        (match.participants as any[]).some((p: any) => p.userId === userId)
+        coerceParticipants(match.participants).some((p) => p.userId === userId)
       );
     }
 
-    const dedupedMatches = dedupeMatches(filteredMatches as unknown as MatchLike[]);
+    const dedupedMatches = dedupeMatches(
+      filteredMatches as unknown as MatchLike[]
+    );
 
     // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
       dedupedMatches.map(async (match) => {
-        const participants = match.participants as any[];
+        const participants = coerceParticipants(match.participants);
 
         // Get user information for participants
         const userIds = participants.map((p) => p.userId);

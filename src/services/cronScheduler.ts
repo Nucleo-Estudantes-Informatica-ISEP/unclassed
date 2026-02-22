@@ -1,12 +1,42 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { CronExecution, Prisma, PrismaClient } from "@prisma/client";
 import { getCache } from "./cache";
+
+interface JobExecutionResult {
+  processedPartitions: number;
+  matchesFound: number;
+  expiredMatches: number;
+  totalActiveRequests: number;
+  errors: string[];
+  metadata?: Record<string, unknown>;
+}
+
+interface ScheduledRun {
+  jobName: string;
+  nextRun: Date;
+}
+
+interface CronStats {
+  lastRunTime: Date | null;
+  totalExecutions24h: number;
+  successfulExecutions24h: number;
+  failedExecutions24h: number;
+  totalMatchesFound24h: number;
+  totalExpiredMatches24h: number;
+  averageExecutionTime: number;
+  successRate24h: number;
+  recentExecutions: CronExecution[];
+  isRunning: boolean;
+  schedulerStatus: "RUNNING" | "STOPPED";
+  activeJobs: number;
+  nextScheduledRuns: ScheduledRun[];
+}
 
 interface ScheduledJob {
   id: string;
   name: string;
   schedule: string; // Cron expression
-  handler: () => Promise<void>;
+  handler: () => Promise<void | JobExecutionResult>;
   enabled: boolean;
   lastRun?: Date;
   nextRun?: Date;
@@ -488,7 +518,10 @@ export class CronScheduler {
   /**
    * Helper method to update execution record
    */
-  private async updateExecutionRecord(executionId: string, data: any) {
+  private async updateExecutionRecord(
+    executionId: string,
+    data: Prisma.CronExecutionUpdateInput
+  ) {
     try {
       await this.prisma.cronExecution.update({
         where: { id: executionId },
@@ -502,7 +535,7 @@ export class CronScheduler {
   /**
    * Job handlers
    */
-  private async runBatchMatching(): Promise<any> {
+  private async runBatchMatching(): Promise<JobExecutionResult> {
     try {
       // Get initial active request count
       const totalActiveRequests = await this.prisma.singleSwapRequest.count({ where: { status: 'ACTIVE' } }) +
@@ -529,7 +562,7 @@ export class CronScheduler {
     }
   }
 
-  private async cleanupProvisionalMatches(): Promise<any> {
+  private async cleanupProvisionalMatches(): Promise<JobExecutionResult> {
     try {
       const expiredCount = await this.matchingService.expireProvisionalMatches();
       if (expiredCount > 0) {
@@ -550,12 +583,12 @@ export class CronScheduler {
     }
   }
 
-  private async runHealthCheck(): Promise<any> {
+  private async runHealthCheck(): Promise<JobExecutionResult> {
     try {
       const stats = await this.matchingService.getAdvancedStats();
       console.log(`💓 Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`);
 
-      const warnings = [];
+      const warnings: string[] = [];
 
       // Log warnings for concerning metrics
       if (stats.averageProcessingTime > 10000) {
@@ -601,7 +634,7 @@ export class CronScheduler {
   /**
    * Get cron execution history
    */
-  async getExecutionHistory(limit: number = 50): Promise<any[]> {
+  async getExecutionHistory(limit: number = 50): Promise<CronExecution[]> {
     try {
       return await this.prisma.cronExecution.findMany({
         orderBy: { startedAt: 'desc' },
@@ -616,7 +649,7 @@ export class CronScheduler {
   /**
    * Get cron statistics
    */
-  async getCronStats(): Promise<any> {
+  async getCronStats(): Promise<CronStats> {
     try {
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -663,7 +696,7 @@ export class CronScheduler {
         activeJobs: Array.from(this.jobs.values()).filter(j => j.enabled).length,
         nextScheduledRuns: Array.from(this.jobs.values())
           .filter(j => j.enabled && j.nextRun)
-          .map(j => ({ jobName: j.name, nextRun: j.nextRun }))
+          .map((j) => ({ jobName: j.name, nextRun: j.nextRun! }))
           .sort((a, b) => (a.nextRun?.getTime() || 0) - (b.nextRun?.getTime() || 0))
       };
     } catch (error) {

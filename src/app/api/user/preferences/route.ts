@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
 
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest) {
     const { emailNotifications, sharePhoneOnMatch } = await req.json();
 
     // Validate inputs
-    const updateData: any = {};
+    const updateData: Prisma.UserUpdateInput = {};
     
     if (emailNotifications !== undefined) {
       if (typeof emailNotifications !== "boolean") {

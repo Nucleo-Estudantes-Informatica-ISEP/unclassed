@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
@@ -8,6 +9,16 @@ const createBundleSwapRequestSchema = z.object({
   preferredClassIds: z.array(z.string()).min(1),
   preferenceOrderMatters: z.boolean().default(true),
 });
+
+interface MatchParticipant {
+  userId?: string;
+  status?: string;
+}
+
+function coerceMatchParticipants(value: unknown): MatchParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as MatchParticipant[];
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +32,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.BundleSwapRequestWhereInput = {};
     
     // If not admin, users can only see their own requests
     if (session.role !== "ADMIN") {
@@ -129,8 +140,8 @@ export async function POST(request: NextRequest) {
 
     // Check if user is participant in any accepted match
     const userHasAcceptedMatch = acceptedMatches.some(match => {
-      const participants = match.participants as any[];
-      return participants.some(p => p.userId === session.id && p.status === 'accepted');
+      const participants = coerceMatchParticipants(match.participants);
+      return participants.some((p) => p.userId === session.id && p.status === "accepted");
     });
 
     if (userHasAcceptedMatch) {

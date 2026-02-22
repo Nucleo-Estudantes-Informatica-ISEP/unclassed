@@ -1225,32 +1225,34 @@ export class AdvancedMatchingService {
             }
           } else {
             // New provisional: only create if it is strictly better than ALL existing overlapping ones
-            let canCreate = false;
-            for (const existing of existingForUsers) {
-              const improvementThreshold = 0.05;
-              const satisfactionDiff = match.satisfactionScore - (existing.satisfactionScore || 0);
-              const shouldUpgrade = satisfactionDiff > improvementThreshold;
-              if (shouldUpgrade) {
-                // Upgrade old and allow creation
-                try {
-                  await prisma.match.update({
-                    where: { id: existing.id },
-                    data: { status: "UPGRADED", isProvisional: false },
-                  });
-                  await this.reactivateRequestsFromMatch(existing);
-                } catch (e) {
-                  console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
-                }
-                canCreate = true;
-              }
-            }
-            if (!canCreate) {
-              // Skip creating this provisional match as it doesn't improve upon existing ones
+            const improvementThreshold = 0.05;
+            const upgradableMatches = existingForUsers.filter((existing) => {
+              const satisfactionDiff =
+                match.satisfactionScore - (existing.satisfactionScore || 0);
+              return satisfactionDiff > improvementThreshold;
+            });
+
+            if (upgradableMatches.length !== existingForUsers.length) {
+              // Skip creating this provisional match unless it improves over ALL overlaps
               console.log(
                 `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
               );
               continue;
             }
+
+            // Upgrade all overlapping provisional matches now that improvement is guaranteed
+            for (const existing of upgradableMatches) {
+              try {
+                await prisma.match.update({
+                  where: { id: existing.id },
+                  data: { status: "UPGRADED", isProvisional: false },
+                });
+                await this.reactivateRequestsFromMatch(existing);
+              } catch (e) {
+                console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
+              }
+            }
+
             // Ensure created match remains provisional
             isProvisional = true;
           }
