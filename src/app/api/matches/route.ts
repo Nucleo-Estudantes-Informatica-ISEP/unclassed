@@ -3,6 +3,44 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import getServerSession from "@/services/getServerSession";
 
+interface MatchLike {
+  id: string;
+  matchType: string;
+  createdAt: Date;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+  participants: unknown;
+}
+
+function getMatchSignature(match: MatchLike): string {
+  const requestIds = [
+    ...(match.singleSwapRequestIds || []),
+    ...(match.bundleSwapRequestIds || []),
+  ]
+    .slice()
+    .sort()
+    .join("|");
+
+  return `${match.matchType}:${requestIds}`;
+}
+
+function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
+  const bySignature = new Map<string, T>();
+
+  for (const match of matches) {
+    const signature = getMatchSignature(match);
+    const current = bySignature.get(signature);
+
+    if (!current || match.createdAt >= current.createdAt) {
+      bySignature.set(signature, match);
+    }
+  }
+
+  return Array.from(bySignature.values()).sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
@@ -20,6 +58,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       where.status = status;
+    } else {
+      where.status = {
+        in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
+      };
     }
 
     if (matchType) {
@@ -43,9 +85,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const dedupedMatches = dedupeMatches(filteredMatches as unknown as MatchLike[]);
+
     // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
-      filteredMatches.map(async (match) => {
+      dedupedMatches.map(async (match) => {
         const participants = match.participants as any[];
 
         // Get user information for participants

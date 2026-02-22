@@ -45,11 +45,74 @@ interface UserDashboardProps {
   userRole: "USER" | "ADMIN";
 }
 
+type DashboardMatch = {
+  id: string;
+  matchType: string;
+  status: string;
+  swapPattern: string;
+  participants: Array<{
+    userId?: string;
+    status?: string;
+    user?: { name?: string; email?: string };
+    fromClass?: { name?: string };
+    toClass?: { name?: string };
+  }>;
+  createdAt: string;
+  singleSwapRequestIds?: string[];
+  bundleSwapRequestIds?: string[];
+};
+
+function getMatchSignature(match: DashboardMatch): string {
+  const requestIds = [
+    ...(match.singleSwapRequestIds || []),
+    ...(match.bundleSwapRequestIds || []),
+  ]
+    .slice()
+    .sort()
+    .join("|");
+
+  if (requestIds) {
+    return `${match.matchType}:${requestIds}`;
+  }
+
+  const participantFlow = match.participants
+    .map((p) => `${p.userId ?? "unknown"}:${p.fromClass?.name ?? ""}->${p.toClass?.name ?? ""}`)
+    .sort()
+    .join("|");
+
+  return `${match.matchType}:${match.swapPattern}:${participantFlow}`;
+}
+
+function dedupeMatches(matches: DashboardMatch[]): DashboardMatch[] {
+  const bySignature = new Map<string, DashboardMatch>();
+
+  for (const match of matches) {
+    const signature = getMatchSignature(match);
+    const current = bySignature.get(signature);
+
+    if (!current) {
+      bySignature.set(signature, match);
+      continue;
+    }
+
+    const matchTime = new Date(match.createdAt).getTime();
+    const currentTime = new Date(current.createdAt).getTime();
+    if (matchTime >= currentTime) {
+      bySignature.set(signature, match);
+    }
+  }
+
+  return Array.from(bySignature.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 export default function UserDashboard({
   userId,
   userRole,
 }: UserDashboardProps) {
   const [selectedTab, setSelectedTab] = useState("overview");
+  const [matchActionLoadingId, setMatchActionLoadingId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -97,12 +160,15 @@ export default function UserDashboard({
     ...(bundleRequests?.filter((r) => r.status === "MATCHED") || []),
   ];
 
-  const activeMatches =
-    matches?.filter(
-      (m) => m.status === "PROPOSED" || m.status === "ACCEPTED"
-    ) || [];
-  const completedMatches =
-    matches?.filter((m) => m.status === "COMPLETED") || [];
+  const dedupedMatches = dedupeMatches((matches || []) as DashboardMatch[]);
+  const visibleMatches = dedupedMatches.filter((m) =>
+    ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"].includes(m.status)
+  );
+
+  const activeMatches = visibleMatches.filter((m) =>
+    ["PROPOSED", "PROVISIONAL", "ACCEPTED"].includes(m.status)
+  );
+  const completedMatches = visibleMatches.filter((m) => m.status === "COMPLETED");
 
   const handleCancelRequest = async (
     requestId: string,
@@ -169,6 +235,40 @@ export default function UserDashboard({
     }
   };
 
+  const handleMatchAction = async (
+    matchId: string,
+    action: "accept" | "reject"
+  ) => {
+    setMatchActionLoadingId(matchId);
+
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || "Erro ao atualizar match");
+      }
+
+      const result = await response.json();
+      toast.success(result.message || "Match atualizado com sucesso");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error updating match:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao atualizar match"
+      );
+    } finally {
+      setMatchActionLoadingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       ACTIVE: { variant: "default" as const, icon: Clock, label: "Ativo" },
@@ -208,6 +308,11 @@ export default function UserDashboard({
         label: "Proposto",
         color: "text-blue-600",
       },
+      PROVISIONAL: {
+        variant: "outline" as const,
+        label: "Provisório",
+        color: "text-amber-600",
+      },
       ACCEPTED: {
         variant: "default" as const,
         label: "Aceite",
@@ -222,6 +327,11 @@ export default function UserDashboard({
         variant: "secondary" as const,
         label: "Completo",
         color: "text-gray-600",
+      },
+      UPGRADED: {
+        variant: "secondary" as const,
+        label: "Substituído",
+        color: "text-gray-500",
       },
     };
 
@@ -333,7 +443,7 @@ export default function UserDashboard({
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold sm:text-2xl">
-                    {matches?.length || 0}
+                    {visibleMatches.length}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {activeMatches.length} em progresso •{" "}
@@ -568,9 +678,19 @@ export default function UserDashboard({
               </p>
             </div>
 
-            {matches && matches.length > 0 ? (
+            {visibleMatches.length > 0 ? (
               <div className="space-y-4">
-                {matches.map((match) => (
+                {visibleMatches.map((match) => {
+                  const currentUserParticipant = match.participants.find(
+                    (participant: any) => participant.userId === userId
+                  );
+                  const currentUserStatus = currentUserParticipant?.status || "pending";
+                  const canRespond =
+                    ["PROPOSED", "PROVISIONAL"].includes(match.status) &&
+                    currentUserStatus === "pending";
+                  const isLoading = matchActionLoadingId === match.id;
+
+                  return (
                   <Card key={match.id}>
                     <CardHeader>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -617,10 +737,41 @@ export default function UserDashboard({
                         <p className="mt-4 text-xs text-muted-foreground">
                           Criado em <ClientDate date={match.createdAt} format="short" />
                         </p>
+
+                        {canRespond && (
+                          <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row">
+                            <Button
+                              className="w-full sm:w-auto"
+                              disabled={isLoading}
+                              onClick={() => handleMatchAction(match.id, "accept")}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Aceitar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              className="w-full sm:w-auto"
+                              disabled={isLoading}
+                              onClick={() => handleMatchAction(match.id, "reject")}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Rejeitar
+                            </Button>
+                          </div>
+                        )}
+
+                        {!canRespond &&
+                          ["PROPOSED", "PROVISIONAL"].includes(match.status) &&
+                          currentUserStatus === "accepted" && (
+                            <p className="mt-3 text-sm text-muted-foreground">
+                              Já aceitou este match. A aguardar pelos restantes participantes.
+                            </p>
+                          )}
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Card>

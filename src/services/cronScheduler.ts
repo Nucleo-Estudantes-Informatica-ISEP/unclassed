@@ -1,6 +1,6 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
-import { PrismaClient } from "@prisma/client";
-import { getCache, CacheKeys } from "./cache";
+import { Prisma, PrismaClient } from "@prisma/client";
+import { getCache } from "./cache";
 
 interface ScheduledJob {
   id: string;
@@ -234,52 +234,39 @@ export class CronScheduler {
    * Acquire distributed lock using database
    */
   private async acquireLock(jobId: string, timeoutMs: number): Promise<boolean> {
-    try {
-      const expiresAt = new Date(Date.now() + timeoutMs);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + timeoutMs);
 
-      // Try to create or update lock in MongoDB
-      const result = await this.prisma.cronLock.upsert({
-        where: { jobId },
-        create: {
+    try {
+      // Clear stale lock before attempting acquisition.
+      await this.prisma.cronLock.deleteMany({
+        where: {
           jobId,
-          expiresAt,
-          createdAt: new Date()
-        },
-        update: {
-          expiresAt: {
-            set: expiresAt
-          }
+          expiresAt: { lte: now }
         }
       });
 
-      // Check if we got a valid lock (not expired)
-      const now = new Date();
-      return result.expiresAt > now;
-    } catch (error) {
-      console.warn(`Failed to acquire lock for job ${jobId}:`, error);
-
-      // Fallback: try to find and check existing lock
-      try {
-        const existingLock = await this.prisma.cronLock.findUnique({
-          where: { jobId }
-        });
-
-        if (!existingLock) return true; // No lock exists, we can proceed
-
-        const now = new Date();
-        if (existingLock.expiresAt <= now) {
-          // Lock is expired, try to delete it and proceed
-          await this.prisma.cronLock.delete({
-            where: { jobId }
-          }).catch(() => {});
-          return true;
+      // Only one worker can create the unique jobId lock.
+      await this.prisma.cronLock.create({
+        data: {
+          jobId,
+          expiresAt,
+          createdAt: new Date()
         }
+      });
 
-        return false; // Valid lock exists
-      } catch (fallbackError) {
-        console.warn(`Fallback lock check failed for job ${jobId}:`, fallbackError);
-        return false; // Be conservative
+      return true;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Unique constraint hit: another instance already holds the lock.
+        return false;
       }
+
+      console.warn(`Failed to acquire lock for job ${jobId}:`, error);
+      return false;
     }
   }
 
