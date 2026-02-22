@@ -22,6 +22,4 @@ services:
       - EMAIL_PASS=${EMAIL_PASS}
       - ADMIN_CACHE_TTL=${ADMIN_CACHE_TTL}
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED}
-    ports:
-      - "3000:3000"
     restart: unless-stopped
