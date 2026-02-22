@@ -7,11 +7,11 @@ export async function POST() {
     // Clear the authentication cookie
     cookies().delete(config.cookies.auth.name);
     
-    return NextResponse.json({ message: "Logout successful" });
+    return NextResponse.json({ message: "Logout realizado com sucesso" });
   } catch (error) {
     console.error("Logout error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

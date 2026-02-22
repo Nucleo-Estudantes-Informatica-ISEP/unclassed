@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
       initialized: isAppInitialized()
     }, {
       status: 503,

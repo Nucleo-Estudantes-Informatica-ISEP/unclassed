@@ -41,7 +41,7 @@ async function handleBatchMatching(request: NextRequest): Promise<NextResponse> 
       triggerSource,
       ...results,
       expiredProvisionalMatches: expiredCount,
-      message: `✅ Batch processing completed successfully`
+      message: `✅ Processamento em lote concluído com sucesso`
     };
 
     console.log(`✅ Batch matching completed in ${totalTime}ms:`, {
@@ -64,9 +64,9 @@ async function handleBatchMatching(request: NextRequest): Promise<NextResponse> 
     
     return NextResponse.json({
       success: false,
-      error: "Internal server error",
+      error: "Erro interno do servidor",
       timestamp: new Date().toISOString(),
-      message: `❌ Scheduled batch processing failed: ${error}`
+      message: `❌ O processamento em lote agendado falhou: ${error}`
     }, { status: 500 });
   }
 }

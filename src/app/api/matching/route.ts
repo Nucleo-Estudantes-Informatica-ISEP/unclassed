@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     if (!requestId || !requestType) {
       return NextResponse.json(
-        { error: "Missing requestId or requestType" }, 
+        { error: "requestId ou requestType em falta" }, 
         { status: 400 }
       );
     }
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       immediateMatches: immediateMatches.length,
       matches: immediateMatches,
       message: immediateMatches.length > 0 
-        ? `🎉 Found ${immediateMatches.length} immediate match(es)!`
-        : "⏳ No immediate matches found, added to queue for batch processing",
+        ? `🎉 Encontrado(s) ${immediateMatches.length} match(es) imediato(s)!`
+        : "⏳ Não foram encontrados matches imediatos; pedido adicionado à fila de processamento em lote",
       requestId,
       requestType,
       userId: request.headers.get('user-id') || 'anonymous'
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Matching error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -70,14 +70,14 @@ export async function PUT(request: NextRequest) {
       success: true,
       ...results,
       expiredProvisionalMatches: expiredCount,
-      message: `Batch processing completed: ${results.matchesFound} new matches, ${expiredCount} provisional matches expired`,
+      message: `Processamento em lote concluído: ${results.matchesFound} novos matches, ${expiredCount} matches provisórios expiraram`,
       executedBy: 'system'
     });
 
   } catch (error) {
     console.error('Batch processing error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Stats error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

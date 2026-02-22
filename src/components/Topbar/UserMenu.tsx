@@ -38,7 +38,7 @@ export default function UserMenu({ user }: UserMenuProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Logout failed");
+        throw new Error("Falha no logout");
       }
 
       toast.success("Logout realizado com sucesso!");

@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session || session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const matchingService = new AdvancedMatchingService();
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const expiredCount = await matchingService.expireProvisionalMatches();
 
     return NextResponse.json({
-      message: "Advanced matching algorithm completed successfully",
+      message: "Algoritmo avançado de matching concluído com sucesso",
       matchesCreated: results.matchesFound,
       processedPartitions: results.processedPartitions,
       expiredProvisionalMatches: expiredCount,
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error running advanced matching algorithm:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const matchingService = new AdvancedMatchingService();
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error getting matching stats:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

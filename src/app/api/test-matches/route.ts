@@ -16,12 +16,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     // Only allow admins or in development
     if (session.role !== 'ADMIN' && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     // Create sample users if they don't exist
@@ -48,13 +48,13 @@ export async function POST(request: NextRequest) {
         swapRequests: swapRequests.length,
         matches: matches.length
       },
-      message: 'Sample matches created successfully!'
+      message: 'Matches de exemplo criados com sucesso!'
     });
 
   } catch (error) {
     console.error('Error creating test matches:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

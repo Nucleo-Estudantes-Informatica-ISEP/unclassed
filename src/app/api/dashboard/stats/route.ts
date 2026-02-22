@@ -104,6 +104,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error getting dashboard stats:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }

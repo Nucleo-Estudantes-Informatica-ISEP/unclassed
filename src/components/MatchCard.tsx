@@ -72,7 +72,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to update match');
+        throw new Error(error.error || "Falha ao atualizar match");
       }
 
       const result = await response.json();
@@ -82,7 +82,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
 
     } catch (error) {
       console.error('Match action error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update match');
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar match");
     } finally {
       setLoading(false);
     }

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      message: 'Application initialized successfully',
+      message: 'Aplicação inicializada com sucesso',
       initialized: isAppInitialized(),
       services: {
         cronScheduler: cronStatus
@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: false,
-      message: 'Failed to initialize application',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Falha ao inicializar a aplicação',
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
     }, { status: 500 });
   }
 }
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       initialized: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
     }, { status: 500 });
   }
 }
