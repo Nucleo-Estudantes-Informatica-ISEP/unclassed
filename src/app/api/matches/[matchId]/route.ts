@@ -181,7 +181,7 @@ async function handleMatchAccept(match: MatchRecord, userId: string) {
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants,
+      participants: updatedParticipants as any,
       status: allAccepted ? 'ACCEPTED' : 'PROPOSED',
       isProvisional: false, // Remove provisional status when accepted
     }
@@ -215,7 +215,7 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
         ...p,
         status: p.userId === userId ? 'rejected' : p.status,
         rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
-      }))
+      })) as any
     }
   });
 
@@ -253,7 +253,7 @@ async function handleMatchComplete(match: MatchRecord, userId: string, matchingS
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants,
+      participants: updatedParticipants as any,
       status: allCompleted ? 'COMPLETED' : 'ACCEPTED'
     }
   });
@@ -309,7 +309,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
         ...p,
         status: p.userId === userId ? 'revoked' : p.status,
         revokedAt: p.userId === userId ? new Date() : p.revokedAt
-      }))
+      })) as any
     }
   });
 
