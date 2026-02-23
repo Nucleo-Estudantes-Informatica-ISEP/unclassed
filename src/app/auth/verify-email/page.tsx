@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 import { Button } from "@/lib/components/ui/button";
 
@@ -18,6 +18,10 @@ function VerifyEmailContent() {
   const token = searchParams.get("token");
 
   const verifyEmail = async () => {
+    if (isLoading) {
+      return;
+    }
+
     if (!token) {
       setError("Token de verificação não encontrado");
       return;
@@ -81,17 +85,6 @@ function VerifyEmailContent() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="mx-auto mb-4 size-8 animate-spin" />
-          <p className="text-gray-600">A verificar o teu email...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md space-y-8 text-center">
@@ -133,8 +126,13 @@ function VerifyEmailContent() {
               Voltar ao login
             </Button>
           ) : (
-            <Button onClick={verifyEmail} className="w-full" size="lg">
-              Verificar email
+            <Button
+              onClick={verifyEmail}
+              className="w-full"
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? "A carregar..." : "Verificar email"}
             </Button>
           )}
         </div>
