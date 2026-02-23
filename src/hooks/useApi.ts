@@ -78,7 +78,7 @@ export function useApi<T>(url: string): ApiState<T> {
         });
 
         if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
+          throw new Error(`Erro: ${response.status}`);
         }
 
         const data = await response.json();
@@ -92,7 +92,7 @@ export function useApi<T>(url: string): ApiState<T> {
             data: null,
             loading: false,
             error:
-              error instanceof Error ? error.message : "An error occurred",
+              error instanceof Error ? error.message : "Ocorreu um erro",
           });
         }
       }

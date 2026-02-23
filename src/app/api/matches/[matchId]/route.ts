@@ -52,7 +52,7 @@ export async function GET(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     const match = (await prisma.match.findUnique({
@@ -60,7 +60,7 @@ export async function GET(
     })) as MatchRecord | null;
 
     if (!match) {
-      return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
     }
 
     // Check if user is participant
@@ -68,7 +68,7 @@ export async function GET(
     const isParticipant = participants.some((p) => p.userId === session.id);
 
     if (!isParticipant && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     return NextResponse.json(match);
@@ -76,7 +76,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching match:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -93,13 +93,13 @@ export async function PATCH(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     const { action } = await request.json();
     
     if (!['accept', 'reject', 'complete', 'revoke'].includes(action)) {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
 
     const match = (await prisma.match.findUnique({
@@ -107,7 +107,7 @@ export async function PATCH(
     })) as MatchRecord | null;
 
     if (!match) {
-      return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
     }
 
     // Check if user is participant
@@ -115,7 +115,7 @@ export async function PATCH(
     const userParticipation = participants.find((p) => p.userId === session.id);
 
     if (!userParticipation && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     let updatedMatch;
@@ -139,7 +139,7 @@ export async function PATCH(
         break;
         
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -151,7 +151,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Error updating match:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -295,7 +295,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
   const now = new Date();
 
   if (!provisionalUntil || now > provisionalUntil) {
-    throw new Error('Revocation period has expired');
+    throw new Error('O período de revogação expirou');
   }
 
   console.log(`🔄 User ${userId} revoked match ${match.id} - reactivating requests`);
@@ -439,15 +439,15 @@ async function updatePartitionRequestCount(partitionKey: string) {
 function getActionMessage(action: string): string {
   switch (action) {
     case 'accept':
-      return '✅ Match accepted! Waiting for other participants.';
+      return '✅ Match aceite! A aguardar pelos outros participantes.';
     case 'reject':
-      return '❌ Match rejected. Your request is now active again.';
+      return '❌ Match rejeitado. O teu pedido voltou a ficar ativo.';
     case 'complete':
-      return '🎉 Swap completed! Thank you for using the system.';
+      return '🎉 Permuta concluída! Obrigado por usares a plataforma.';
     case 'revoke':
-      return '🔄 Match revoked. Your request is active again.';
+      return '🔄 Match revogado. O teu pedido voltou a ficar ativo.';
     default:
-      return 'Action completed.';
+      return 'Ação concluída.';
   }
 }
 
