@@ -1,57 +1,91 @@
-'use client';
+"use client";
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, Suspense } from 'react';
-import { Button } from '@/lib/components/ui/button';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+
+import { Button } from "@/lib/components/ui/button";
 
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasAttemptedVerification, setHasAttemptedVerification] =
+    useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  
-  const token = searchParams.get('token');
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (token) {
-      verifyEmail(token);
-    } else {
-      setError('Token de verificação não encontrado');
-      setIsLoading(false);
+  const token = searchParams.get("token");
+
+  const verifyEmail = async () => {
+    if (!token) {
+      setError("Token de verificação não encontrado");
+      return;
     }
-  }, [token]);
-  
-  const verifyEmail = async (verificationToken: string) => {
+
+    setHasAttemptedVerification(true);
+    setError("");
+    setIsLoading(true);
+
     try {
-      const response = await fetch('/api/auth/verify-email', {
-        method: 'POST',
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token: verificationToken }),
+        body: JSON.stringify({ token }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         setSuccess(true);
       } else {
-        setError(data.error || 'Erro ao verificar email');
+        setError(data.error || "Erro ao verificar email");
       }
-    } catch (error) {
-      setError('Erro de conexão');
+    } catch {
+      setError("Erro de conexão");
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+        <div className="w-full max-w-md space-y-8 text-center">
+          <div className="rounded-lg bg-white p-8 shadow-md">
+            <XCircle className="mx-auto mb-4 size-16 text-red-500" />
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">
+              Erro na verificação
+            </h1>
+            <p className="mb-6 text-red-600">
+              Token de verificação não encontrado
+            </p>
+
+            <Button
+              onClick={() => router.push("/login")}
+              className="w-full"
+              size="lg"
+            >
+              Voltar ao login
+            </Button>
+          </div>
+
+          <p className="text-sm text-gray-500">
+            🎓 Uma iniciativa do{" "}
+            <span className="font-semibold text-blue-600">NEI-ISEP</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <Loader2 className="mx-auto mb-4 size-8 animate-spin" />
           <p className="text-gray-600">A verificar o teu email...</p>
         </div>
       </div>
@@ -59,34 +93,55 @@ function VerifyEmailContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full text-center space-y-8">
-        <div className="bg-white rounded-lg shadow-md p-8">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="w-full max-w-md space-y-8 text-center">
+        <div className="rounded-lg bg-white p-8 shadow-md">
           {success ? (
             <>
-              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Email verificado</h1>
-              <p className="text-gray-600 mb-6">A tua conta foi ativada com sucesso!</p>
+              <CheckCircle2 className="mx-auto mb-4 size-16 text-green-500" />
+              <h1 className="mb-2 text-2xl font-bold text-gray-900">
+                Email verificado
+              </h1>
+              <p className="mb-6 text-gray-600">
+                A tua conta foi ativada com sucesso!
+              </p>
             </>
           ) : (
             <>
-              <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Erro na verificação</h1>
-              <p className="text-red-600 mb-6">{error}</p>
+              <h1 className="mb-2 text-2xl font-bold text-gray-900">
+                Confirmação de email
+              </h1>
+              {hasAttemptedVerification && error ? (
+                <>
+                  <XCircle className="mx-auto mb-4 size-16 text-red-500" />
+                  <p className="mb-6 text-red-600">{error}</p>
+                </>
+              ) : (
+                <p className="mb-6 text-gray-600">
+                  Clica no botão abaixo para confirmar e ativar a tua conta.
+                </p>
+              )}
             </>
           )}
-          
-          <Button
-            onClick={() => router.push('/login')}
-            className="w-full"
-            size="lg"
-          >
-            Voltar ao login
-          </Button>
+
+          {success ? (
+            <Button
+              onClick={() => router.push("/login")}
+              className="w-full"
+              size="lg"
+            >
+              Voltar ao login
+            </Button>
+          ) : (
+            <Button onClick={verifyEmail} className="w-full" size="lg">
+              Verificar email
+            </Button>
+          )}
         </div>
-        
+
         <p className="text-sm text-gray-500">
-          🎓 Uma iniciativa do <span className="font-semibold text-blue-600">NEI-ISEP</span>
+          🎓 Uma iniciativa do{" "}
+          <span className="font-semibold text-blue-600">NEI-ISEP</span>
         </p>
       </div>
     </div>
