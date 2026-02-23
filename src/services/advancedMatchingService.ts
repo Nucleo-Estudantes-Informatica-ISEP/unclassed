@@ -197,9 +197,6 @@ export class AdvancedMatchingService {
             `✅ Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`
           );
 
-          // Before creating new matches, check if we can upgrade existing provisional ones
-          await this.upgradeProvisionalMatches(matches);
-
           return await this.createMatches(matches); // Use the calculated isProvisional from matches
         }
 
@@ -431,9 +428,6 @@ export class AdvancedMatchingService {
       if (matches.length > 0) {
         const createdMatches = await this.createMatches(matches, false); // Not provisional
         results.matchesFound += createdMatches.length;
-
-        // Upgrade any existing provisional matches
-        await this.upgradeProvisionalMatches(matches);
       }
 
       // Update partition statistics
@@ -507,9 +501,11 @@ export class AdvancedMatchingService {
   async upgradeProvisionalMatches(newMatches: MatchResult[]): Promise<void> {
     for (const newMatch of newMatches) {
       // Find existing provisional matches involving ANY of the same participants
-      const existingProvisional = await this.findProvisionalMatchesForUsers(
+      const existingProvisional = (
+        await this.findProvisionalMatchesForUsers(
         newMatch.participants.map((p: MatchParticipant) => p.userId)
-      );
+        )
+      ).filter((m) => m.isProvisional);
 
       for (const existing of existingProvisional) {
         // Calculate satisfaction improvement threshold (must be at least 5% better)
@@ -517,25 +513,13 @@ export class AdvancedMatchingService {
         const satisfactionDiff =
           newMatch.satisfactionScore - (existing.satisfactionScore || 0);
 
-        // Check if both matches are perfect (100% satisfaction)
-        const newIsPerfect = newMatch.satisfactionScore >= 0.99; // Allow for floating point precision
-        const existingIsPerfect = (existing.satisfactionScore || 0) >= 0.99;
-
-        // Upgrade if satisfaction is significantly better OR if both are perfect matches
-        const shouldUpgrade =
-          satisfactionDiff > improvementThreshold ||
-          (newIsPerfect && existingIsPerfect);
+        // Only upgrade when there is a real improvement.
+        const shouldUpgrade = satisfactionDiff > improvementThreshold;
 
         if (shouldUpgrade) {
-          if (newIsPerfect && existingIsPerfect) {
-            console.log(
-              `⬆️ Upgrading perfect match ${existing.id} with another perfect match (both 100% satisfaction)`
-            );
-          } else {
-            console.log(
-              `⬆️ Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`
-            );
-          }
+          console.log(
+            `⬆️ Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`
+          );
 
           // Mark old match as upgraded and reactivate its requests
           await prisma.match.update({
@@ -545,14 +529,6 @@ export class AdvancedMatchingService {
 
           // Reactivate requests from the old match
           await this.reactivateRequestsFromMatch(existing);
-
-          // For perfect matches, don't make them provisional unless the existing was also provisional
-          if (newIsPerfect && !existing.isProvisional) {
-            newMatch.isProvisional = false;
-          } else {
-            // Create new match as provisional (still allow further upgrades)
-            newMatch.isProvisional = true;
-          }
         } else {
           console.log(
             `⏳ New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`
@@ -568,7 +544,11 @@ export class AdvancedMatchingService {
   async expireProvisionalMatches(): Promise<number> {
     const now = new Date();
     const toExpire = (await prisma.match.findMany({
-      where: { isProvisional: true, provisionalUntil: { lte: now } },
+      where: {
+        isProvisional: true,
+        status: { in: ["PROPOSED", "PROVISIONAL"] },
+        provisionalUntil: { lte: now },
+      },
     })) as unknown as StoredMatch[];
 
     if (toExpire.length === 0) return 0;
@@ -1216,11 +1196,8 @@ export class AdvancedMatchingService {
           globalIsProvisional !== undefined
             ? globalIsProvisional
             : match.isProvisional;
-        const provisionalUntil = isProvisional
-          ? new Date(Date.now() + 6 * 60 * 60 * 1000) // 6 hours
-          : undefined;
 
-        // Guard: prevent duplicate provisional proposals for same participants
+        // Guard: prevent duplicate active proposals for the same participants.
         const userIds = match.participants.map((p: MatchParticipant) => p.userId);
         const existingForUsers = await this.findProvisionalMatchesForUsers(userIds);
 
@@ -1241,7 +1218,10 @@ export class AdvancedMatchingService {
             // New permanent (non-provisional) match should supersede older provisional matches
             for (const existing of existingForUsers) {
               try {
-                await prisma.match.update({ where: { id: existing.id }, data: { status: "UPGRADED" } });
+                await prisma.match.update({
+                  where: { id: existing.id },
+                  data: { status: "UPGRADED" },
+                });
                 await this.reactivateRequestsFromMatch(existing);
               } catch (e) {
                 console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
@@ -1249,36 +1229,42 @@ export class AdvancedMatchingService {
             }
           } else {
             // New provisional: only create if it is strictly better than ALL existing overlapping ones
-            let canCreate = false;
-            for (const existing of existingForUsers) {
-              const improvementThreshold = 0.05;
-              const satisfactionDiff = match.satisfactionScore - (existing.satisfactionScore || 0);
-              const newIsPerfect = match.satisfactionScore >= 0.99;
-              const existingIsPerfect = (existing.satisfactionScore || 0) >= 0.99;
-              const shouldUpgrade =
-                satisfactionDiff > improvementThreshold || (newIsPerfect && existingIsPerfect);
-              if (shouldUpgrade) {
-                // Upgrade old and allow creation
-                try {
-                  await prisma.match.update({ where: { id: existing.id }, data: { status: "UPGRADED" } });
-                  await this.reactivateRequestsFromMatch(existing);
-                } catch (e) {
-                  console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
-                }
-                canCreate = true;
-              }
-            }
-            if (!canCreate) {
-              // Skip creating this provisional match as it doesn't improve upon existing ones
+            const improvementThreshold = 0.05;
+            const upgradableMatches = existingForUsers.filter((existing) => {
+              const satisfactionDiff =
+                match.satisfactionScore - (existing.satisfactionScore || 0);
+              return satisfactionDiff > improvementThreshold;
+            });
+
+            if (upgradableMatches.length !== existingForUsers.length) {
+              // Skip creating this provisional match unless it improves over ALL overlaps
               console.log(
                 `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
               );
               continue;
             }
+
+            // Upgrade all overlapping provisional matches now that improvement is guaranteed
+            for (const existing of upgradableMatches) {
+              try {
+                await prisma.match.update({
+                  where: { id: existing.id },
+                  data: { status: "UPGRADED" },
+                });
+                await this.reactivateRequestsFromMatch(existing);
+              } catch (e) {
+                console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
+              }
+            }
+
             // Ensure created match remains provisional
             isProvisional = true;
           }
         }
+
+        const provisionalUntil = isProvisional
+          ? new Date(Date.now() + 6 * 60 * 60 * 1000) // 6 hours
+          : undefined;
 
         // Use atomic transaction to prevent race conditions between multiple machines
         const result = await prisma.$transaction(async (tx) => {
@@ -1384,7 +1370,8 @@ export class AdvancedMatchingService {
   }
 
   /**
-   * Find provisional matches for specific user IDs
+   * Find active matches for specific user IDs.
+   * Only active states are considered; upgraded/rejected history is ignored.
    */
   private async findProvisionalMatchesForUsers(
     userIds: string[]
@@ -1392,10 +1379,7 @@ export class AdvancedMatchingService {
     // For MongoDB with Prisma, we need to use a different approach to query JSON arrays
     const matches = (await prisma.match.findMany({
       where: {
-        OR: [
-          { isProvisional: true },
-          { status: { in: ["PROPOSED", "ACCEPTED"] } },
-        ],
+        status: { in: ["PROPOSED", "ACCEPTED"] },
       },
     })) as unknown as StoredMatch[];
 

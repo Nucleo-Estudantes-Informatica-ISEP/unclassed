@@ -170,8 +170,7 @@ const Home: React.FC = async () => {
                     opacity: 0.11,
                     textShadow: "0 0 24px #1010101c",
                   }}
-                  // @ts-ignore
-                  {...{ "data-dark": true }}
+                  data-dark="true"
                 >
                   <span className="dark:hidden">{item.n}</span>
                   <span

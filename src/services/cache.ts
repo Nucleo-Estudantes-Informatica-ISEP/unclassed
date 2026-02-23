@@ -9,7 +9,7 @@ interface CacheEntry<T> {
  * For production, consider using Redis or similar
  */
 class CacheService {
-  private cache = new Map<string, CacheEntry<any>>();
+  private cache = new Map<string, CacheEntry<unknown>>();
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -36,7 +36,7 @@ class CacheService {
       return null;
     }
 
-    return entry.data;
+    return entry.data as T;
   }
 
   /**

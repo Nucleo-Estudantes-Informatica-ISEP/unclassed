@@ -1,7 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
+import {
+  buildMatchSignature,
+  compareMatchesByRecencyDesc,
+  shouldReplaceMatchByRecency,
+} from "@/lib/matchDedup";
 import prisma from "@/lib/prisma";
 import getServerSession from "@/services/getServerSession";
+
+interface MatchLike {
+  id: string;
+  matchType: string;
+  swapPattern: string;
+  createdAt: Date;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+  participants: unknown;
+}
+
+interface RawParticipant {
+  userId?: string;
+  fromClass?: string;
+  toClass?: string;
+}
+
+function coerceParticipants(value: unknown): RawParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as RawParticipant[];
+}
+
+function getMatchSignature(match: MatchLike): string {
+  return buildMatchSignature({
+    matchType: match.matchType,
+    swapPattern: match.swapPattern,
+    singleSwapRequestIds: match.singleSwapRequestIds,
+    bundleSwapRequestIds: match.bundleSwapRequestIds,
+    participants: coerceParticipants(match.participants).map((p) => ({
+      userId: p.userId,
+      fromClass: p.fromClass,
+      toClass: p.toClass,
+    })),
+  });
+}
+
+function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
+  const bySignature = new Map<string, T>();
+
+  for (const match of matches) {
+    const signature = getMatchSignature(match);
+    const current = bySignature.get(signature);
+
+    if (shouldReplaceMatchByRecency(match, current)) {
+      bySignature.set(signature, match);
+    }
+  }
+
+  return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,10 +72,14 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.MatchWhereInput = {};
 
     if (status) {
       where.status = status;
+    } else {
+      where.status = {
+        in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
+      };
     }
 
     if (matchType) {
@@ -35,18 +95,22 @@ export async function GET(request: NextRequest) {
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
-        (match.participants as any[]).some((p: any) => p.userId === session.id)
+        coerceParticipants(match.participants).some((p) => p.userId === session.id)
       );
     } else if (userId) {
       filteredMatches = matches.filter((match) =>
-        (match.participants as any[]).some((p: any) => p.userId === userId)
+        coerceParticipants(match.participants).some((p) => p.userId === userId)
       );
     }
 
+    const dedupedMatches = dedupeMatches(
+      filteredMatches as unknown as MatchLike[]
+    );
+
     // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
-      filteredMatches.map(async (match) => {
-        const participants = match.participants as any[];
+      dedupedMatches.map(async (match) => {
+        const participants = coerceParticipants(match.participants);
 
         // Get user information for participants
         const userIds = participants.map((p) => p.userId);

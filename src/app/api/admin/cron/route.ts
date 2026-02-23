@@ -3,6 +3,12 @@ import getServerSession from "@/services/getServerSession";
 import { getCronScheduler } from "@/services/cronScheduler";
 import { getCache, CacheKeys } from "@/services/cache";
 
+interface CachedCronStats {
+  schedulerStatus?: string;
+  activeJobs?: number;
+  nextScheduledRuns?: unknown[];
+}
+
 /**
  * GET /api/admin/cron
  * Get comprehensive cron statistics and execution history
@@ -29,6 +35,7 @@ export async function GET(request: NextRequest) {
     const cachedJobs = cache.get(CacheKeys.ADMIN_JOB_STATUS);
     
     if (cachedStats && cachedHistory && cachedJobs) {
+      const cachedCronStats = cachedStats as CachedCronStats;
       console.log('📦 Serving admin cron data from cache');
       return NextResponse.json({
         success: true,
@@ -38,9 +45,9 @@ export async function GET(request: NextRequest) {
         executionHistory: cachedHistory,
         jobStatus: cachedJobs,
         scheduler: {
-          isStarted: (cachedStats as any).schedulerStatus === 'RUNNING',
-          activeJobs: (cachedStats as any).activeJobs || 0,
-          nextScheduledRuns: (cachedStats as any).nextScheduledRuns || []
+          isStarted: cachedCronStats.schedulerStatus === "RUNNING",
+          activeJobs: cachedCronStats.activeJobs || 0,
+          nextScheduledRuns: cachedCronStats.nextScheduledRuns || [],
         }
       });
     }

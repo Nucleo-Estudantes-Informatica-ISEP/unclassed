@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Class, SingleSwapRequest, Subject, User } from "@prisma/client";
 import getServerSession from '@/services/getServerSession';
 import prisma from '@/lib/prisma';
 
@@ -122,7 +123,11 @@ async function createSampleSubjects() {
   return subjects;
 }
 
-async function createSampleSwapRequests(users: any[], classes: any[], subjects: any[]) {
+async function createSampleSwapRequests(
+  users: User[],
+  classes: Class[],
+  subjects: Subject[]
+): Promise<SingleSwapRequest[]> {
   // Clean existing requests
   await prisma.singleSwapRequest.deleteMany({});
   await prisma.bundleSwapRequest.deleteMany({});
@@ -156,7 +161,11 @@ async function createSampleSwapRequests(users: any[], classes: any[], subjects: 
   return swapRequests;
 }
 
-async function createSampleMatches(users: any[], classes: any[], swapRequests: any[]) {
+async function createSampleMatches(
+  users: User[],
+  classes: Class[],
+  swapRequests: SingleSwapRequest[]
+) {
   // Clean existing matches
   await prisma.match.deleteMany({});
 

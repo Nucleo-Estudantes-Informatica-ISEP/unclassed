@@ -1,12 +1,42 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
-import { PrismaClient } from "@prisma/client";
-import { getCache, CacheKeys } from "./cache";
+import { CronExecution, Prisma, PrismaClient } from "@prisma/client";
+import { getCache } from "./cache";
+
+interface JobExecutionResult {
+  processedPartitions: number;
+  matchesFound: number;
+  expiredMatches: number;
+  totalActiveRequests: number;
+  errors: string[];
+  metadata?: Prisma.InputJsonValue;
+}
+
+interface ScheduledRun {
+  jobName: string;
+  nextRun: Date;
+}
+
+interface CronStats {
+  lastRunTime: Date | null;
+  totalExecutions24h: number;
+  successfulExecutions24h: number;
+  failedExecutions24h: number;
+  totalMatchesFound24h: number;
+  totalExpiredMatches24h: number;
+  averageExecutionTime: number;
+  successRate24h: number;
+  recentExecutions: CronExecution[];
+  isRunning: boolean;
+  schedulerStatus: "RUNNING" | "STOPPED";
+  activeJobs: number;
+  nextScheduledRuns: ScheduledRun[];
+}
 
 interface ScheduledJob {
   id: string;
   name: string;
   schedule: string; // Cron expression
-  handler: () => Promise<void>;
+  handler: () => Promise<void | JobExecutionResult>;
   enabled: boolean;
   lastRun?: Date;
   nextRun?: Date;
@@ -234,52 +264,75 @@ export class CronScheduler {
    * Acquire distributed lock using database
    */
   private async acquireLock(jobId: string, timeoutMs: number): Promise<boolean> {
-    try {
-      const expiresAt = new Date(Date.now() + timeoutMs);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + timeoutMs);
 
-      // Try to create or update lock in MongoDB
-      const result = await this.prisma.cronLock.upsert({
-        where: { jobId },
-        create: {
+    try {
+      // Reclaim stale lock atomically (no delete/create gap).
+      const reclaimed = await this.prisma.cronLock.updateMany({
+        where: {
           jobId,
-          expiresAt,
-          createdAt: new Date()
+          expiresAt: { lte: now }
         },
-        update: {
-          expiresAt: {
-            set: expiresAt
-          }
+        data: {
+          expiresAt,
+          createdAt: now
         }
       });
 
-      // Check if we got a valid lock (not expired)
-      const now = new Date();
-      return result.expiresAt > now;
+      if (reclaimed.count > 0) {
+        return true;
+      }
+
+      // No stale lock was reclaimable; try to create a fresh one.
+      await this.prisma.cronLock.create({
+        data: {
+          jobId,
+          expiresAt,
+          createdAt: now
+        }
+      });
+
+      return true;
     } catch (error) {
-      console.warn(`Failed to acquire lock for job ${jobId}:`, error);
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Another instance may have raced us. Retry reclaim in case the
+        // lock became stale between the first reclaim attempt and create.
+        try {
+          const reclaimedOnRetry = await this.prisma.cronLock.updateMany({
+            where: {
+              jobId,
+              expiresAt: { lte: new Date() }
+            },
+            data: {
+              expiresAt,
+              createdAt: now
+            }
+          });
 
-      // Fallback: try to find and check existing lock
-      try {
-        const existingLock = await this.prisma.cronLock.findUnique({
-          where: { jobId }
-        });
+          if (reclaimedOnRetry.count > 0) {
+            return true;
+          }
 
-        if (!existingLock) return true; // No lock exists, we can proceed
-
-        const now = new Date();
-        if (existingLock.expiresAt <= now) {
-          // Lock is expired, try to delete it and proceed
-          await this.prisma.cronLock.delete({
-            where: { jobId }
-          }).catch(() => {});
-          return true;
+          // Defensive visibility: with a valid unique index this should never be > 1.
+          const lockCount = await this.prisma.cronLock.count({ where: { jobId } });
+          if (lockCount > 1) {
+            console.error(
+              `Lock invariant violation for job ${jobId}: found ${lockCount} lock rows`
+            );
+          }
+        } catch (retryError) {
+          console.warn(`Failed to retry lock reclaim for job ${jobId}:`, retryError);
         }
 
-        return false; // Valid lock exists
-      } catch (fallbackError) {
-        console.warn(`Fallback lock check failed for job ${jobId}:`, fallbackError);
-        return false; // Be conservative
+        return false;
       }
+
+      console.warn(`Failed to acquire lock for job ${jobId}:`, error);
+      return false;
     }
   }
 
@@ -501,7 +554,10 @@ export class CronScheduler {
   /**
    * Helper method to update execution record
    */
-  private async updateExecutionRecord(executionId: string, data: any) {
+  private async updateExecutionRecord(
+    executionId: string,
+    data: Prisma.CronExecutionUpdateInput
+  ) {
     try {
       await this.prisma.cronExecution.update({
         where: { id: executionId },
@@ -515,7 +571,7 @@ export class CronScheduler {
   /**
    * Job handlers
    */
-  private async runBatchMatching(): Promise<any> {
+  private async runBatchMatching(): Promise<JobExecutionResult> {
     try {
       // Get initial active request count
       const totalActiveRequests = await this.prisma.singleSwapRequest.count({ where: { status: 'ACTIVE' } }) +
@@ -542,7 +598,7 @@ export class CronScheduler {
     }
   }
 
-  private async cleanupProvisionalMatches(): Promise<any> {
+  private async cleanupProvisionalMatches(): Promise<JobExecutionResult> {
     try {
       const expiredCount = await this.matchingService.expireProvisionalMatches();
       if (expiredCount > 0) {
@@ -563,12 +619,12 @@ export class CronScheduler {
     }
   }
 
-  private async runHealthCheck(): Promise<any> {
+  private async runHealthCheck(): Promise<JobExecutionResult> {
     try {
       const stats = await this.matchingService.getAdvancedStats();
       console.log(`💓 Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`);
 
-      const warnings = [];
+      const warnings: string[] = [];
 
       // Log warnings for concerning metrics
       if (stats.averageProcessingTime > 10000) {
@@ -614,7 +670,7 @@ export class CronScheduler {
   /**
    * Get cron execution history
    */
-  async getExecutionHistory(limit: number = 50): Promise<any[]> {
+  async getExecutionHistory(limit: number = 50): Promise<CronExecution[]> {
     try {
       return await this.prisma.cronExecution.findMany({
         orderBy: { startedAt: 'desc' },
@@ -629,7 +685,7 @@ export class CronScheduler {
   /**
    * Get cron statistics
    */
-  async getCronStats(): Promise<any> {
+  async getCronStats(): Promise<CronStats> {
     try {
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -662,7 +718,7 @@ export class CronScheduler {
         : 0;
 
       return {
-        lastRunTime: lastExecution?.completedAt || lastExecution?.startedAt,
+        lastRunTime: lastExecution?.completedAt ?? lastExecution?.startedAt ?? null,
         totalExecutions24h: last24hExecutions.length,
         successfulExecutions24h: completedLast24h.length,
         failedExecutions24h: failedLast24h.length,
@@ -676,7 +732,7 @@ export class CronScheduler {
         activeJobs: Array.from(this.jobs.values()).filter(j => j.enabled).length,
         nextScheduledRuns: Array.from(this.jobs.values())
           .filter(j => j.enabled && j.nextRun)
-          .map(j => ({ jobName: j.name, nextRun: j.nextRun }))
+          .map((j) => ({ jobName: j.name, nextRun: j.nextRun! }))
           .sort((a, b) => (a.nextRun?.getTime() || 0) - (b.nextRun?.getTime() || 0))
       };
     } catch (error) {

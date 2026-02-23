@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get("year");
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.ClassWhereInput = {};
     
     if (year) {
       where.year = parseInt(year);

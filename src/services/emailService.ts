@@ -160,7 +160,7 @@ class EmailService {
                 <a href="${data.dashboardUrl}/matches" class="button">Ver Match</a>
               </p>
               
-              <p>Podes ver todos os detalhes e aceitar/rejeitar esta troca na tua dashboard.</p>
+              <p>Podes ver todos os detalhes e aceitar/rejeitar esta troca na página de matches.</p>
             </div>
             <div class="footer">
               <p>© 2025 Unclassed - NEI-ISEP</p>
