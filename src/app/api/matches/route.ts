@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const where: Prisma.MatchWhereInput = {};
 
     if (status) {
-      where.status = status;
+      where.status = status as Prisma.EnumMatchStatusFilter<"Match"> | any;
     } else {
       where.status = {
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (matchType) {
-      where.matchType = matchType;
+      where.matchType = matchType as Prisma.EnumMatchTypeFilter<"Match"> | any;
     }
 
     const matches = await prisma.match.findMany({
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         const participants = coerceParticipants(match.participants);
 
         // Get user information for participants
-        const userIds = participants.map((p) => p.userId);
+        const userIds = participants.map((p) => p.userId).filter((id): id is string => id !== undefined);
         const users = await prisma.user.findMany({
           where: { id: { in: userIds } },
           select: {
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
         const classIds = [
           ...participants.map((p) => p.fromClass),
           ...participants.map((p) => p.toClass),
-        ];
+        ].filter((id): id is string => id !== undefined);
         const classes = await prisma.class.findMany({
           where: { id: { in: classIds } },
           select: { id: true, name: true, year: true },

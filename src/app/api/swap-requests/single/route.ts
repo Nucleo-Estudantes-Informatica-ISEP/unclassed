@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: Prisma.SingleSwapRequestWhereInput = {};
-    
+
     // If not admin, users can only see their own requests
     if (session.role !== "ADMIN") {
       where.userId = session.id;
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      where.status = status;
+      where.status = status as Prisma.EnumRequestStatusFilter<"SingleSwapRequest"> | any;
     }
 
     const swapRequests = await prisma.singleSwapRequest.findMany({
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
     const [subject, currentClass, preferredClasses] = await Promise.all([
       prisma.subject.findUnique({ where: { id: validatedData.subjectId } }),
       prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({ 
-        where: { id: { in: validatedData.preferredClassIds } } 
+      prisma.class.findMany({
+        where: { id: { in: validatedData.preferredClassIds } }
       })
     ]);
 
@@ -205,8 +205,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
-        ...swapRequest, 
+      {
+        ...swapRequest,
         preferredClasses: preferredClassesInfo,
         message: "Pedido criado com sucesso! A procurar matches imediatos..."
       },
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating single swap request:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validação falhou", details: error.errors },

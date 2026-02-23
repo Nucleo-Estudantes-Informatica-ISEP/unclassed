@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: Prisma.BundleSwapRequestWhereInput = {};
-    
+
     // If not admin, users can only see their own requests
     if (session.role !== "ADMIN") {
       where.userId = session.id;
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      where.status = status;
+      where.status = status as Prisma.EnumRequestStatusFilter<"BundleSwapRequest"> | any;
     }
 
     const swapRequests = await prisma.bundleSwapRequest.findMany({
@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
     // Verify the classes exist
     const [currentClass, preferredClasses] = await Promise.all([
       prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({ 
-        where: { id: { in: validatedData.preferredClassIds } } 
+      prisma.class.findMany({
+        where: { id: { in: validatedData.preferredClassIds } }
       })
     ]);
 
@@ -196,8 +196,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
-        ...swapRequest, 
+      {
+        ...swapRequest,
         preferredClasses: preferredClassesInfo,
         message: "Pedido de permuta completa criado! A procurar matches imediatos..."
       },
@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating bundle swap request:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validação falhou", details: error.errors },
