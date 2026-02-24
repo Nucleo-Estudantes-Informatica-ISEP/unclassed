@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
+import {
+  buildMatchSignature,
+  compareMatchesByRecencyDesc,
+  shouldReplaceMatchByRecency,
+} from "@/lib/matchDedup";
 
 // Define the raw participant shape stored on Match.participants
 interface RawParticipant {
@@ -15,11 +20,51 @@ interface RawParticipant {
   status?: "pending" | "accepted" | "rejected" | "completed";
 }
 
+interface MatchLike {
+  id: string;
+  matchType: "SINGLE" | "BUNDLE";
+  swapPattern: string;
+  status: string;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+  participants: unknown;
+  createdAt: Date;
+}
+
 // Safely coerce JSON participants to typed RawParticipant[]
 function coerceParticipants(value: unknown): RawParticipant[] {
   if (!Array.isArray(value)) return [];
   // We trust backend to write correct shape; cast via unknown to satisfy TS
   return value as unknown as RawParticipant[];
+}
+
+function getMatchSignature(match: MatchLike): string {
+  return buildMatchSignature({
+    matchType: match.matchType,
+    swapPattern: match.swapPattern,
+    singleSwapRequestIds: match.singleSwapRequestIds,
+    bundleSwapRequestIds: match.bundleSwapRequestIds,
+    participants: coerceParticipants(match.participants).map((p) => ({
+      userId: p.userId,
+      fromClass: p.fromClass,
+      toClass: p.toClass,
+    })),
+  });
+}
+
+function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
+  const bySignature = new Map<string, T>();
+
+  for (const match of matches) {
+    const signature = getMatchSignature(match);
+    const current = bySignature.get(signature);
+
+    if (shouldReplaceMatchByRecency(match, current)) {
+      bySignature.set(signature, match);
+    }
+  }
+
+  return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
 export default async function MatchesPage() {
@@ -47,10 +92,11 @@ export default async function MatchesPage() {
     const participants = coerceParticipants(match.participants);
     return participants.some((p) => p.userId === session.id);
   });
+  const uniqueUserMatches = dedupeMatches(userMatches);
 
   // Enrich matches with user and class information
   const matches = await Promise.all(
-    userMatches.map(async (match) => {
+    uniqueUserMatches.map(async (match) => {
       const participants = coerceParticipants(match.participants);
 
       // Get user information for participants
@@ -113,6 +159,7 @@ export default async function MatchesPage() {
   );
 
   const completedMatches = matches.filter((m) => m.status === "COMPLETED");
+  const replacedMatches = matches.filter((m) => m.status === "UPGRADED");
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -130,7 +177,9 @@ export default async function MatchesPage() {
         </div>
       </div>
 
-      {activeMatches.length === 0 && completedMatches.length === 0 ? (
+      {activeMatches.length === 0 &&
+      completedMatches.length === 0 &&
+      replacedMatches.length === 0 ? (
         <div className="py-12 text-center px-2">
           <div className="mb-4 text-5xl sm:text-6xl">🔍</div>
           <h3 className="mb-2 text-lg sm:text-xl font-semibold">
@@ -181,6 +230,30 @@ export default async function MatchesPage() {
                 emptyMessage="Nenhum match completo"
                 iconEmoji="🎉"
                 badgeColor="green"
+              />
+            </>
+          )}
+
+          {/* Replaced/Upgraded Matches */}
+          {replacedMatches.length > 0 && (
+            <>
+              {(activeMatches.length > 0 || completedMatches.length > 0) && (
+                <div className="my-8 border-t border-gray-200"></div>
+              )}
+              <MatchListClient
+                matches={replacedMatches.map((match) => ({
+                  ...match,
+                  satisfactionScore: match.satisfactionScore ?? 0,
+                  subject: match.subject || undefined,
+                  createdAt: match.createdAt.toISOString(),
+                  updatedAt: match.updatedAt.toISOString(),
+                  provisionalUntil: match.provisionalUntil?.toISOString() || null,
+                }))}
+                currentUserId={session.id}
+                title="Matches Substituídos"
+                emptyMessage="Nenhum match substituído"
+                iconEmoji="🔁"
+                badgeColor="yellow"
               />
             </>
           )}

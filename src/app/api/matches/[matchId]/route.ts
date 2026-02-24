@@ -11,6 +11,36 @@ import { AdvancedMatchingService } from '@/services/advancedMatchingService';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/emailService';
 
+interface MatchParticipant {
+  userId: string;
+  fromClass?: string;
+  toClass?: string;
+  requestId?: string;
+  requestType?: string;
+  satisfactionScore?: number;
+  status?: string;
+  acceptedAt?: Date | string | null;
+  rejectedAt?: Date | string | null;
+  completedAt?: Date | string | null;
+  revokedAt?: Date | string | null;
+}
+
+interface MatchRecord {
+  id: string;
+  status: string;
+  isProvisional: boolean;
+  provisionalUntil: Date | string | null;
+  graphPartition: string;
+  participants: unknown;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+}
+
+function coerceParticipants(value: unknown): MatchParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as MatchParticipant[];
+}
+
 /**
  * GET /api/matches/[matchId]
  * Get match details
@@ -22,24 +52,23 @@ export async function GET(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: params.matchId }
-    });
+    })) as MatchRecord | null;
 
     if (!match) {
-      return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
     }
 
     // Check if user is participant
-    const isParticipant = match.participants.some(
-      (p: any) => p.userId === session.id
-    );
+    const participants = coerceParticipants(match.participants);
+    const isParticipant = participants.some((p) => p.userId === session.id);
 
     if (!isParticipant && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     return NextResponse.json(match);
@@ -47,7 +76,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching match:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -64,30 +93,29 @@ export async function PATCH(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     const { action } = await request.json();
     
     if (!['accept', 'reject', 'complete', 'revoke'].includes(action)) {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
 
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: params.matchId }
-    });
+    })) as MatchRecord | null;
 
     if (!match) {
-      return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
     }
 
     // Check if user is participant
-    const userParticipation = match.participants.find(
-      (p: any) => p.userId === session.id
-    );
+    const participants = coerceParticipants(match.participants);
+    const userParticipation = participants.find((p) => p.userId === session.id);
 
     if (!userParticipation && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     let updatedMatch;
@@ -111,7 +139,7 @@ export async function PATCH(
         break;
         
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -123,7 +151,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Error updating match:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -136,9 +164,9 @@ export async function PATCH(
 /**
  * Handle match acceptance - user confirms they want this match
  */
-async function handleMatchAccept(match: any, userId: string) {
+async function handleMatchAccept(match: MatchRecord, userId: string) {
   // Update participant status
-  const updatedParticipants = match.participants.map((p: any) => {
+  const updatedParticipants = coerceParticipants(match.participants).map((p) => {
     if (p.userId === userId) {
       return { ...p, status: 'accepted', acceptedAt: new Date() };
     }
@@ -147,13 +175,13 @@ async function handleMatchAccept(match: any, userId: string) {
 
   // Check if all participants have accepted
   const allAccepted = updatedParticipants.every(
-    (p: any) => p.status === 'accepted'
+    (p) => p.status === 'accepted'
   );
 
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants,
+      participants: updatedParticipants as any,
       status: allAccepted ? 'ACCEPTED' : 'PROPOSED',
       isProvisional: false, // Remove provisional status when accepted
     }
@@ -174,7 +202,7 @@ async function handleMatchAccept(match: any, userId: string) {
 /**
  * Handle match rejection - clean up graph and reactivate requests
  */
-async function handleMatchReject(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchReject(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   console.log(`❌ User ${userId} rejected match ${match.id} - cleaning up graph`);
 
   // Mark match as rejected
@@ -183,11 +211,11 @@ async function handleMatchReject(match: any, userId: string, matchingService: Ad
     data: {
       status: 'REJECTED',
       isProvisional: false,
-      participants: match.participants.map((p: any) => ({
+      participants: coerceParticipants(match.participants).map((p) => ({
         ...p,
         status: p.userId === userId ? 'rejected' : p.status,
         rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
-      }))
+      })) as any
     }
   });
 
@@ -206,11 +234,11 @@ async function handleMatchReject(match: any, userId: string, matchingService: Ad
 /**
  * Handle match completion - finalize the swap
  */
-async function handleMatchComplete(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchComplete(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   console.log(`🏁 User ${userId} completed match ${match.id} - finalizing swap`);
 
   // Update participant status
-  const updatedParticipants = match.participants.map((p: any) => {
+  const updatedParticipants = coerceParticipants(match.participants).map((p) => {
     if (p.userId === userId) {
       return { ...p, status: 'completed', completedAt: new Date() };
     }
@@ -219,13 +247,13 @@ async function handleMatchComplete(match: any, userId: string, matchingService: 
 
   // Check if all participants have completed
   const allCompleted = updatedParticipants.every(
-    (p: any) => p.status === 'completed'
+    (p) => p.status === 'completed'
   );
 
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants,
+      participants: updatedParticipants as any,
       status: allCompleted ? 'COMPLETED' : 'ACCEPTED'
     }
   });
@@ -261,13 +289,13 @@ async function handleMatchComplete(match: any, userId: string, matchingService: 
 /**
  * Handle match revocation - user changes mind within 6-hour window
  */
-async function handleMatchRevoke(match: any, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchRevoke(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
   // Check if revocation is still allowed (within 6 hours)
   const provisionalUntil = match.provisionalUntil ? new Date(match.provisionalUntil) : null;
   const now = new Date();
 
   if (!provisionalUntil || now > provisionalUntil) {
-    throw new Error('Revocation period has expired');
+    throw new Error('O período de revogação expirou');
   }
 
   console.log(`🔄 User ${userId} revoked match ${match.id} - reactivating requests`);
@@ -277,11 +305,11 @@ async function handleMatchRevoke(match: any, userId: string, matchingService: Ad
     where: { id: match.id },
     data: {
       status: 'REJECTED',
-      participants: match.participants.map((p: any) => ({
+      participants: coerceParticipants(match.participants).map((p) => ({
         ...p,
         status: p.userId === userId ? 'revoked' : p.status,
         revokedAt: p.userId === userId ? new Date() : p.revokedAt
-      }))
+      })) as any
     }
   });
 
@@ -304,7 +332,7 @@ async function handleMatchRevoke(match: any, userId: string, matchingService: Ad
 /**
  * Reactivate requests from a cancelled/rejected match
  */
-async function reactivateRequestsFromMatch(match: any) {
+async function reactivateRequestsFromMatch(match: MatchRecord) {
   console.log(`🔄 Reactivating requests from cancelled match ${match.id}`);
 
   // Reactivate single swap requests
@@ -341,7 +369,7 @@ async function reactivateRequestsFromMatch(match: any) {
 /**
  * Remove completed requests from graph entirely
  */
-async function removeRequestsFromGraph(match: any) {
+async function removeRequestsFromGraph(match: MatchRecord) {
   console.log(`🗑️ Removing completed requests from graph for match ${match.id}`);
 
   // Delete single swap requests (they're completed)
@@ -366,7 +394,7 @@ async function removeRequestsFromGraph(match: any) {
 /**
  * Update graph partition counts after match changes
  */
-async function updateGraphPartitionsFromMatch(match: any, matchingService: AdvancedMatchingService) {
+async function updateGraphPartitionsFromMatch(match: MatchRecord, matchingService: AdvancedMatchingService) {
   console.log(`📊 Updating graph partitions affected by match ${match.id}`);
 
   // Get unique graph partitions affected
@@ -411,25 +439,25 @@ async function updatePartitionRequestCount(partitionKey: string) {
 function getActionMessage(action: string): string {
   switch (action) {
     case 'accept':
-      return '✅ Match accepted! Waiting for other participants.';
+      return '✅ Match aceite! A aguardar pelos outros participantes.';
     case 'reject':
-      return '❌ Match rejected. Your request is now active again.';
+      return '❌ Match rejeitado. O teu pedido voltou a ficar ativo.';
     case 'complete':
-      return '🎉 Swap completed! Thank you for using the system.';
+      return '🎉 Permuta concluída! Obrigado por usares a plataforma.';
     case 'revoke':
-      return '🔄 Match revoked. Your request is active again.';
+      return '🔄 Match revogado. O teu pedido voltou a ficar ativo.';
     default:
-      return 'Action completed.';
+      return 'Ação concluída.';
   }
 }
 
 /**
  * Send status update emails to all participants
  */
-async function notifyMatchStatusUpdate(match: any, action: string, userId: string) {
+async function notifyMatchStatusUpdate(match: MatchRecord, action: string, userId: string) {
   try {
     // Get all participant user details
-    const participantIds = match.participants.map((p: any) => p.userId);
+    const participantIds = coerceParticipants(match.participants).map((p) => p.userId);
     const users = await prisma.user.findMany({
       where: {
         id: { in: participantIds },

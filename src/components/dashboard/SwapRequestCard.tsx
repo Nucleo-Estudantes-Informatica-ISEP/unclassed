@@ -20,10 +20,32 @@ import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
 
 interface SwapRequestCardProps {
-  request: any;
+  request: SwapRequest;
   type: "single" | "bundle";
   onUpdate?: () => void;
   showActions?: boolean;
+}
+
+interface SwapRequestClass {
+  id: string;
+  name: string;
+  year: number;
+}
+
+interface SwapRequestSubject {
+  code?: string;
+  name?: string;
+  year?: number;
+  semester?: number;
+}
+
+interface SwapRequest {
+  id: string;
+  status: string;
+  createdAt: string | Date;
+  currentClass?: SwapRequestClass;
+  preferredClasses?: SwapRequestClass[];
+  subject?: SwapRequestSubject;
 }
 
 export default function SwapRequestCard({ request, type, onUpdate, showActions = true }: SwapRequestCardProps) {
@@ -160,7 +182,7 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Turmas Preferidas</p>
           <div className="flex flex-wrap gap-2">
-            {request.preferredClasses?.map((cls: any, index: number) => (
+            {request.preferredClasses?.map((cls, index) => (
               <Badge 
                 key={cls.id} 
                 variant={index === 0 ? "default" : "secondary"}
@@ -199,7 +221,7 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
               </p>
             </div>
             <p className="text-xs text-green-600 dark:text-green-300 mb-2">
-              O sistema encontrou uma permuta compatível. Verifique a secção "Matches" para mais detalhes.
+              O sistema encontrou uma permuta compatível. Verifique a secção Matches para mais detalhes.
             </p>
             <Button 
               variant="outline" 

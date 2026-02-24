@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Class, SingleSwapRequest, Subject, User } from "@prisma/client";
 import getServerSession from '@/services/getServerSession';
 import prisma from '@/lib/prisma';
 
@@ -16,12 +17,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     // Only allow admins or in development
     if (session.role !== 'ADMIN' && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
     // Create sample users if they don't exist
@@ -48,13 +49,13 @@ export async function POST(request: NextRequest) {
         swapRequests: swapRequests.length,
         matches: matches.length
       },
-      message: 'Sample matches created successfully!'
+      message: 'Matches de exemplo criados com sucesso!'
     });
 
   } catch (error) {
     console.error('Error creating test matches:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
@@ -122,7 +123,11 @@ async function createSampleSubjects() {
   return subjects;
 }
 
-async function createSampleSwapRequests(users: any[], classes: any[], subjects: any[]) {
+async function createSampleSwapRequests(
+  users: User[],
+  classes: Class[],
+  subjects: Subject[]
+): Promise<SingleSwapRequest[]> {
   // Clean existing requests
   await prisma.singleSwapRequest.deleteMany({});
   await prisma.bundleSwapRequest.deleteMany({});
@@ -156,7 +161,11 @@ async function createSampleSwapRequests(users: any[], classes: any[], subjects: 
   return swapRequests;
 }
 
-async function createSampleMatches(users: any[], classes: any[], swapRequests: any[]) {
+async function createSampleMatches(
+  users: User[],
+  classes: Class[],
+  swapRequests: SingleSwapRequest[]
+) {
   // Clean existing matches
   await prisma.match.deleteMany({});
 

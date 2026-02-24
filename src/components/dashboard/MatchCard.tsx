@@ -20,9 +20,37 @@ import {
 import { ClientDate } from "@/components/ClientDate";
 
 interface MatchCardProps {
-  match: any;
+  match: DashboardMatch;
   currentUserId?: string;
   showActions?: boolean;
+}
+
+interface ParticipantUser {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  sharePhoneOnMatch?: boolean | null;
+}
+
+interface ParticipantClass {
+  name?: string;
+}
+
+interface MatchParticipant {
+  userId?: string;
+  user?: ParticipantUser;
+  fromClass?: ParticipantClass;
+  toClass?: ParticipantClass;
+  requestType?: string;
+  status?: string;
+}
+
+interface DashboardMatch {
+  matchType: string;
+  swapPattern: string;
+  status: string;
+  createdAt: string | Date;
+  participants: MatchParticipant[];
 }
 
 export default function MatchCard({ match, currentUserId, showActions = true }: MatchCardProps) {
@@ -63,12 +91,14 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
 
   // Removed formatDate function - using ClientDate component instead
 
-  const isCurrentUserInvolved = (participants: any[]) => {
-    return currentUserId && participants.some((p: any) => p.userId === currentUserId);
+  const isCurrentUserInvolved = (participants: MatchParticipant[]) => {
+    return Boolean(
+      currentUserId && participants.some((p) => p.userId === currentUserId)
+    );
   };
 
-  const getCurrentUserParticipation = (participants: any[]) => {
-    return participants.find((p: any) => p.userId === currentUserId);
+  const getCurrentUserParticipation = (participants: MatchParticipant[]) => {
+    return participants.find((p) => p.userId === currentUserId);
   };
 
   const currentUserParticipation = getCurrentUserParticipation(match.participants);
@@ -133,7 +163,7 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
           </div>
 
           <div className="space-y-2">
-            {match.participants.map((participant: any, index: number) => (
+            {match.participants.map((participant, index) => (
               <div
                 key={index}
                 className={`flex items-center justify-between p-3 rounded-lg border ${

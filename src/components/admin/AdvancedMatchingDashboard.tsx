@@ -123,7 +123,7 @@ export default function AdvancedMatchingDashboard() {
       if (matchingData.success) {
         setStats(matchingData);
       } else {
-        toast.error('Failed to load matching statistics');
+        toast.error("Falha ao carregar estatísticas de matching");
       }
       
       if (cronData.success) {
@@ -134,7 +134,7 @@ export default function AdvancedMatchingDashboard() {
       }
     } catch (error) {
       console.error('Error loading stats:', error);
-      toast.error('Error loading statistics');
+      toast.error("Erro ao carregar estatísticas");
     } finally {
       setLoading(false);
     }
@@ -152,11 +152,11 @@ export default function AdvancedMatchingDashboard() {
         toast.success(result.message);
         await loadStats(); // Refresh stats
       } else {
-        toast.error('Batch processing failed');
+        toast.error("Falha no processamento em lote");
       }
     } catch (error) {
       console.error('Error running batch processing:', error);
-      toast.error('Error running batch processing');
+      toast.error("Erro ao executar processamento em lote");
     } finally {
       setRunningBatch(false);
     }
@@ -182,10 +182,10 @@ export default function AdvancedMatchingDashboard() {
         <Card>
           <CardContent className="p-8 text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-            <p className="text-lg font-medium">Failed to load matching statistics</p>
+            <p className="text-lg font-medium">Falha ao carregar estatísticas de matching</p>
             <Button onClick={loadStats} className="mt-4">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
+              Tentar novamente
             </Button>
           </CardContent>
         </Card>
@@ -327,7 +327,7 @@ export default function AdvancedMatchingDashboard() {
                   
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Match Success Rate</span>
+                          <span>Taxa de Sucesso dos Matches</span>
                       <span>{(stats.averageSatisfactionScore * 100).toFixed(1)}%</span>
                     </div>
                     <Progress value={stats.averageSatisfactionScore * 100} />
@@ -415,7 +415,7 @@ export default function AdvancedMatchingDashboard() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">
-                        Success Rate (24h)
+                        Taxa de Sucesso (24h)
                       </CardTitle>
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
@@ -451,7 +451,7 @@ export default function AdvancedMatchingDashboard() {
                           <span className="text-green-600">{cronStats.successfulExecutions24h}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span>Failed</span>
+                          <span>Falhadas</span>
                           <span className="text-red-600">{cronStats.failedExecutions24h}</span>
                         </div>
                       </div>
@@ -615,7 +615,7 @@ export default function AdvancedMatchingDashboard() {
                             <p className="font-medium">{partition.activeRequests}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Success Rate</p>
+                            <p className="text-muted-foreground">Taxa de Sucesso</p>
                             <p className="font-medium">{(partition.successRate * 100).toFixed(1)}%</p>
                           </div>
                           <div>
@@ -716,7 +716,7 @@ export default function AdvancedMatchingDashboard() {
                           <AlertTriangle className="h-4 w-4 text-red-500" />
                         )}
                         <span className="text-sm font-medium">
-                          {lastBatchResult.success ? "Success" : "Failed"}
+                          {lastBatchResult.success ? "Sucesso" : "Falha"}
                         </span>
                       </div>
                       
@@ -726,7 +726,7 @@ export default function AdvancedMatchingDashboard() {
 
                       {lastBatchResult.errors.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="font-medium text-red-600 mb-2">Errors:</h4>
+                          <h4 className="font-medium text-red-600 mb-2">Erros:</h4>
                           <ul className="list-disc list-inside text-sm space-y-1">
                             {lastBatchResult.errors.map((error, index) => (
                               <li key={index} className="text-red-600">{error}</li>

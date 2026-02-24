@@ -19,7 +19,7 @@ export async function GET(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const swapRequest = await prisma.singleSwapRequest.findUnique({
@@ -39,14 +39,14 @@ export async function GET(
 
     if (!swapRequest) {
       return NextResponse.json(
-        { error: "Swap request not found" },
+        { error: "Pedido de permuta não encontrado" },
         { status: 404 }
       );
     }
 
     // Users can only see their own requests unless they are admin
     if (session.role !== "ADMIN" && swapRequest.userId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Acesso proibido" }, { status: 403 });
     }
 
     // Add preferred classes info
@@ -59,7 +59,7 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching single swap request:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -72,7 +72,7 @@ export async function PUT(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -84,14 +84,14 @@ export async function PUT(
 
     if (!existingRequest) {
       return NextResponse.json(
-        { error: "Swap request not found" },
+        { error: "Pedido de permuta não encontrado" },
         { status: 404 }
       );
     }
 
     // Users can only update their own requests unless they are admin
     if (session.role !== "ADMIN" && existingRequest.userId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Acesso proibido" }, { status: 403 });
     }
 
     // If updating preferred classes, verify they exist
@@ -102,7 +102,7 @@ export async function PUT(
 
       if (preferredClasses.length !== validatedData.preferredClassIds.length) {
         return NextResponse.json(
-          { error: "One or more preferred classes not found" },
+          { error: "Uma ou mais turmas preferidas não foram encontradas" },
           { status: 404 }
         );
       }
@@ -140,13 +140,13 @@ export async function PUT(
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation failed", details: error.errors },
+        { error: "Validação falhou", details: error.errors },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -159,7 +159,7 @@ export async function DELETE(
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const existingRequest = await prisma.singleSwapRequest.findUnique({
@@ -168,26 +168,26 @@ export async function DELETE(
 
     if (!existingRequest) {
       return NextResponse.json(
-        { error: "Swap request not found" },
+        { error: "Pedido de permuta não encontrado" },
         { status: 404 }
       );
     }
 
     // Users can only delete their own requests unless they are admin
     if (session.role !== "ADMIN" && existingRequest.userId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Acesso proibido" }, { status: 403 });
     }
 
     await prisma.singleSwapRequest.delete({
       where: { id: params.id }
     });
 
-    return NextResponse.json({ message: "Swap request deleted successfully" });
+    return NextResponse.json({ message: "Pedido de permuta eliminado com sucesso" });
 
   } catch (error) {
     console.error("Error deleting single swap request:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

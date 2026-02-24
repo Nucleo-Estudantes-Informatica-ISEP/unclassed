@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
 
@@ -7,7 +8,7 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession();
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Utilizador não encontrado" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error fetching user preferences:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -43,13 +44,13 @@ export async function PATCH(req: NextRequest) {
     const session = await getServerSession();
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { emailNotifications, sharePhoneOnMatch } = await req.json();
 
     // Validate inputs
-    const updateData: any = {};
+    const updateData: Prisma.UserUpdateInput = {};
     
     if (emailNotifications !== undefined) {
       if (typeof emailNotifications !== "boolean") {
@@ -91,7 +92,7 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error("Error updating user preferences:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

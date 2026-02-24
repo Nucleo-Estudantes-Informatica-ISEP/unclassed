@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
@@ -9,11 +10,21 @@ const createBundleSwapRequestSchema = z.object({
   preferenceOrderMatters: z.boolean().default(true),
 });
 
+interface MatchParticipant {
+  userId?: string;
+  status?: string;
+}
+
+function coerceMatchParticipants(value: unknown): MatchParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as MatchParticipant[];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -21,8 +32,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
 
     // Build where clause
-    const where: any = {};
-    
+    const where: Prisma.BundleSwapRequestWhereInput = {};
+
     // If not admin, users can only see their own requests
     if (session.role !== "ADMIN") {
       where.userId = session.id;
@@ -31,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      where.status = status;
+      where.status = status as Prisma.EnumRequestStatusFilter<"BundleSwapRequest"> | any;
     }
 
     const swapRequests = await prisma.bundleSwapRequest.findMany({
@@ -62,7 +73,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching bundle swap requests:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -72,7 +83,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -81,17 +92,17 @@ export async function POST(request: NextRequest) {
     // Verify the classes exist
     const [currentClass, preferredClasses] = await Promise.all([
       prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({ 
-        where: { id: { in: validatedData.preferredClassIds } } 
+      prisma.class.findMany({
+        where: { id: { in: validatedData.preferredClassIds } }
       })
     ]);
 
     if (!currentClass) {
-      return NextResponse.json({ error: "Current class not found" }, { status: 404 });
+      return NextResponse.json({ error: "Turma atual não encontrada" }, { status: 404 });
     }
 
     if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json({ error: "One or more preferred classes not found" }, { status: 404 });
+      return NextResponse.json({ error: "Uma ou mais turmas preferidas não foram encontradas" }, { status: 404 });
     }
 
     // Verify classes are from the same year
@@ -99,7 +110,7 @@ export async function POST(request: NextRequest) {
     const years = Array.from(new Set(allClasses.map(c => c.year)));
     if (years.length > 1) {
       return NextResponse.json(
-        { error: "All classes must be from the same academic year" },
+        { error: "Todas as turmas têm de ser do mesmo ano letivo" },
         { status: 400 }
       );
     }
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (existingRequest) {
       return NextResponse.json(
-        { error: "You already have an active bundle request for this class" },
+        { error: "Já tens um pedido de permuta completa ativo para esta turma" },
         { status: 409 }
       );
     }
@@ -129,13 +140,13 @@ export async function POST(request: NextRequest) {
 
     // Check if user is participant in any accepted match
     const userHasAcceptedMatch = acceptedMatches.some(match => {
-      const participants = match.participants as any[];
-      return participants.some(p => p.userId === session.id && p.status === 'accepted');
+      const participants = coerceMatchParticipants(match.participants);
+      return participants.some((p) => p.userId === session.id && p.status === "accepted");
     });
 
     if (userHasAcceptedMatch) {
       return NextResponse.json(
-        { error: "Não é possível criar novos pedidos enquanto tem matches aceites pendentes. Por favor complete ou rejeite os matches existentes primeiro." },
+        { error: "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro." },
         { status: 409 }
       );
     }
@@ -185,8 +196,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
-        ...swapRequest, 
+      {
+        ...swapRequest,
         preferredClasses: preferredClassesInfo,
         message: "Pedido de permuta completa criado! A procurar matches imediatos..."
       },
@@ -195,16 +206,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating bundle swap request:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation failed", details: error.errors },
+        { error: "Validação falhou", details: error.errors },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

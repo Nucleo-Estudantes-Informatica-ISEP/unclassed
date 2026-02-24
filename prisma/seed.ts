@@ -9,39 +9,39 @@ const subjectsData = [
   { code: "ALGAN", name: "Álgebra Linear e Geometria Analítica", year: 1, semester: 1 },
   { code: "APROG", name: "Algoritmia e Programação", year: 1, semester: 1 },
   { code: "AMATA", name: "Análise Matemática", year: 1, semester: 1 },
-  { code: "PRCMP", name: "Princípios de Computadores", year: 1, semester: 1 },
-  { code: "LAPR1", name: "Laboratório de Projeto 1", year: 1, semester: 1 },
+  { code: "PRCMP", name: "Princípios da Computacao", year: 1, semester: 1 },
+  { code: "LAPR1", name: "Laboratório/Projeto 1", year: 1, semester: 1 },
 
-  // 1st Year - 2nd Semester  
+  // 1st Year - 2nd Semester
   { code: "ESOFT", name: "Engenharia de Software", year: 1, semester: 2 },
   { code: "MATCP", name: "Matemática Computacional", year: 1, semester: 2 },
   { code: "MDISC", name: "Matemática Discreta", year: 1, semester: 2 },
   { code: "PPROG", name: "Paradigmas de Programação", year: 1, semester: 2 },
-  { code: "LAPR2", name: "Laboratório de Projeto 2", year: 1, semester: 2 },
+  { code: "LAPR2", name: "Laboratório/Projeto 2", year: 1, semester: 2 },
 
   // 2nd Year - 1st Semester
   { code: "ARQCP", name: "Arquitetura de Computadores", year: 2, semester: 1 },
   { code: "BDDAD", name: "Base de Dados", year: 2, semester: 1 },
   { code: "ESINF", name: "Estruturas de Informação", year: 2, semester: 1 },
-  { code: "FSIAP", name: "Fundamentos de Sistemas de Informação e Aplicações", year: 2, semester: 1 },
-  { code: "LAPR3", name: "Laboratório de Projeto 3", year: 2, semester: 1 },
+  { code: "FSIAP", name: "Física Aplicada", year: 2, semester: 1 },
+  { code: "LAPR3", name: "Laboratório/Projeto 3", year: 2, semester: 1 },
 
   // 2nd Year - 2nd Semester
   { code: "EAPLI", name: "Engenharia de Aplicações", year: 2, semester: 2 },
   { code: "LPROG", name: "Linguagens de Programação", year: 2, semester: 2 },
   { code: "RCOMP", name: "Redes de Computadores", year: 2, semester: 2 },
   { code: "SCOMP", name: "Sistemas de Computadores", year: 2, semester: 2 },
-  { code: "LAPR4", name: "Laboratório de Projeto 4", year: 2, semester: 2 },
+  { code: "LAPR4", name: "Laboratório/Projeto 4", year: 2, semester: 2 },
 
-  // 3rd Year - 1st Semester
-  { code: "ASIST", name: "Administração de Sistemas de Informação", year: 3, semester: 1 },
-  { code: "ALGAV", name: "Algoritmos Avançados", year: 3, semester: 1 },
-  { code: "ARQSI", name: "Arquitetura de Sistemas de Informação", year: 3, semester: 1 },
+  // 5th Year - 1st Semester
+  { code: "ASIST", name: "Administração de Sistemas", year: 3, semester: 1 },
+  { code: "ALGAV", name: "Algoritmia Avançada", year: 3, semester: 1 },
+  { code: "ARQSI", name: "Arquitetura de Sistemas", year: 3, semester: 1 },
   { code: "GESTA", name: "Gestão", year: 3, semester: 1 },
-  { code: "SGRAI", name: "Sistemas Gráficos e Interfaces", year: 3, semester: 1 },
+  { code: "SGRAI", name: "Sistemas Gráficos e Interacao", year: 3, semester: 1 },
   { code: "LAPR5", name: "Laboratório de Projeto 5", year: 3, semester: 1 },
 
-  // 3rd Year - 2nd Semester
+  // 6th Year - 1st Semester
   { code: "ANADI", name: "Análise de Dados em Informática", year: 3, semester: 2 },
   { code: "CORGA", name: "Computação Organizacional", year: 3, semester: 2 },
   { code: "INFOR", name: "Informática nas Organizações", year: 3, semester: 2 },
@@ -87,6 +87,7 @@ const classesData = [
   { name: "2DM", year: 2 },
   { name: "2DN", year: 2 },
   { name: "2DP", year: 2 },
+  { name: "2DO", year: 2 },
   { name: "2NA", year: 2 },
   { name: "2NB", year: 2 },
   { name: "2NC", year: 2 },

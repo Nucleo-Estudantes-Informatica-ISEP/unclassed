@@ -40,7 +40,7 @@ export async function withAuth(
         if (!rateLimitResult.allowed) {
           return NextResponse.json(
             {
-              error: "Rate limit exceeded",
+              error: "Limite de pedidos excedido",
               retryAfter: rateLimitResult.retryAfter,
             },
             { status: 429 }
@@ -69,7 +69,7 @@ export async function withAuth(
 
       if (!session) {
         return NextResponse.json(
-          { error: "Authentication required" },
+          { error: "Autenticação obrigatória" },
           { status: 401 }
         );
       }
@@ -77,7 +77,7 @@ export async function withAuth(
       // Check admin requirement
       if (requireAdmin && session.role !== "ADMIN") {
         return NextResponse.json(
-          { error: "Admin access required" },
+          { error: "Acesso de administrador necessário" },
           { status: 403 }
         );
       }
@@ -95,7 +95,7 @@ export async function withAuth(
     } catch (error) {
       console.error("Authentication middleware error:", error);
       return NextResponse.json(
-        { error: "Internal server error" },
+        { error: "Erro interno do servidor" },
         { status: 500 }
       );
     }
@@ -232,7 +232,7 @@ export async function withCSRF(
 
     if (!validateOrigin(request)) {
       return NextResponse.json(
-        { error: "Invalid request origin" },
+        { error: "Origem do pedido inválida" },
         { status: 403 }
       );
     }

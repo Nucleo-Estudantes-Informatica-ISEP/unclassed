@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
 
@@ -6,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     const semester = searchParams.get("semester");
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.SubjectWhereInput = {};
     
     if (year) {
       where.year = parseInt(year);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching subjects:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
@@ -16,11 +17,21 @@ const updateSingleSwapRequestSchema = z.object({
   status: z.enum(["ACTIVE", "CANCELLED"]).optional(),
 });
 
+interface MatchParticipant {
+  userId?: string;
+  status?: string;
+}
+
+function coerceMatchParticipants(value: unknown): MatchParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value as MatchParticipant[];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -28,8 +39,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
 
     // Build where clause
-    const where: any = {};
-    
+    const where: Prisma.SingleSwapRequestWhereInput = {};
+
     // If not admin, users can only see their own requests
     if (session.role !== "ADMIN") {
       where.userId = session.id;
@@ -38,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      where.status = status;
+      where.status = status as Prisma.EnumRequestStatusFilter<"SingleSwapRequest"> | any;
     }
 
     const swapRequests = await prisma.singleSwapRequest.findMany({
@@ -72,7 +83,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching single swap requests:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -82,7 +93,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -92,21 +103,21 @@ export async function POST(request: NextRequest) {
     const [subject, currentClass, preferredClasses] = await Promise.all([
       prisma.subject.findUnique({ where: { id: validatedData.subjectId } }),
       prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({ 
-        where: { id: { in: validatedData.preferredClassIds } } 
+      prisma.class.findMany({
+        where: { id: { in: validatedData.preferredClassIds } }
       })
     ]);
 
     if (!subject) {
-      return NextResponse.json({ error: "Subject not found" }, { status: 404 });
+      return NextResponse.json({ error: "Disciplina não encontrada" }, { status: 404 });
     }
 
     if (!currentClass) {
-      return NextResponse.json({ error: "Current class not found" }, { status: 404 });
+      return NextResponse.json({ error: "Turma atual não encontrada" }, { status: 404 });
     }
 
     if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json({ error: "One or more preferred classes not found" }, { status: 404 });
+      return NextResponse.json({ error: "Uma ou mais turmas preferidas não foram encontradas" }, { status: 404 });
     }
 
     // Check if user already has an active request for this subject
@@ -120,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     if (existingRequest) {
       return NextResponse.json(
-        { error: "You already have an active request for this subject" },
+        { error: "Já tens um pedido ativo para esta disciplina" },
         { status: 409 }
       );
     }
@@ -134,13 +145,13 @@ export async function POST(request: NextRequest) {
 
     // Check if user is participant in any accepted match
     const userHasAcceptedMatch = acceptedMatches.some(match => {
-      const participants = match.participants as any[];
-      return participants.some(p => p.userId === session.id && p.status === 'accepted');
+      const participants = coerceMatchParticipants(match.participants);
+      return participants.some((p) => p.userId === session.id && p.status === "accepted");
     });
 
     if (userHasAcceptedMatch) {
       return NextResponse.json(
-        { error: "Não é possível criar novos pedidos enquanto tem matches aceites pendentes. Por favor complete ou rejeite os matches existentes primeiro." },
+        { error: "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro." },
         { status: 409 }
       );
     }
@@ -194,8 +205,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
-        ...swapRequest, 
+      {
+        ...swapRequest,
         preferredClasses: preferredClassesInfo,
         message: "Pedido criado com sucesso! A procurar matches imediatos..."
       },
@@ -204,16 +215,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating single swap request:", error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation failed", details: error.errors },
+        { error: "Validação falhou", details: error.errors },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

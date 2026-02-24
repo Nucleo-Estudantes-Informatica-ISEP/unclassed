@@ -78,7 +78,7 @@ export function getCronSchedulerStatus() {
       enabled: enableScheduler,
       running: false,
       jobs: [],
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
     };
   }
 }
