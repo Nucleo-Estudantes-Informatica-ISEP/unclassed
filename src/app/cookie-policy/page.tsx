@@ -18,7 +18,7 @@ const CookiePolicy: React.FC = () => {
         <section>
           <h2 className="text-2xl font-semibold mb-4">2. Como Utilizamos os Cookies</h2>
           <p>
-            A plataforma UNCLASSED utiliza cookies para melhorar a experiência do utilizador e garantir o funcionamento adequado 
+            A plataforma Unclassed utiliza cookies para melhorar a experiência do utilizador e garantir o funcionamento adequado 
             dos serviços. Os cookies que utilizamos servem para:
           </p>
           <ul className="list-disc pl-6 mt-2">
@@ -88,7 +88,7 @@ const CookiePolicy: React.FC = () => {
         <section>
           <h2 className="text-2xl font-semibold mb-4">7. Cookies de Terceiros</h2>
           <p>
-            A plataforma UNCLASSED não utiliza cookies de terceiros para análise ou publicidade. Todos os cookies utilizados 
+            A plataforma Unclassed não utiliza cookies de terceiros para análise ou publicidade. Todos os cookies utilizados 
             são próprios e necessários para o funcionamento da plataforma.
           </p>
         </section>

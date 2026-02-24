@@ -104,7 +104,6 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Criar Pedido de Permuta Completa
-          <Badge variant="secondary">Bundle</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
