@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: session.id },
       select: {
+        phone: true,
         emailNotifications: true,
         emailVerified: true,
         sharePhoneOnMatch: true
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
+      phone: user.phone,
       emailNotifications: user.emailNotifications,
       emailVerified: user.emailVerified,
       sharePhoneOnMatch: user.sharePhoneOnMatch
@@ -47,7 +49,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { emailNotifications, sharePhoneOnMatch } = await req.json();
+    const { emailNotifications, sharePhoneOnMatch, phone } = await req.json();
 
     // Validate inputs
     const updateData: Prisma.UserUpdateInput = {};
@@ -72,10 +74,33 @@ export async function PATCH(req: NextRequest) {
       updateData.sharePhoneOnMatch = sharePhoneOnMatch;
     }
 
+    if (phone !== undefined) {
+      if (phone !== null && typeof phone !== "string") {
+        return NextResponse.json(
+          { error: "phone deve ser texto ou null" },
+          { status: 400 }
+        );
+      }
+
+      const trimmedPhone = phone?.trim() || null;
+      const isValidPhone =
+        trimmedPhone === null || /^9[1236]\d{7}$/.test(trimmedPhone);
+
+      if (!isValidPhone) {
+        return NextResponse.json(
+          { error: "Número de telemóvel inválido" },
+          { status: 400 }
+        );
+      }
+
+      updateData.phone = trimmedPhone;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
       data: updateData,
       select: {
+        phone: true,
         emailNotifications: true,
         emailVerified: true,
         sharePhoneOnMatch: true,

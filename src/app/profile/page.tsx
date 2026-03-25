@@ -17,6 +17,7 @@ export default async function ProfilePage() {
       id: true,
       name: true,
       email: true,
+      phone: true,
       role: true,
       emailVerified: true,
       emailNotifications: true,
@@ -37,6 +38,7 @@ export default async function ProfilePage() {
         role: user.role
       }}
       preferences={{
+        phone: user.phone,
         emailNotifications: user.emailNotifications,
         emailVerified: user.emailVerified,
         sharePhoneOnMatch: user.sharePhoneOnMatch

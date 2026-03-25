@@ -191,7 +191,7 @@ export function validateOrigin(request: NextRequest): boolean {
 
   // Allow requests from the same domain
   const allowedOrigins = [
-    process.env.NEXTAUTH_URL,
+    process.env.APP_BASE_URL,
     process.env.NEXT_PUBLIC_APP_URL,
     "http://localhost:3000",
     "http://127.0.0.1:3000",

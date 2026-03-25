@@ -12,6 +12,7 @@ import { CheckCircle2, Mail, Settings, User, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserPreferences {
+  phone: string | null;
   emailNotifications: boolean;
   emailVerified: boolean;
   sharePhoneOnMatch: boolean;
@@ -33,9 +34,11 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
   const router = useRouter();
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState('');
 
-  const handlePreferenceChange = async (preferenceType: 'emailNotifications' | 'sharePhoneOnMatch', value: boolean) => {
+  const handlePreferenceChange = async (
+    preferenceType: 'emailNotifications' | 'sharePhoneOnMatch',
+    value: boolean
+  ) => {
     setIsSaving(true);
     try {
       const updateData = { [preferenceType]: value };
@@ -63,26 +66,25 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!initialUser?.email) return;
-
+  const handlePhoneSave = async () => {
     setIsSaving(true);
+
     try {
-      const response = await fetch('/api/auth/send-verification', {
-        method: 'POST',
+      const response = await fetch('/api/user/preferences', {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: initialUser.email }),
+        body: JSON.stringify({ phone: preferences.phone }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('Email de verificação enviado com sucesso!');
-        toast.success('Email de verificação enviado!');
+        setPreferences((prev) => ({ ...prev, phone: data.user.phone }));
+        toast.success('Telemóvel atualizado com sucesso!');
       } else {
-        toast.error(data.error || 'Erro ao enviar email de verificação');
+        toast.error(data.error || 'Erro ao atualizar telemóvel');
       }
     } catch (error) {
       toast.error('Erro de conexão. Tenta novamente.');
@@ -139,33 +141,39 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
                     {initialUser.role === 'ADMIN' ? 'Administrador' : 'Utilizador'}
                   </p>
                 </div>
+                <div>
+                  <Label className="text-sm font-medium text-foreground">Telemóvel</Label>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="tel"
+                      value={preferences.phone ?? ''}
+                      onChange={(event) =>
+                        setPreferences((prev) => ({
+                          ...prev,
+                          phone: event.target.value,
+                        }))
+                      }
+                      placeholder="912345678"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePhoneSave}
+                      disabled={isSaving}
+                    >
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {!preferences.emailVerified && (
                 <Alert className="border-yellow-200 bg-yellow-50">
                   <Mail className="h-4 w-4 text-yellow-600" />
                   <AlertDescription className="text-yellow-800">
-                    <div className="flex items-center justify-between">
-                      <span>O teu email não está verificado. Algumas funcionalidades podem estar limitadas.</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResendVerification}
-                        disabled={isSaving}
-                        className="ml-4"
-                      >
-                        Reenviar Verificação
-                      </Button>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {message && (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    {message}
+                    A verificação do email é gerida pelo sistema central de autenticação.
+                    Atualiza o estado da tua conta no ZITADEL se precisares de acesso total.
                   </AlertDescription>
                 </Alert>
               )}

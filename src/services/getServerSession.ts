@@ -1,27 +1,23 @@
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
-
-import { Session } from "@/types/Session";
-import { config } from "@/config";
+import { auth } from "@/auth";
 import { exclude } from "@/lib/exclude";
 import prisma from "@/lib/prisma";
 
 const getServerSession = async () => {
-  const cookie = cookies().get(config.cookies.auth.name);
-  const token = cookie?.value as string;
-  if (!token) return null;
+  const session = await auth();
 
-  const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) return null;
-
-  try {
-    const decoded = jwt.verify(token, jwtSecret) as Session;
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) return null;
-    return exclude(user, ["password"]);
-  } catch (error) {
+  if (!session?.user?.id) {
     return null;
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  return exclude(user, ["password", "verificationToken", "verificationTokenExpiry"]);
 };
 
 export default getServerSession;

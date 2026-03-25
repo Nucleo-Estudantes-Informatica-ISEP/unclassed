@@ -26,10 +26,24 @@ model User {
   sharePhoneOnMatch       Boolean             @default(false) // Share phone number with match partners
   createdAt               DateTime            @default(now())
   role                    Role                @default(USER)
+  identities              UserIdentity[]
   singleSwapRequests      SingleSwapRequest[]
   bundleSwapRequests      BundleSwapRequest[]
 
   @@index([verificationToken])
+}
+
+model UserIdentity {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  provider        String
+  providerSubject String
+  userId          String   @unique @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
 }
 
 model Subject {
