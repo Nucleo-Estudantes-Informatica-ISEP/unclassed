@@ -14,16 +14,21 @@ function getClaim(
 const providers =
   process.env.AUTH_ISSUER_URL && process.env.AUTH_CLIENT_ID
     ? [
-        Zitadel({
-          issuer: process.env.AUTH_ISSUER_URL,
-          clientId: process.env.AUTH_CLIENT_ID,
-          clientSecret: process.env.AUTH_CLIENT_SECRET,
-          authorization: {
-            params: {
-              scope: process.env.AUTH_SCOPES || "openid email profile",
+        {
+          ...Zitadel({
+            issuer: process.env.AUTH_ISSUER_URL,
+            clientId: process.env.AUTH_CLIENT_ID,
+            clientSecret: process.env.AUTH_CLIENT_SECRET,
+            authorization: {
+              params: {
+                scope: process.env.AUTH_SCOPES || "openid email profile",
+              },
             },
-          },
-        }),
+          }),
+          // ZITADEL may omit profile/email claims from the ID token when an
+          // access token is issued. Fetch user data from userinfo instead.
+          idToken: false,
+        },
       ]
     : [];
 
