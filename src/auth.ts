@@ -43,6 +43,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
+    async signIn({ account, profile }) {
+      if (account?.provider !== "zitadel") {
+        return true;
+      }
+
+      const claims = (profile ?? {}) as Record<string, unknown>;
+      return claims.email_verified === true;
+    },
     async jwt({ token, account, profile }) {
       if (account) {
         token.idToken = account.id_token;
