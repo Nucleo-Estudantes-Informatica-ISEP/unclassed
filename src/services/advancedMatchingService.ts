@@ -422,8 +422,9 @@ export class AdvancedMatchingService {
       // Build graph for this partition
       const graph = await this.buildPartitionGraph(partition, context);
 
-      // Find 3-way matches with greedy approach
-      const matches = await this.find3WayMatches(graph, context);
+      // Find direct and 3-way matches with greedy approach so simple swaps
+      // are still recovered when immediate matching skips due to a lock.
+      const matches = await this.findBatchMatches(graph, context);
 
       if (matches.length > 0) {
         const createdMatches = await this.createMatches(matches, false); // Not provisional
@@ -453,14 +454,17 @@ export class AdvancedMatchingService {
   }
 
   /**
-   * Find 3-way matches using optimized cycle detection
+   * Find direct and 3-way matches using optimized cycle detection.
+   * Direct 2-way swaps are prioritized because they are the simplest and most
+   * reliable fallback when immediate matching was skipped.
    */
-  private async find3WayMatches(
+  private async findBatchMatches(
     graph: Map<string, GraphEdge[]>,
     context: ProcessingContext
   ): Promise<MatchResult[]> {
     const matches: MatchResult[] = [];
     const processed = new Set<string>();
+    const candidateCycleLengths = [2, 3];
 
     for (const [nodeId, edges] of Array.from(graph.entries())) {
       // Check timeout
@@ -471,20 +475,31 @@ export class AdvancedMatchingService {
 
       if (processed.has(nodeId)) continue;
 
-      // Find 3-way cycles starting from this node
-      const cycles = this.findCyclesFromNode(nodeId, graph, 3);
+      let matchedCurrentNode = false;
 
-      for (const cycle of cycles) {
-        if (cycle.length === 3) {
+      for (const cycleLength of candidateCycleLengths) {
+        if (matchedCurrentNode) {
+          break;
+        }
+
+        const cycles = this.findCyclesFromNode(nodeId, graph, cycleLength);
+
+        for (const cycle of cycles) {
+          if (cycle.some((id: string) => processed.has(id))) {
+            continue;
+          }
+
           const matchResult = await this.convertCycleToMatch(
             cycle,
             graph,
             context
           );
+
           if (matchResult) {
             matches.push(matchResult);
-            // Mark all participants as processed
             cycle.forEach((id: string) => processed.add(id));
+            matchedCurrentNode = true;
+            break;
           }
         }
       }
@@ -1202,20 +1217,9 @@ export class AdvancedMatchingService {
         const existingForUsers = await this.findProvisionalMatchesForUsers(userIds);
 
         if (existingForUsers.length > 0) {
-          // If there is any existing non-provisional PROPOSED/ACCEPTED match for any participant,
-          // we lock out creation entirely (strict locking)
-          const hasCommitted = existingForUsers.some(
-            (m) => !m.isProvisional && ["PROPOSED", "ACCEPTED"].includes(m.status as string)
-          );
-          if (hasCommitted) {
-            console.log(
-              `⛔ Skipping match creation: users already in committed match (PROPOSED/ACCEPTED)`
-            );
-            continue;
-          }
-
           if (!isProvisional) {
-            // New permanent (non-provisional) match should supersede older provisional matches
+            // New permanent (non-provisional) match should supersede any older
+            // active overlap instead of being blocked by it.
             for (const existing of existingForUsers) {
               try {
                 await prisma.match.update({
@@ -1237,7 +1241,8 @@ export class AdvancedMatchingService {
             });
 
             if (upgradableMatches.length !== existingForUsers.length) {
-              // Skip creating this provisional match unless it improves over ALL overlaps
+              // Skip creating this provisional match unless it improves over all
+              // active overlaps for the participating users.
               console.log(
                 `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
               );
