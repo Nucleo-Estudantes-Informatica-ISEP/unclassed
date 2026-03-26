@@ -56,11 +56,20 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await signIn("zitadel", { redirectTo: "/profile", redirect: true });
+      const result = await signIn("zitadel", {
+        redirectTo: "/profile",
+        redirect: false,
+      });
 
       if (result?.error) {
         throw new Error(result.error);
       }
+
+      if (!result?.url) {
+        throw new Error("Missing redirect URL from auth provider");
+      }
+
+      window.location.assign(result.url);
     } catch (error) {
       console.error("Register error:", error);
       setIsLoading(false);
