@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import getServerSession from "@/services/getServerSession";
+
 import prisma from "@/lib/prisma";
+import getServerSession from "@/services/getServerSession";
+import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
+import { triggerImmediateMatching } from "@/services/matchingTriggers";
 
 const createBundleSwapRequestSchema = z.object({
   currentClassId: z.string(),
@@ -10,15 +13,7 @@ const createBundleSwapRequestSchema = z.object({
   preferenceOrderMatters: z.boolean().default(true),
 });
 
-interface MatchParticipant {
-  userId?: string;
-  status?: string;
-}
-
-function coerceMatchParticipants(value: unknown): MatchParticipant[] {
-  if (!Array.isArray(value)) return [];
-  return value as MatchParticipant[];
-}
+const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,21 +36,25 @@ export async function GET(request: NextRequest) {
       where.userId = userId;
     }
 
-    if (status) {
-      where.status = status as Prisma.EnumRequestStatusFilter<"BundleSwapRequest"> | any;
+    if (
+      status &&
+      requestStatuses.includes(status as (typeof requestStatuses)[number])
+    ) {
+      const validatedStatus = status as (typeof requestStatuses)[number];
+      where.status = validatedStatus;
     }
 
     const swapRequests = await prisma.bundleSwapRequest.findMany({
       where,
       include: {
         user: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         currentClass: {
-          select: { id: true, name: true, year: true }
-        }
+          select: { id: true, name: true, year: true },
+        },
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     // Add preferred classes info
@@ -63,7 +62,7 @@ export async function GET(request: NextRequest) {
       swapRequests.map(async (request) => {
         const preferredClasses = await prisma.class.findMany({
           where: { id: { in: request.preferredClassIds } },
-          select: { id: true, name: true, year: true }
+          select: { id: true, name: true, year: true },
         });
         return { ...request, preferredClasses };
       })
@@ -93,21 +92,27 @@ export async function POST(request: NextRequest) {
     const [currentClass, preferredClasses] = await Promise.all([
       prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
       prisma.class.findMany({
-        where: { id: { in: validatedData.preferredClassIds } }
-      })
+        where: { id: { in: validatedData.preferredClassIds } },
+      }),
     ]);
 
     if (!currentClass) {
-      return NextResponse.json({ error: "Turma atual não encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Turma atual não encontrada" },
+        { status: 404 }
+      );
     }
 
     if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json({ error: "Uma ou mais turmas preferidas não foram encontradas" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Uma ou mais turmas preferidas não foram encontradas" },
+        { status: 404 }
+      );
     }
 
     // Verify classes are from the same year
     const allClasses = [currentClass, ...preferredClasses];
-    const years = Array.from(new Set(allClasses.map(c => c.year)));
+    const years = Array.from(new Set(allClasses.map((c) => c.year)));
     if (years.length > 1) {
       return NextResponse.json(
         { error: "Todas as turmas têm de ser do mesmo ano letivo" },
@@ -120,33 +125,27 @@ export async function POST(request: NextRequest) {
       where: {
         userId: session.id,
         currentClassId: validatedData.currentClassId,
-        status: "ACTIVE"
-      }
+        status: "ACTIVE",
+      },
     });
 
     if (existingRequest) {
       return NextResponse.json(
-        { error: "Já tens um pedido de permuta completa ativo para esta turma" },
+        {
+          error: "Já tens um pedido de permuta completa ativo para esta turma",
+        },
         { status: 409 }
       );
     }
 
-    // Check if user has any accepted matches (prevent creating new requests while having pending matches)
-    const acceptedMatches = await prisma.match.findMany({
-      where: {
-        status: { in: ["PROPOSED", "ACCEPTED"] }
-      }
-    });
-
-    // Check if user is participant in any accepted match
-    const userHasAcceptedMatch = acceptedMatches.some(match => {
-      const participants = coerceMatchParticipants(match.participants);
-      return participants.some((p) => p.userId === session.id && p.status === "accepted");
-    });
+    const userHasAcceptedMatch = await hasBlockingAcceptedMatch(session.id);
 
     if (userHasAcceptedMatch) {
       return NextResponse.json(
-        { error: "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro." },
+        {
+          error:
+            "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro.",
+        },
         { status: 409 }
       );
     }
@@ -160,50 +159,38 @@ export async function POST(request: NextRequest) {
         ticketType: "ALL_CLASSES",
         priority: 1, // Default priority
         status: "ACTIVE",
-        graphPartition: `year-${currentClass.year}`
+        graphPartition: `year-${currentClass.year}`,
       },
       include: {
         user: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         currentClass: {
-          select: { id: true, name: true, year: true }
-        }
-      }
+          select: { id: true, name: true, year: true },
+        },
+      },
     });
 
     // Add preferred classes info
     const preferredClassesInfo = await prisma.class.findMany({
       where: { id: { in: swapRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true }
+      select: { id: true, name: true, year: true },
     });
 
-    // Trigger immediate matching in background
-    // For internal requests, use 127.0.0.1:3000 to avoid IPv6 resolution issues in Docker
-    const baseUrl = 'http://127.0.0.1:3000';
-    fetch(`${baseUrl}/api/matching`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': request.headers.get('authorization') || ''
-      },
-      body: JSON.stringify({
-        requestId: swapRequest.id,
-        requestType: 'bundle'
-      })
-    }).catch(error => {
-      console.warn('Failed to trigger immediate matching:', error);
+    // Trigger immediate matching in the background without relying on an internal HTTP hop.
+    void triggerImmediateMatching(swapRequest.id, "bundle").catch((error) => {
+      console.warn("Failed to trigger immediate matching:", error);
     });
 
     return NextResponse.json(
       {
         ...swapRequest,
         preferredClasses: preferredClassesInfo,
-        message: "Pedido de permuta completa criado! A procurar matches imediatos..."
+        message:
+          "Pedido de permuta completa criado! A procurar matches imediatos...",
       },
       { status: 201 }
     );
-
   } catch (error) {
     console.error("Error creating bundle swap request:", error);
 

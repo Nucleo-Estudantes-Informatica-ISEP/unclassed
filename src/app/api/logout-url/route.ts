@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { buildLogoutCallbackPath } from "@/lib/zitadel";
-import { auth } from "@/auth";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const redirectTo = await buildLogoutCallbackPath(session?.idToken);
+    const redirectTo = await buildLogoutCallbackPath();
 
     return NextResponse.json({ redirectTo });
   } catch (error) {

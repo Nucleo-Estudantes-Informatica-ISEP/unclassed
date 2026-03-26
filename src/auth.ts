@@ -52,8 +52,11 @@ function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
 
 const missingAuthEnvVars = getMissingAuthEnvVars();
 const authConfigured = isAuthConfigured();
+const isProductionBuild =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.npm_lifecycle_event === "build";
 
-if (!authConfigured && process.env.NODE_ENV === "production") {
+if (!authConfigured && process.env.NODE_ENV === "production" && !isProductionBuild) {
   throw new Error(
     `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
   );
@@ -98,23 +101,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const claims = (profile ?? {}) as Record<string, unknown>;
       const emailVerified = parseEmailVerifiedClaim(claims);
 
-      if (emailVerified === false) {
-        return false;
-      }
-
-      if (emailVerified === undefined) {
+      if (emailVerified !== true) {
         console.warn(
-          "ZITADEL userinfo did not include email_verified claim. Allowing sign-in."
+          "Blocking ZITADEL sign-in because email_verified claim is missing or false."
         );
+        return false;
       }
 
       return true;
     },
     async jwt({ token, account, profile }) {
-      if (account) {
-        token.idToken = account.id_token;
-      }
-
       if (!account || !profile) {
         return token;
       }
@@ -154,7 +150,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         name: (token.name as string) || session.user?.name,
         email: (token.email as string) || session.user?.email,
       };
-      session.idToken = token.idToken as string | undefined;
 
       return session;
     },

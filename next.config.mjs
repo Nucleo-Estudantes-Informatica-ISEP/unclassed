@@ -13,10 +13,6 @@ const nextConfig = {
     // your project has type errors.
     // ignoreBuildErrors: true,
   },
-  experimental: {
-    // Disable static optimization for dynamic routes that use cookies
-    missingSuspenseWithCSRBailout: false,
-  },
   // Force dynamic rendering for pages that use authentication
   async headers() {
     return [

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import { AdvancedMatchingService } from "@/services/advancedMatchingService";
+import { triggerImmediateMatching } from "@/services/matchingTriggers";
+
+const matchingRequestSchema = z.object({
+  requestId: z.string().min(1),
+  requestType: z.enum(["single", "bundle"]),
+});
 
 /**
  * POST /api/matching
@@ -8,40 +17,53 @@ import { AdvancedMatchingService } from "@/services/advancedMatchingService";
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { requestId, requestType } = body;
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      allowCronSecret: true,
+      enforceSameOriginForSessionWrites: true,
+    });
 
-    if (!requestId || !requestType) {
-      return NextResponse.json(
-        { error: "requestId ou requestType em falta" }, 
-        { status: 400 }
-      );
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
-    console.log(`🔍 Immediate matching requested for ${requestType} request ${requestId}`);
-    
-    const matchingService = new AdvancedMatchingService();
-    
-    // Update request partition info
-    await matchingService.updateRequestPartition(requestId, requestType);
-    
-    // Process immediate matches (< 5 seconds)
-    const immediateMatches = await matchingService.processImmediateMatches(requestId);
-    
+    const { requestId, requestType } = matchingRequestSchema.parse(
+      await request.json()
+    );
+
+    console.log(
+      `🔍 Immediate matching requested for ${requestType} request ${requestId}`
+    );
+
+    const immediateMatches = await triggerImmediateMatching(
+      requestId,
+      requestType
+    );
+
     return NextResponse.json({
       success: true,
       immediateMatches: immediateMatches.length,
       matches: immediateMatches,
-      message: immediateMatches.length > 0 
-        ? `🎉 Encontrado(s) ${immediateMatches.length} match(es) imediato(s)!`
-        : "⏳ Não foram encontrados matches imediatos; pedido adicionado à fila de processamento em lote",
+      message:
+        immediateMatches.length > 0
+          ? `🎉 Encontrado(s) ${immediateMatches.length} match(es) imediato(s)!`
+          : "⏳ Não foram encontrados matches imediatos; pedido adicionado à fila de processamento em lote",
       requestId,
       requestType,
-      userId: request.headers.get('user-id') || 'anonymous'
+      requestedBy:
+        authResult.authenticatedBy === "cron"
+          ? "cron"
+          : authResult.session?.email || "admin",
     });
-
   } catch (error) {
-    console.error('Matching error:', error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validação falhou", details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error("Matching error:", error);
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }
@@ -56,26 +78,38 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    console.log('🔄 Batch processing requested');
-    
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      allowCronSecret: true,
+      enforceSameOriginForSessionWrites: true,
+    });
+
+    if (!authResult.ok) {
+      return authResult.response;
+    }
+
+    console.log("🔄 Batch processing requested");
+
     const matchingService = new AdvancedMatchingService();
-    
+
     // Run batch processing
     const results = await matchingService.runBatchProcessing();
-    
+
     // Expire old provisional matches
     const expiredCount = await matchingService.expireProvisionalMatches();
-    
+
     return NextResponse.json({
       success: true,
       ...results,
       expiredProvisionalMatches: expiredCount,
       message: `Processamento em lote concluído: ${results.matchesFound} novos matches, ${expiredCount} matches provisórios expiraram`,
-      executedBy: 'system'
+      executedBy:
+        authResult.authenticatedBy === "cron"
+          ? "cron"
+          : authResult.session?.email || "admin",
     });
-
   } catch (error) {
-    console.error('Batch processing error:', error);
+    console.error("Batch processing error:", error);
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }
@@ -89,18 +123,29 @@ export async function PUT(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      allowCronSecret: true,
+    });
+
+    if (!authResult.ok) {
+      return authResult.response;
+    }
+
     const matchingService = new AdvancedMatchingService();
     const stats = await matchingService.getAdvancedStats();
-    
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      requestedBy: 'anonymous',
-      ...stats
+      requestedBy:
+        authResult.authenticatedBy === "cron"
+          ? "cron"
+          : authResult.session?.email || "admin",
+      ...stats,
     });
-
   } catch (error) {
-    console.error('Stats error:', error);
+    console.error("Stats error:", error);
     return NextResponse.json(
       { error: "Erro interno do servidor" },
       { status: 500 }

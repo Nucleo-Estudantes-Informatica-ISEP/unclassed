@@ -12,18 +12,23 @@ interface Params {
   id: string;
 }
 
+type SingleSwapRequestRouteContext = {
+  params: Promise<Params>;
+};
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: SingleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const swapRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: { id: true, name: true, email: true }
@@ -67,9 +72,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: SingleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -79,7 +85,7 @@ export async function PUT(
     const validatedData = updateSingleSwapRequestSchema.parse(body);
 
     const existingRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!existingRequest) {
@@ -109,7 +115,7 @@ export async function PUT(
     }
 
     const updatedRequest = await prisma.singleSwapRequest.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...validatedData,
         updatedAt: new Date()
@@ -154,16 +160,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: SingleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const existingRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!existingRequest) {
@@ -179,7 +186,7 @@ export async function DELETE(
     }
 
     await prisma.singleSwapRequest.delete({
-      where: { id: params.id }
+      where: { id }
     });
 
     return NextResponse.json({ message: "Pedido de permuta eliminado com sucesso" });

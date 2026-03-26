@@ -21,7 +21,7 @@ export interface AuthMiddlewareOptions {
 /**
  * Authentication middleware for API endpoints
  */
-export async function withAuth(
+export function withAuth(
   handler: (request: AuthenticatedRequest) => Promise<NextResponse>,
   options: AuthMiddlewareOptions = {}
 ) {
@@ -173,7 +173,7 @@ function getMaxRequestsForKey(key: string): number {
 /**
  * Cleanup old rate limit entries periodically
  */
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, value] of Array.from(rateLimitStore.entries())) {
     if (now > value.resetTime) {
@@ -181,6 +181,8 @@ setInterval(() => {
     }
   }
 }, 300000); // Cleanup every 5 minutes
+
+cleanupTimer.unref?.();
 
 /**
  * Helper function to validate request origin
