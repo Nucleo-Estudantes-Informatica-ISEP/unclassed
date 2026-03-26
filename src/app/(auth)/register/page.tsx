@@ -7,11 +7,46 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/lib/components/ui/button";
 
 const Register: React.FC = () => {
+  const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
+  const [authConfigured, setAuthConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    void handleRegister();
+    let mounted = true;
+
+    const checkAuthConfig = async () => {
+      try {
+        const response = await fetch("/api/auth/configured", { cache: "no-store" });
+        const data = (await response.json()) as { configured?: boolean };
+
+        if (mounted) {
+          setAuthConfigured(data.configured !== false);
+          setAuthConfigLoaded(true);
+        }
+      } catch {
+        if (mounted) {
+          setAuthConfigured(false);
+          setAuthConfigLoaded(true);
+        }
+      }
+    };
+
+    void checkAuthConfig();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!authConfigLoaded || !authConfigured) {
+      return;
+    }
+
+    void handleRegister();
+    // We intentionally want this to run once after checking config.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authConfigLoaded, authConfigured]);
 
   async function handleRegister() {
     if (isLoading) {
@@ -21,7 +56,11 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await signIn("zitadel", { redirectTo: "/profile" });
+      const result = await signIn("zitadel", { redirectTo: "/profile", redirect: true });
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error("Register error:", error);
       setIsLoading(false);
@@ -48,7 +87,18 @@ const Register: React.FC = () => {
         Estamos a redirecionar-te para o registo/login central.
       </p>
 
-      <Button className="mt-6 w-full" onClick={handleRegister} disabled={isLoading}>
+      {!authConfigured ? (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Auth is not configured. Contacta a equipa para configurar
+          AUTH_ISSUER_URL, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET e AUTH_SECRET.
+        </p>
+      ) : null}
+
+      <Button
+        className="mt-6 w-full"
+        onClick={handleRegister}
+        disabled={isLoading || !authConfigLoaded || !authConfigured}
+      >
         {isLoading ? "A redirecionar para NEI Auth..." : "Continuar com NEI Auth"}
       </Button>
 

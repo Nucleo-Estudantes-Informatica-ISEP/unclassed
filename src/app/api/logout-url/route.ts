@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
 import { buildLogoutCallbackPath } from "@/lib/zitadel";
+import { auth } from "@/auth";
 
 export async function GET() {
-  const session = await auth();
-  const redirectTo = await buildLogoutCallbackPath(session?.idToken);
+  try {
+    const session = await auth();
+    const redirectTo = await buildLogoutCallbackPath(session?.idToken);
 
-  return NextResponse.json({ redirectTo });
+    return NextResponse.json({ redirectTo });
+  } catch (error) {
+    console.error("Failed to build logout URL:", error);
+    return NextResponse.json({ redirectTo: "/" });
+  }
 }

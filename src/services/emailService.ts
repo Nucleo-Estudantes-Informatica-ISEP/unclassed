@@ -1,5 +1,4 @@
-import nodemailer from 'nodemailer';
-import crypto from 'crypto';
+import nodemailer from "nodemailer";
 
 export interface EmailConfig {
   host: string;
@@ -27,90 +26,51 @@ class EmailService {
   private fromEmail: string;
 
   constructor() {
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@unclassed.isep.ipp.pt';
+    this.fromEmail = process.env.EMAIL_FROM || "noreply@unclassed.isep.ipp.pt";
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
     try {
       // Check if we have email credentials configured
-      if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      if (
+        process.env.EMAIL_HOST &&
+        process.env.EMAIL_USER &&
+        process.env.EMAIL_PASS
+      ) {
         // Use configured email service
         this.transporter = nodemailer.createTransport({
           host: process.env.EMAIL_HOST,
-          port: parseInt(process.env.EMAIL_PORT || '587'),
-          secure: process.env.EMAIL_SECURE === 'true',
+          port: parseInt(process.env.EMAIL_PORT || "587"),
+          secure: process.env.EMAIL_SECURE === "true",
           auth: {
             user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-          }
+            pass: process.env.EMAIL_PASS,
+          },
         });
-        console.log(`📧 Email service initialized with ${process.env.EMAIL_HOST}`);
-      } else if (process.env.NODE_ENV === 'development') {
+        console.log(
+          `📧 Email service initialized with ${process.env.EMAIL_HOST}`
+        );
+      } else if (process.env.NODE_ENV === "development") {
         // For development without credentials, use Ethereal Email (test account)
         this.transporter = nodemailer.createTransport({
-          host: 'smtp.ethereal.email',
+          host: "smtp.ethereal.email",
           port: 587,
           secure: false,
           auth: {
-            user: 'ethereal.user@ethereal.email',
-            pass: 'ethereal.pass'
-          }
+            user: "ethereal.user@ethereal.email",
+            pass: "ethereal.pass",
+          },
         });
-        console.log('📧 Using Ethereal Email for development (test emails)');
+        console.log("📧 Using Ethereal Email for development (test emails)");
       } else {
-        console.warn('⚠️ No email configuration found - emails will not be sent');
+        console.warn(
+          "⚠️ No email configuration found - emails will not be sent"
+        );
       }
     } catch (error) {
-      console.error('Failed to initialize email transporter:', error);
+      console.error("Failed to initialize email transporter:", error);
     }
-  }
-
-  generateVerificationToken(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
-
-  private getVerificationEmailTemplate(userName: string, verificationUrl: string): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #ffffff; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }
-            .header { background: #2563eb; color: #ffffff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; color: #333333; }
-            .button { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-            .footer { text-align: center; margin-top: 20px; font-size: 14px; color: #6b7280; }
-            h1, h2, h3 { color: #333333; }
-            p { color: #333333; }
-            code { background: #e5e7eb; padding: 2px 4px; border-radius: 3px; color: #333333; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🎓 Unclassed - ISEP</h1>
-              <p>Verificação de Email</p>
-            </div>
-            <div class="content">
-              <h2>Olá ${userName}!</h2>
-              <p>Obrigado por te registares na plataforma Unclassed. Para completar o teu registo, por favor verifica o teu endereço de email clicando no botão abaixo:</p>
-              <p style="text-align: center;">
-                <a href="${verificationUrl}" class="button">Verificar Email</a>
-              </p>
-              <p>Se não conseguires clicar no botão, copia e cola o seguinte link no teu navegador:</p>
-              <p><code>${verificationUrl}</code></p>
-              <p><strong>Nota:</strong> Este link de verificação expira em 24 horas.</p>
-              <p>Se não criaste uma conta na Unclassed, podes ignorar este email.</p>
-            </div>
-            <div class="footer">
-              <p>© 2025 Unclassed - NEI-ISEP</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
   }
 
   private getMatchNotificationTemplate(data: MatchNotificationData): string {
@@ -145,10 +105,10 @@ class EmailService {
               <div class="match-details">
                 <h3>📋 Detalhes da Troca</h3>
                 <p><strong>Tipo:</strong> ${data.matchType}</p>
-                ${data.subjects.length > 0 ? `<p><strong>Disciplinas:</strong> ${data.subjects.join(', ')}</p>` : ''}
+                ${data.subjects.length > 0 ? `<p><strong>Disciplinas:</strong> ${data.subjects.join(", ")}</p>` : ""}
                 <p><strong>Da turma:</strong> ${data.fromClass}</p>
                 <p><strong>Para a turma:</strong> ${data.toClass}</p>
-                <p><strong>Outros participantes:</strong> ${data.otherParticipants.join(', ')}</p>
+                <p><strong>Outros participantes:</strong> ${data.otherParticipants.join(", ")}</p>
               </div>
 
               <div class="warning">
@@ -171,43 +131,12 @@ class EmailService {
     `;
   }
 
-  async sendVerificationEmail(userEmail: string, userName: string, verificationToken: string): Promise<boolean> {
+  async sendMatchNotification(
+    userEmail: string,
+    data: MatchNotificationData
+  ): Promise<boolean> {
     if (!this.transporter) {
-      console.error('Email transporter not initialized');
-      return false;
-    }
-
-    try {
-      const baseUrl =
-        process.env.APP_BASE_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        'http://localhost:3000';
-      const verificationUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
-
-      const mailOptions = {
-        from: this.fromEmail,
-        to: userEmail,
-        subject: '🎓 Verifica o teu email - Unclassed ISEP',
-        html: this.getVerificationEmailTemplate(userName, verificationUrl)
-      };
-
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Verification email sent:', result.messageId);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔗 Preview URL:', nodemailer.getTestMessageUrl(result));
-      }
-
-      return true;
-    } catch (error) {
-      console.error('❌ Failed to send verification email:', error);
-      return false;
-    }
-  }
-
-  async sendMatchNotification(userEmail: string, data: MatchNotificationData): Promise<boolean> {
-    if (!this.transporter) {
-      console.error('Email transporter not initialized');
+      console.error("Email transporter not initialized");
       return false;
     }
 
@@ -216,43 +145,49 @@ class EmailService {
         from: this.fromEmail,
         to: userEmail,
         subject: `🎯 Novo Match Encontrado - ${data.matchType}`,
-        html: this.getMatchNotificationTemplate(data)
+        html: this.getMatchNotificationTemplate(data),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Match notification sent:', result.messageId);
+      console.log("✅ Match notification sent:", result.messageId);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔗 Preview URL:', nodemailer.getTestMessageUrl(result));
+      if (process.env.NODE_ENV === "development") {
+        console.log("🔗 Preview URL:", nodemailer.getTestMessageUrl(result));
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Failed to send match notification:', error);
+      console.error("❌ Failed to send match notification:", error);
       return false;
     }
   }
 
-  async sendMatchStatusUpdate(userEmail: string, userName: string, matchId: string, status: string, details: string): Promise<boolean> {
+  async sendMatchStatusUpdate(
+    userEmail: string,
+    userName: string,
+    matchId: string,
+    status: string,
+    details: string
+  ): Promise<boolean> {
     if (!this.transporter) {
-      console.error('Email transporter not initialized');
+      console.error("Email transporter not initialized");
       return false;
     }
 
     const statusEmoji = {
-      'ACCEPTED': '✅',
-      'REJECTED': '❌',
-      'COMPLETED': '🎉',
-      'CANCELLED': '⚠️'
+      ACCEPTED: "✅",
+      REJECTED: "❌",
+      COMPLETED: "🎉",
+      CANCELLED: "⚠️",
     };
 
-    const emoji = statusEmoji[status as keyof typeof statusEmoji] || '📋';
+    const emoji = statusEmoji[status as keyof typeof statusEmoji] || "📋";
 
     try {
       const baseUrl =
         process.env.APP_BASE_URL ||
         process.env.NEXT_PUBLIC_APP_URL ||
-        'http://localhost:3000';
+        "http://localhost:3000";
 
       const mailOptions = {
         from: this.fromEmail,
@@ -271,14 +206,14 @@ class EmailService {
               <a href="${baseUrl}/matches" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Ver Matches</a>
             </p>
           </div>
-        `
+        `,
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Match status update sent:', result.messageId);
+      console.log("✅ Match status update sent:", result.messageId);
       return true;
     } catch (error) {
-      console.error('❌ Failed to send match status update:', error);
+      console.error("❌ Failed to send match status update:", error);
       return false;
     }
   }
@@ -290,10 +225,10 @@ class EmailService {
 
     try {
       await this.transporter.verify();
-      console.log('✅ Email service connection verified');
+      console.log("✅ Email service connection verified");
       return true;
     } catch (error) {
-      console.error('❌ Email service connection failed:', error);
+      console.error("❌ Email service connection failed:", error);
       return false;
     }
   }

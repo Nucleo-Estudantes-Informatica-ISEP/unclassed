@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { Prisma } from "@prisma/client";
 
 import prisma from "@/lib/prisma";
 
@@ -35,6 +36,33 @@ function buildManagedPassword(sub: string) {
   return `${OIDC_PASSWORD_PREFIX}:${digest}`;
 }
 
+async function ensureNoEmailConflict(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  email: string
+) {
+  const conflictingUser = await tx.user.findFirst({
+    where: {
+      id: {
+        not: userId,
+      },
+      email: {
+        equals: email,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (conflictingUser) {
+    throw new Error(
+      "Cannot sync OIDC user because the email is already used by another local account."
+    );
+  }
+}
+
 export async function syncLocalUserFromOidc({
   sub,
   email,
@@ -48,9 +76,10 @@ export async function syncLocalUserFromOidc({
   }
 
   const normalizedName = normalizeName(name, normalizedEmail);
-  const isEmailVerified = Boolean(emailVerified);
+  const resolvedEmailVerified =
+    typeof emailVerified === "boolean" ? emailVerified : null;
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existingIdentity = await tx.userIdentity.findUnique({
       where: {
         provider_providerSubject: {
@@ -64,12 +93,16 @@ export async function syncLocalUserFromOidc({
     });
 
     if (existingIdentity) {
+      await ensureNoEmailConflict(tx, existingIdentity.userId, normalizedEmail);
+
       return tx.user.update({
         where: { id: existingIdentity.userId },
         data: {
           email: normalizedEmail,
           name: normalizedName,
-          emailVerified: isEmailVerified,
+          ...(resolvedEmailVerified !== null
+            ? { emailVerified: resolvedEmailVerified }
+            : {}),
           verificationToken: null,
           verificationTokenExpiry: null,
         },
@@ -102,7 +135,9 @@ export async function syncLocalUserFromOidc({
         data: {
           email: normalizedEmail,
           name: normalizedName,
-          emailVerified: isEmailVerified,
+          ...(resolvedEmailVerified !== null
+            ? { emailVerified: resolvedEmailVerified }
+            : {}),
           verificationToken: null,
           verificationTokenExpiry: null,
         },
@@ -114,7 +149,7 @@ export async function syncLocalUserFromOidc({
         email: normalizedEmail,
         name: normalizedName,
         password: buildManagedPassword(sub),
-        emailVerified: isEmailVerified,
+        emailVerified: resolvedEmailVerified ?? false,
         verificationToken: null,
         verificationTokenExpiry: null,
         identities: {

@@ -17,10 +17,7 @@ export function getAppBaseUrl() {
 }
 
 export function getPostLogoutRedirectUri() {
-  return (
-    process.env.AUTH_POST_LOGOUT_REDIRECT_URI ||
-    `${getAppBaseUrl()}/`
-  );
+  return process.env.AUTH_POST_LOGOUT_REDIRECT_URI || `${getAppBaseUrl()}/`;
 }
 
 export function getIssuerUrl() {
@@ -55,10 +52,7 @@ export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
     metadata.end_session_endpoint || `${issuer}/oidc/v1/end_session`;
 
   const url = new URL(endSessionEndpoint);
-  url.searchParams.set(
-    "post_logout_redirect_uri",
-    getPostLogoutRedirectUri()
-  );
+  url.searchParams.set("post_logout_redirect_uri", getPostLogoutRedirectUri());
 
   if (idTokenHint) {
     url.searchParams.set("id_token_hint", idTokenHint);
@@ -79,7 +73,13 @@ export function resolveSafeLogoutTarget(target?: string | null) {
 
   try {
     const resolvedTarget = new URL(target);
-    const issuerOrigin = new URL(getIssuerUrl()).origin;
+    const issuerUrl = process.env.AUTH_ISSUER_URL;
+
+    if (!issuerUrl) {
+      return getPostLogoutRedirectUri();
+    }
+
+    const issuerOrigin = new URL(trimTrailingSlash(issuerUrl)).origin;
 
     if (resolvedTarget.origin !== issuerOrigin) {
       return getPostLogoutRedirectUri();

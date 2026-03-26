@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Zitadel from "next-auth/providers/zitadel";
 
+import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 
 function getClaim(
@@ -11,30 +12,76 @@ function getClaim(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-const providers =
-  process.env.AUTH_ISSUER_URL && process.env.AUTH_CLIENT_ID
-    ? [
-        {
-          ...Zitadel({
-            issuer: process.env.AUTH_ISSUER_URL,
-            clientId: process.env.AUTH_CLIENT_ID,
-            clientSecret: process.env.AUTH_CLIENT_SECRET,
-            authorization: {
-              params: {
-                scope: process.env.AUTH_SCOPES || "openid email profile",
-              },
+function parseBooleanEnv(value: string | undefined, defaultValue: boolean) {
+  if (typeof value !== "string") {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+
+  if (normalized === "false") {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
+  const raw = claims.email_verified;
+
+  if (typeof raw === "boolean") {
+    return raw;
+  }
+
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  return undefined;
+}
+
+const missingAuthEnvVars = getMissingAuthEnvVars();
+const authConfigured = isAuthConfigured();
+
+if (!authConfigured && process.env.NODE_ENV === "production") {
+  throw new Error(
+    `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
+  );
+}
+
+const providers = authConfigured
+  ? [
+      {
+        ...Zitadel({
+          issuer: process.env.AUTH_ISSUER_URL,
+          clientId: process.env.AUTH_CLIENT_ID,
+          clientSecret: process.env.AUTH_CLIENT_SECRET,
+          authorization: {
+            params: {
+              scope: process.env.AUTH_SCOPES || "openid email profile",
             },
-          }),
-          // ZITADEL may omit profile/email claims from the ID token when an
-          // access token is issued. Fetch user data from userinfo instead.
-          idToken: false,
-        },
-      ]
-    : [];
+          },
+        }),
+        // ZITADEL may omit profile/email claims from the ID token when an
+        // access token is issued. Fetch user data from userinfo instead.
+        idToken: false,
+      },
+    ]
+  : [];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
-  trustHost: true,
+  trustHost: parseBooleanEnv(process.env.AUTH_TRUST_HOST, false),
   secret: process.env.AUTH_SECRET,
   pages: {
     signIn: "/login",
@@ -49,7 +96,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const claims = (profile ?? {}) as Record<string, unknown>;
-      return claims.email_verified === true;
+      const emailVerified = parseEmailVerifiedClaim(claims);
+
+      if (emailVerified === false) {
+        return false;
+      }
+
+      if (emailVerified === undefined) {
+        console.warn(
+          "ZITADEL userinfo did not include email_verified claim. Allowing sign-in."
+        );
+      }
+
+      return true;
     },
     async jwt({ token, account, profile }) {
       if (account) {
@@ -75,10 +134,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         sub,
         email: getClaim(claims, "email") || token.email,
         name: getClaim(claims, "name") || token.name,
-        emailVerified:
-          typeof claims.email_verified === "boolean"
-            ? claims.email_verified
-            : false,
+        emailVerified: parseEmailVerifiedClaim(claims),
       });
 
       token.localUserId = localUser.id;
