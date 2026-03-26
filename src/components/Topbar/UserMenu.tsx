@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,25 +31,21 @@ export default function UserMenu({ user }: UserMenuProps) {
     setIsLoggingOut(true);
 
     try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch("/api/logout-url", {
+        cache: "no-store",
       });
 
       if (!response.ok) {
         throw new Error("Falha no logout");
       }
 
-      toast.success("Logout realizado com sucesso!");
-
-      // Redirect to home page
-      router.push("/");
-      router.refresh();
+      const data = (await response.json()) as { redirectTo?: string };
+      await signOut({ redirectTo: data.redirectTo || "/" });
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Erro ao fazer logout");
+      router.push("/");
+      router.refresh();
     } finally {
       setIsLoggingOut(false);
     }

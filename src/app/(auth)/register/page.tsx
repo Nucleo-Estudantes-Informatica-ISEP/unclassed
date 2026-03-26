@@ -1,202 +1,113 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
 
 import { Button } from "@/lib/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/lib/components/ui/form";
-import { Input } from "@/lib/components/ui/input";
-import { Checkbox } from "@/lib/components/ui/checkbox";
-import { registerSchema } from "@/schemas/authSchema";
 
 const Register: React.FC = () => {
-  const formSchema = registerSchema;
-  const router = useRouter();
+  const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
+  const [authConfigured, setAuthConfigured] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      password: "",
-      confirmPassword: "",
-      sharePhoneOnMatch: false,
-      shareNameAndEmail: false,
-    },
-    mode: "onChange",
-  });
+  useEffect(() => {
+    let mounted = true;
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
+    const checkAuthConfig = async () => {
+      try {
+        const response = await fetch("/api/auth/configured", { cache: "no-store" });
+        const data = (await response.json()) as { configured?: boolean };
 
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.message) {
-          toast.success(data.message);
-        } else {
-          toast.success("Conta criada com sucesso! Verifica o teu email para ativar a conta.");
+        if (mounted) {
+          setAuthConfigured(data.configured !== false);
+          setAuthConfigLoaded(true);
         }
-        router.push("/login");
-      } else {
-        toast.error(data.error || "Erro ao criar conta");
+      } catch {
+        if (mounted) {
+          setAuthConfigured(false);
+          setAuthConfigLoaded(true);
+        }
+      }
+    };
+
+    void checkAuthConfig();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authConfigLoaded || !authConfigured) {
+      return;
+    }
+
+    void handleRegister();
+    // We intentionally want this to run once after checking config.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authConfigLoaded, authConfigured]);
+
+  async function handleRegister() {
+    if (isLoading) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await signIn("zitadel", { redirectTo: "/profile", redirect: true });
+
+      if (result?.error) {
+        throw new Error(result.error);
       }
     } catch (error) {
       console.error("Register error:", error);
-      toast.error("Erro inesperado ao criar conta");
+      setIsLoading(false);
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-2 px-6 py-8"
+    <div className="space-y-4 px-6 py-8">
+      <h2 className="pb-2 text-2xl font-bold">Criar conta</h2>
+      <p className="text-sm text-muted-foreground">
+        O registo passa a ser gerido pelo sistema central de autenticação do NEI.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Depois do primeiro login, o Unclassed cria ou liga automaticamente o teu
+        utilizador local e mantém os teus dados atuais se já tinhas conta.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Se fores um utilizador novo, entra e completa os teus dados de perfil no
+        Unclassed após a autenticação.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Estamos a redirecionar-te para o registo/login central.
+      </p>
+
+      {!authConfigured ? (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Auth is not configured. Contacta a equipa para configurar
+          AUTH_ISSUER_URL, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET e AUTH_SECRET.
+        </p>
+      ) : null}
+
+      <Button
+        className="mt-6 w-full"
+        onClick={handleRegister}
+        disabled={isLoading || !authConfigLoaded || !authConfigured}
       >
-        <h2 className="pb-4 text-2xl font-bold">Criar conta</h2>
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome</FormLabel>
-              <FormControl>
-                <Input placeholder="Nome..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder="Email..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Número de telemóvel</FormLabel>
-              <FormControl>
-                <Input placeholder="Número de telemóvel..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl>
-                <Input placeholder="Password..." type="password" {...field} />
-              </FormControl>
-              <FormDescription>
-                A tua password deve ter pelo menos 8 caracteres.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="confirmPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Repetir Password</FormLabel>
-              <FormControl>
-                <Input placeholder="Repetir Password..." type="password" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="shareNameAndEmail"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-[#101010]/[0.17] dark:border-[#CFCFCF]/[0.17] p-4">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>
-                  Partilhar nome e email registado
-                </FormLabel>
-                <FormDescription>
-                  Consentes em mostrar o teu nome e email a outros estudantes quando há um match.
-                </FormDescription>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="sharePhoneOnMatch"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-[#101010]/[0.17] dark:border-[#CFCFCF]/[0.17] p-4">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>
-                  Partilhar número de telemóvel quando há match
-                </FormLabel>
-                <FormDescription>
-                  Consentes que o teu número de telemóvel seja partilhado com outros estudantes quando há um match para facilitar a comunicação. Esta opção pode ser alterada no teu perfil.
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
-        />
-        <div className="flex flex-col gap-y-2">
-          <Button className="mt-8" type="submit">
-            Criar Conta
-          </Button>
-          <Link className="text-sm underline" href="/login">
-            Já tens uma conta? Faz login!
-          </Link>
-        </div>
-      </form>
-    </Form>
+        {isLoading ? "A redirecionar para NEI Auth..." : "Continuar com NEI Auth"}
+      </Button>
+
+      <div className="flex flex-col gap-y-2 pt-2">
+        <Link className="text-sm underline" href="/login">
+          Já tens conta no sistema central? Entrar
+        </Link>
+      </div>
+    </div>
   );
 };
 
