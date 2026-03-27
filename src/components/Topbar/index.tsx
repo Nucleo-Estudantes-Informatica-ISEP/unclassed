@@ -24,8 +24,19 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
     setIsLoggingOut(true);
 
     try {
+      const response = await fetch("/api/logout-url", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout failed");
+      }
+
+      const data = (await response.json()) as { redirectTo?: string };
+      const redirectTo = data.redirectTo || "/";
+
       await signOut({ redirect: false });
-      window.location.href = "/";
+      window.location.href = redirectTo;
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Erro ao fazer logout");

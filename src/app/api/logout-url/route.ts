@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
         : typeof token?.idToken === "string"
           ? token.idToken
           : null;
-    const redirectTo = await buildZitadelLogoutUrl(idTokenHint);
+    const logoutHint = typeof token?.email === "string" ? token.email : null;
+    const redirectTo = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
 
     return NextResponse.json({ redirectTo });
   } catch (error) {

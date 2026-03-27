@@ -47,7 +47,10 @@ async function getOidcMetadata(): Promise<OidcMetadata> {
   return (await response.json()) as OidcMetadata;
 }
 
-export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
+export async function buildZitadelLogoutUrl(
+  idTokenHint?: string | null,
+  logoutHint?: string | null
+) {
   const issuer = getIssuerUrl();
   const metadata: OidcMetadata = await getOidcMetadata().catch(
     () => ({}) as OidcMetadata
@@ -69,11 +72,18 @@ export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
     url.searchParams.set("id_token_hint", idTokenHint);
   }
 
+  if (logoutHint) {
+    url.searchParams.set("logout_hint", logoutHint);
+  }
+
   return url.toString();
 }
 
-export async function buildLogoutCallbackPath(idTokenHint?: string | null) {
-  const target = await buildZitadelLogoutUrl(idTokenHint);
+export async function buildLogoutCallbackPath(
+  idTokenHint?: string | null,
+  logoutHint?: string | null
+) {
+  const target = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
   return `/api/logout/callback?target=${encodeURIComponent(target)}`;
 }
 
