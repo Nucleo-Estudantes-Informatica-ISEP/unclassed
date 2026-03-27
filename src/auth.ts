@@ -115,6 +115,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token;
       }
 
+      if (typeof account.id_token === "string" && account.id_token.length > 0) {
+        token.idTokenHint = account.id_token;
+      }
+
       const claims = profile as Record<string, unknown>;
       const sub =
         getClaim(claims, "sub") ||
