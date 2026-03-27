@@ -470,7 +470,7 @@ export class AdvancedMatchingService {
     const processed = new Set<string>();
     const candidateCycleLengths = [2, 3];
 
-    for (const [nodeId, edges] of Array.from(graph.entries())) {
+    for (const [nodeId] of Array.from(graph.entries())) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
         console.log(`⏱️ Batch processing timeout reached`);
@@ -1404,13 +1404,33 @@ export class AdvancedMatchingService {
 
         // Guard: prevent duplicate active proposals for the same participants.
         const userIds = match.participants.map((p: MatchParticipant) => p.userId);
-        const existingForUsers = await this.findProvisionalMatchesForUsers(userIds);
+        const existingForUsers = await this.findProvisionalMatchesForUsers(
+          userIds
+        );
+        const committedOverlaps = existingForUsers.filter(
+          (existing) =>
+            !existing.isProvisional &&
+            (existing.status === "PROPOSED" || existing.status === "ACCEPTED")
+        );
+        const provisionalOverlaps = existingForUsers.filter(
+          (existing) =>
+            existing.isProvisional &&
+            (existing.status === "PROPOSED" ||
+              existing.status === "PROVISIONAL")
+        );
 
-        if (existingForUsers.length > 0) {
+        if (committedOverlaps.length > 0) {
+          console.log(
+            `⏭️ Skipping match creation: committed overlap exists for users ${userIds.join(",")}`
+          );
+          continue;
+        }
+
+        if (provisionalOverlaps.length > 0) {
           if (!isProvisional) {
-            // New permanent (non-provisional) match should supersede any older
-            // active overlap instead of being blocked by it.
-            for (const existing of existingForUsers) {
+            // Permanent matches may supersede older provisional overlaps, but
+            // never committed ones.
+            for (const existing of provisionalOverlaps) {
               try {
                 await prisma.match.update({
                   where: { id: existing.id },
@@ -1424,13 +1444,13 @@ export class AdvancedMatchingService {
           } else {
             // New provisional: only create if it is strictly better than ALL existing overlapping ones
             const improvementThreshold = 0.05;
-            const upgradableMatches = existingForUsers.filter((existing) => {
+            const upgradableMatches = provisionalOverlaps.filter((existing) => {
               const satisfactionDiff =
                 match.satisfactionScore - (existing.satisfactionScore || 0);
               return satisfactionDiff > improvementThreshold;
             });
 
-            if (upgradableMatches.length !== existingForUsers.length) {
+            if (upgradableMatches.length !== provisionalOverlaps.length) {
               // Skip creating this provisional match unless it improves over all
               // active overlaps for the participating users.
               console.log(
@@ -1574,7 +1594,7 @@ export class AdvancedMatchingService {
     // For MongoDB with Prisma, we need to use a different approach to query JSON arrays
     const matches = (await prisma.match.findMany({
       where: {
-        status: { in: ["PROPOSED", "ACCEPTED"] },
+        status: { in: ["PROPOSED", "ACCEPTED", "PROVISIONAL"] },
       },
     })) as unknown as StoredMatch[];
 
