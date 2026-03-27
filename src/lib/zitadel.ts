@@ -30,6 +30,10 @@ export function getIssuerUrl() {
   return trimTrailingSlash(issuer);
 }
 
+export function getAuthClientId() {
+  return process.env.AUTH_CLIENT_ID?.trim() || null;
+}
+
 async function getOidcMetadata(): Promise<OidcMetadata> {
   const issuer = getIssuerUrl();
   const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
@@ -53,6 +57,11 @@ export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
 
   const url = new URL(endSessionEndpoint);
   url.searchParams.set("post_logout_redirect_uri", getPostLogoutRedirectUri());
+
+  const clientId = getAuthClientId();
+  if (clientId) {
+    url.searchParams.set("client_id", clientId);
+  }
 
   if (idTokenHint) {
     url.searchParams.set("id_token_hint", idTokenHint);
