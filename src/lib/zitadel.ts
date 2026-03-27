@@ -63,6 +63,8 @@ export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
     url.searchParams.set("client_id", clientId);
   }
 
+  url.searchParams.set("state", crypto.randomUUID());
+
   if (idTokenHint) {
     url.searchParams.set("id_token_hint", idTokenHint);
   }
