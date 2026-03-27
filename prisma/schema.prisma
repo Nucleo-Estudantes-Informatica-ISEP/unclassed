@@ -148,6 +148,25 @@ model Match {
   @@index([satisfactionScore])
 }
 
+model MatchNotificationDelivery {
+  id               String                     @id @default(auto()) @map("_id") @db.ObjectId
+  matchId          String                     @db.ObjectId
+  userId           String                     @db.ObjectId
+  notificationType String
+  email            String
+  status           NotificationDeliveryStatus @default(SENDING)
+  reservedAt       DateTime                   @default(now())
+  sentAt           DateTime?
+  lastError        String?
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([matchId, userId, notificationType])
+  @@index([matchId])
+  @@index([userId])
+  @@index([notificationType])
+  @@index([status])
+}
+
 enum Role {
   USER
   ADMIN
@@ -207,6 +226,12 @@ enum MatchStatus {
   COMPLETED
   PROVISIONAL // Temporary match, can be upgraded
   UPGRADED // Was provisional, now replaced with better match
+}
+
+enum NotificationDeliveryStatus {
+  SENDING
+  SENT
+  FAILED
 }
 
 model CronExecution {

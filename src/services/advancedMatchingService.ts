@@ -1,6 +1,7 @@
+import type { Prisma } from "@prisma/client";
+
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
-import type { Prisma } from "@prisma/client";
 
 // ===== INTERFACES =====
 
@@ -127,6 +128,9 @@ interface UserRecord {
   emailNotifications?: boolean | null;
 }
 
+const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
+const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
+
 interface ClassRecord {
   id: string;
   name: string;
@@ -164,6 +168,7 @@ export class AdvancedMatchingService {
   private readonly MAX_CYCLE_LENGTH = 10;
   private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds
   private readonly DIRECT_MATCH_TIMEOUT = 5000; // 5 seconds
+  private readonly PARTITION_LOCK_STALE_MS = 2 * 60 * 1000; // 2 minutes
 
   // ===== IMMEDIATE PROCESSING (<5 seconds) =====
 
@@ -422,8 +427,9 @@ export class AdvancedMatchingService {
       // Build graph for this partition
       const graph = await this.buildPartitionGraph(partition, context);
 
-      // Find 3-way matches with greedy approach
-      const matches = await this.find3WayMatches(graph, context);
+      // Find direct and 3-way matches with greedy approach so simple swaps
+      // are still recovered when immediate matching skips due to a lock.
+      const matches = await this.findBatchMatches(graph, context);
 
       if (matches.length > 0) {
         const createdMatches = await this.createMatches(matches, false); // Not provisional
@@ -453,16 +459,19 @@ export class AdvancedMatchingService {
   }
 
   /**
-   * Find 3-way matches using optimized cycle detection
+   * Find direct and 3-way matches using optimized cycle detection.
+   * Direct 2-way swaps are prioritized because they are the simplest and most
+   * reliable fallback when immediate matching was skipped.
    */
-  private async find3WayMatches(
+  private async findBatchMatches(
     graph: Map<string, GraphEdge[]>,
     context: ProcessingContext
   ): Promise<MatchResult[]> {
     const matches: MatchResult[] = [];
     const processed = new Set<string>();
+    const candidateCycleLengths = [2, 3];
 
-    for (const [nodeId, edges] of Array.from(graph.entries())) {
+    for (const [nodeId] of Array.from(graph.entries())) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
         console.log(`⏱️ Batch processing timeout reached`);
@@ -471,20 +480,31 @@ export class AdvancedMatchingService {
 
       if (processed.has(nodeId)) continue;
 
-      // Find 3-way cycles starting from this node
-      const cycles = this.findCyclesFromNode(nodeId, graph, 3);
+      let matchedCurrentNode = false;
 
-      for (const cycle of cycles) {
-        if (cycle.length === 3) {
+      for (const cycleLength of candidateCycleLengths) {
+        if (matchedCurrentNode) {
+          break;
+        }
+
+        const cycles = this.findCyclesFromNode(nodeId, graph, cycleLength);
+
+        for (const cycle of cycles) {
+          if (cycle.some((id: string) => processed.has(id))) {
+            continue;
+          }
+
           const matchResult = await this.convertCycleToMatch(
             cycle,
             graph,
             context
           );
+
           if (matchResult) {
             matches.push(matchResult);
-            // Mark all participants as processed
             cycle.forEach((id: string) => processed.add(id));
+            matchedCurrentNode = true;
+            break;
           }
         }
       }
@@ -841,9 +861,19 @@ export class AdvancedMatchingService {
     partitionId: string,
     processId: string
   ): Promise<boolean> {
-    // Attempt to acquire the lock only if not already locked
+    // Attempt to acquire lock if free or stale
+    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
     const res = await prisma.graphPartition.updateMany({
-      where: { id: partitionId, isLocked: false },
+      where: {
+        id: partitionId,
+        OR: [
+          { isLocked: false },
+          {
+            isLocked: true,
+            lockedAt: { lt: staleBefore },
+          },
+        ],
+      },
       data: {
         isLocked: true,
         lockedAt: new Date(),
@@ -866,10 +896,17 @@ export class AdvancedMatchingService {
   }
 
   private async getActivePartitions(): Promise<GraphPartition[]> {
+    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
     return await prisma.graphPartition.findMany({
       where: {
         activeRequests: { gt: 0 },
-        isLocked: false,
+        OR: [
+          { isLocked: false },
+          {
+            isLocked: true,
+            lockedAt: { lt: staleBefore },
+          },
+        ],
       },
       orderBy: [{ priority: "asc" }, { activeRequests: "desc" }],
     });
@@ -1168,19 +1205,205 @@ export class AdvancedMatchingService {
           dashboardUrl: baseUrl,
         };
 
-        const emailSent = await emailService.sendMatchNotification(
-          user.email,
-          notificationData
+        const notificationReserved = await this.reserveMatchNotificationDelivery(
+          matchId,
+          user.id,
+          user.email
         );
-        if (emailSent) {
-          console.log(`✅ Match notification sent to ${user.email}`);
-        } else {
+
+        if (!notificationReserved) {
+          console.log(
+            `⏭️ Match notification already handled or currently in progress for match ${matchId} to ${user.email}`
+          );
+          continue;
+        }
+
+        try {
+          const emailSent = await emailService.sendMatchNotification(
+            user.email,
+            notificationData
+          );
+
+          if (emailSent) {
+            await this.markMatchNotificationDeliverySent(matchId, user.id);
+            console.log(`✅ Match notification sent to ${user.email}`);
+            continue;
+          }
+
+          await this.markMatchNotificationDeliveryFailed(
+            matchId,
+            user.id,
+            "Email service returned false"
+          );
           console.log(`❌ Failed to send notification to ${user.email}`);
+        } catch (error) {
+          await this.markMatchNotificationDeliveryFailed(
+            matchId,
+            user.id,
+            this.getErrorMessage(error)
+          );
+          console.error(
+            `❌ Error sending notification to ${user.email} for match ${matchId}:`,
+            error
+          );
         }
       }
     } catch (error) {
       console.error("Error sending match notifications:", error);
     }
+  }
+
+  private async reserveMatchNotificationDelivery(
+    matchId: string,
+    userId: string,
+    email: string
+  ): Promise<boolean> {
+    const now = new Date();
+    const staleReservationThreshold = new Date(
+      now.getTime() - MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS
+    );
+
+    try {
+      await prisma.matchNotificationDelivery.create({
+        data: {
+          matchId,
+          userId,
+          email,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+          reservedAt: now,
+          sentAt: null,
+          lastError: null,
+        },
+      });
+      return true;
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        const existingDelivery = await prisma.matchNotificationDelivery.findUnique(
+          {
+            where: {
+              matchId_userId_notificationType: {
+                matchId,
+                userId,
+                notificationType: MATCH_NOTIFICATION_TYPE,
+              },
+            },
+            select: {
+              status: true,
+              updatedAt: true,
+            },
+          }
+        );
+
+        if (!existingDelivery) {
+          return false;
+        }
+
+        if (
+          existingDelivery.status === "SENT" ||
+          (existingDelivery.status === "SENDING" &&
+            existingDelivery.updatedAt > staleReservationThreshold)
+        ) {
+          return false;
+        }
+
+        const reclaimedReservation =
+          await prisma.matchNotificationDelivery.updateMany({
+            where: {
+              matchId,
+              userId,
+              notificationType: MATCH_NOTIFICATION_TYPE,
+              OR: [
+                { status: "FAILED" },
+                {
+                  status: "SENDING",
+                  updatedAt: { lte: staleReservationThreshold },
+                },
+              ],
+            },
+            data: {
+              email,
+              status: "SENDING",
+              reservedAt: now,
+              sentAt: null,
+              lastError: null,
+            },
+          });
+
+        return reclaimedReservation.count > 0;
+      }
+
+      throw error;
+    }
+  }
+
+  private async markMatchNotificationDeliverySent(
+    matchId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      await prisma.matchNotificationDelivery.updateMany({
+        where: {
+          matchId,
+          userId,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+        },
+        data: {
+          status: "SENT",
+          sentAt: new Date(),
+          lastError: null,
+        },
+      });
+    } catch (error) {
+      console.warn(
+        `Failed to mark match notification delivery as sent for match ${matchId} and user ${userId}:`,
+        error
+      );
+    }
+  }
+
+  private async markMatchNotificationDeliveryFailed(
+    matchId: string,
+    userId: string,
+    reason: string
+  ): Promise<void> {
+    try {
+      await prisma.matchNotificationDelivery.updateMany({
+        where: {
+          matchId,
+          userId,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+        },
+        data: {
+          status: "FAILED",
+          lastError: reason.slice(0, 500),
+        },
+      });
+    } catch (error) {
+      console.warn(
+        `Failed to mark match notification delivery as failed for match ${matchId} and user ${userId}:`,
+        error
+      );
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    );
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return "Unknown delivery error";
   }
 
   private async createMatches(
@@ -1199,24 +1422,33 @@ export class AdvancedMatchingService {
 
         // Guard: prevent duplicate active proposals for the same participants.
         const userIds = match.participants.map((p: MatchParticipant) => p.userId);
-        const existingForUsers = await this.findProvisionalMatchesForUsers(userIds);
+        const existingForUsers = await this.findProvisionalMatchesForUsers(
+          userIds
+        );
+        const committedOverlaps = existingForUsers.filter(
+          (existing) =>
+            !existing.isProvisional &&
+            (existing.status === "PROPOSED" || existing.status === "ACCEPTED")
+        );
+        const provisionalOverlaps = existingForUsers.filter(
+          (existing) =>
+            existing.isProvisional &&
+            (existing.status === "PROPOSED" ||
+              existing.status === "PROVISIONAL")
+        );
 
-        if (existingForUsers.length > 0) {
-          // If there is any existing non-provisional PROPOSED/ACCEPTED match for any participant,
-          // we lock out creation entirely (strict locking)
-          const hasCommitted = existingForUsers.some(
-            (m) => !m.isProvisional && ["PROPOSED", "ACCEPTED"].includes(m.status as string)
+        if (committedOverlaps.length > 0) {
+          console.log(
+            `⏭️ Skipping match creation: committed overlap exists for users ${userIds.join(",")}`
           );
-          if (hasCommitted) {
-            console.log(
-              `⛔ Skipping match creation: users already in committed match (PROPOSED/ACCEPTED)`
-            );
-            continue;
-          }
+          continue;
+        }
 
+        if (provisionalOverlaps.length > 0) {
           if (!isProvisional) {
-            // New permanent (non-provisional) match should supersede older provisional matches
-            for (const existing of existingForUsers) {
+            // Permanent matches may supersede older provisional overlaps, but
+            // never committed ones.
+            for (const existing of provisionalOverlaps) {
               try {
                 await prisma.match.update({
                   where: { id: existing.id },
@@ -1230,14 +1462,15 @@ export class AdvancedMatchingService {
           } else {
             // New provisional: only create if it is strictly better than ALL existing overlapping ones
             const improvementThreshold = 0.05;
-            const upgradableMatches = existingForUsers.filter((existing) => {
+            const upgradableMatches = provisionalOverlaps.filter((existing) => {
               const satisfactionDiff =
                 match.satisfactionScore - (existing.satisfactionScore || 0);
               return satisfactionDiff > improvementThreshold;
             });
 
-            if (upgradableMatches.length !== existingForUsers.length) {
-              // Skip creating this provisional match unless it improves over ALL overlaps
+            if (upgradableMatches.length !== provisionalOverlaps.length) {
+              // Skip creating this provisional match unless it improves over all
+              // active overlaps for the participating users.
               console.log(
                 `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
               );
@@ -1379,7 +1612,7 @@ export class AdvancedMatchingService {
     // For MongoDB with Prisma, we need to use a different approach to query JSON arrays
     const matches = (await prisma.match.findMany({
       where: {
-        status: { in: ["PROPOSED", "ACCEPTED"] },
+        status: { in: ["PROPOSED", "ACCEPTED", "PROVISIONAL"] },
       },
     })) as unknown as StoredMatch[];
 

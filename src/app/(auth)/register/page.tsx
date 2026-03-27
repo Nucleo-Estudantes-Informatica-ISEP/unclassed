@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 import { Button } from "@/lib/components/ui/button";
@@ -10,6 +11,9 @@ const Register: React.FC = () => {
   const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
   const [authConfigured, setAuthConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl =
+    searchParams.get("callbackUrl") || searchParams.get("redirectTo") || "/profile";
 
   useEffect(() => {
     let mounted = true;
@@ -56,20 +60,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await signIn("zitadel", {
-        redirectTo: "/profile",
-        redirect: false,
-      });
-
-      if (result?.error) {
-        throw new Error(result.error);
-      }
-
-      if (!result?.url) {
-        throw new Error("Missing redirect URL from auth provider");
-      }
-
-      window.location.assign(result.url);
+      await signIn("zitadel", { callbackUrl });
     } catch (error) {
       console.error("Register error:", error);
       setIsLoading(false);

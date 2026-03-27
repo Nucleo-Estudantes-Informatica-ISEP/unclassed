@@ -5,6 +5,7 @@
  * and manages graph cleanup accordingly.
  */
 
+import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from 'next/server';
 import getServerSession from '@/services/getServerSession';
 import { AdvancedMatchingService } from '@/services/advancedMatchingService';
@@ -36,9 +37,19 @@ interface MatchRecord {
   bundleSwapRequestIds: string[];
 }
 
+type MatchRouteContext = {
+  params: Promise<{ matchId: string }>;
+};
+
 function coerceParticipants(value: unknown): MatchParticipant[] {
   if (!Array.isArray(value)) return [];
   return value as MatchParticipant[];
+}
+
+function toParticipantsJson(
+  participants: MatchParticipant[]
+): Prisma.InputJsonValue[] {
+  return participants as unknown as Prisma.InputJsonValue[];
 }
 
 /**
@@ -47,16 +58,17 @@ function coerceParticipants(value: unknown): MatchParticipant[] {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { matchId: string } }
+  { params }: MatchRouteContext
 ) {
   try {
+    const { matchId } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     const match = (await prisma.match.findUnique({
-      where: { id: params.matchId }
+      where: { id: matchId }
     })) as MatchRecord | null;
 
     if (!match) {
@@ -88,9 +100,10 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { matchId: string } }
+  { params }: MatchRouteContext
 ) {
   try {
+    const { matchId } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -103,7 +116,7 @@ export async function PATCH(
     }
 
     const match = (await prisma.match.findUnique({
-      where: { id: params.matchId }
+      where: { id: matchId }
     })) as MatchRecord | null;
 
     if (!match) {
@@ -181,7 +194,7 @@ async function handleMatchAccept(match: MatchRecord, userId: string) {
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants as any,
+      participants: toParticipantsJson(updatedParticipants),
       status: allAccepted ? 'ACCEPTED' : 'PROPOSED',
       isProvisional: false, // Remove provisional status when accepted
     }
@@ -211,11 +224,13 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
     data: {
       status: 'REJECTED',
       isProvisional: false,
-      participants: coerceParticipants(match.participants).map((p) => ({
-        ...p,
-        status: p.userId === userId ? 'rejected' : p.status,
-        rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
-      })) as any
+      participants: toParticipantsJson(
+        coerceParticipants(match.participants).map((p) => ({
+          ...p,
+          status: p.userId === userId ? 'rejected' : p.status,
+          rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
+        }))
+      )
     }
   });
 
@@ -253,7 +268,7 @@ async function handleMatchComplete(match: MatchRecord, userId: string, matchingS
   const updatedMatch = await prisma.match.update({
     where: { id: match.id },
     data: {
-      participants: updatedParticipants as any,
+      participants: toParticipantsJson(updatedParticipants),
       status: allCompleted ? 'COMPLETED' : 'ACCEPTED'
     }
   });
@@ -305,11 +320,13 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
     where: { id: match.id },
     data: {
       status: 'REJECTED',
-      participants: coerceParticipants(match.participants).map((p) => ({
-        ...p,
-        status: p.userId === userId ? 'revoked' : p.status,
-        revokedAt: p.userId === userId ? new Date() : p.revokedAt
-      })) as any
+      participants: toParticipantsJson(
+        coerceParticipants(match.participants).map((p) => ({
+          ...p,
+          status: p.userId === userId ? 'revoked' : p.status,
+          revokedAt: p.userId === userId ? new Date() : p.revokedAt
+        }))
+      )
     }
   });
 

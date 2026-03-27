@@ -52,8 +52,12 @@ function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
 
 const missingAuthEnvVars = getMissingAuthEnvVars();
 const authConfigured = isAuthConfigured();
+const authDebugEnabled = process.env.AUTH_DEBUG === "true";
+const isProductionBuild =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.npm_lifecycle_event === "build";
 
-if (!authConfigured && process.env.NODE_ENV === "production") {
+if (!authConfigured && process.env.NODE_ENV === "production" && !isProductionBuild) {
   throw new Error(
     `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
   );
@@ -98,21 +102,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const claims = (profile ?? {}) as Record<string, unknown>;
       const emailVerified = parseEmailVerifiedClaim(claims);
 
-      if (emailVerified === false) {
-        return false;
-      }
-
-      if (emailVerified === undefined) {
+      if (emailVerified !== true) {
         console.warn(
-          "ZITADEL userinfo did not include email_verified claim. Allowing sign-in."
+          "Blocking ZITADEL sign-in because email_verified claim is missing or false."
         );
+        return false;
       }
 
       return true;
     },
-    async jwt({ token, account, profile }) {
-      if (account) {
+    async jwt({ token, account, profile, trigger }) {
+      if (
+        typeof account?.id_token === "string" &&
+        account.id_token.length > 0
+      ) {
+        token.idTokenHint = account.id_token;
         token.idToken = account.id_token;
+      }
+
+      if (authDebugEnabled && account) {
+        console.info("[auth][jwt]", {
+          trigger,
+          provider: account.provider,
+          hasProfile: Boolean(profile),
+          hasIdToken: typeof account.id_token === "string",
+          hasAccessToken: typeof account.access_token === "string",
+          hasStoredIdTokenHint: typeof token.idTokenHint === "string",
+          hasStoredIdToken: typeof token.idToken === "string",
+          hasTokenEmail: typeof token.email === "string",
+          hasProfileEmail:
+            typeof (profile as Record<string, unknown> | undefined)?.email ===
+            "string",
+        });
       }
 
       if (!account || !profile) {
@@ -146,6 +167,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      if (authDebugEnabled) {
+        console.info("[auth][session]", {
+          hasUser: Boolean(session.user),
+          hasLocalUserId: typeof token.localUserId === "string",
+          hasRole: typeof token.role === "string",
+          hasZitadelSub: typeof token.zitadelSub === "string",
+          hasTokenEmail: typeof token.email === "string",
+          hasIdTokenHint: typeof token.idTokenHint === "string",
+          hasIdToken: typeof token.idToken === "string",
+        });
+      }
+
       session.user = {
         ...session.user,
         id: token.localUserId as string,
@@ -154,7 +187,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         name: (token.name as string) || session.user?.name,
         email: (token.email as string) || session.user?.email,
       };
-      session.idToken = token.idToken as string | undefined;
 
       return session;
     },

@@ -30,6 +30,10 @@ export function getIssuerUrl() {
   return trimTrailingSlash(issuer);
 }
 
+export function getAuthClientId() {
+  return process.env.AUTH_CLIENT_ID?.trim() || null;
+}
+
 async function getOidcMetadata(): Promise<OidcMetadata> {
   const issuer = getIssuerUrl();
   const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
@@ -43,7 +47,10 @@ async function getOidcMetadata(): Promise<OidcMetadata> {
   return (await response.json()) as OidcMetadata;
 }
 
-export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
+export async function buildZitadelLogoutUrl(
+  idTokenHint?: string | null,
+  logoutHint?: string | null
+) {
   const issuer = getIssuerUrl();
   const metadata: OidcMetadata = await getOidcMetadata().catch(
     () => ({}) as OidcMetadata
@@ -54,15 +61,29 @@ export async function buildZitadelLogoutUrl(idTokenHint?: string | null) {
   const url = new URL(endSessionEndpoint);
   url.searchParams.set("post_logout_redirect_uri", getPostLogoutRedirectUri());
 
+  const clientId = getAuthClientId();
+  if (clientId) {
+    url.searchParams.set("client_id", clientId);
+  }
+
+  url.searchParams.set("state", crypto.randomUUID());
+
   if (idTokenHint) {
     url.searchParams.set("id_token_hint", idTokenHint);
+  }
+
+  if (logoutHint) {
+    url.searchParams.set("logout_hint", logoutHint);
   }
 
   return url.toString();
 }
 
-export async function buildLogoutCallbackPath(idTokenHint?: string | null) {
-  const target = await buildZitadelLogoutUrl(idTokenHint);
+export async function buildLogoutCallbackPath(
+  idTokenHint?: string | null,
+  logoutHint?: string | null
+) {
+  const target = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
   return `/api/logout/callback?target=${encodeURIComponent(target)}`;
 }
 

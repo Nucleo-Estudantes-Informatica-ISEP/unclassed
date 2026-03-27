@@ -79,6 +79,10 @@ export async function syncLocalUserFromOidc({
   const resolvedEmailVerified =
     typeof emailVerified === "boolean" ? emailVerified : null;
 
+  if (resolvedEmailVerified !== true) {
+    throw new Error("OIDC login requires a verified email address.");
+  }
+
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existingIdentity = await tx.userIdentity.findUnique({
       where: {
@@ -149,7 +153,7 @@ export async function syncLocalUserFromOidc({
         email: normalizedEmail,
         name: normalizedName,
         password: buildManagedPassword(sub),
-        emailVerified: resolvedEmailVerified ?? false,
+        emailVerified: true,
         verificationToken: null,
         verificationTokenExpiry: null,
         identities: {

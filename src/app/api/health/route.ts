@@ -5,10 +5,13 @@
  * Used for monitoring and load balancer health checks.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getCronSchedulerStatus } from '@/lib/cronInit';
-import { isAppInitialized } from '@/lib/startup';
-import prisma from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+
+import { hasValidCronSecret } from "@/lib/apiAccess";
+import { getCronSchedulerStatus } from "@/lib/cronInit";
+import prisma from "@/lib/prisma";
+import { isAppInitialized } from "@/lib/startup";
+import getServerSession from "@/services/getServerSession";
 
 /**
  * Health check endpoint
@@ -17,73 +20,91 @@ import prisma from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     const startTime = Date.now();
+    const hasCronSecret = hasValidCronSecret(request);
+    const session = hasCronSecret
+      ? null
+      : await getServerSession().catch(() => null);
+    const includeDetailedStatus = hasCronSecret || session?.role === "ADMIN";
 
     // Test database connectivity
-    let dbHealth = 'healthy';
+    let dbHealth = "healthy";
     let dbResponseTime = 0;
     try {
       const dbStart = Date.now();
       await prisma.user.findFirst();
       dbResponseTime = Date.now() - dbStart;
     } catch (error) {
-      dbHealth = 'unhealthy';
-      console.error('Database health check failed:', error);
+      dbHealth = "unhealthy";
+      console.error("Database health check failed:", error);
     }
-
-    // Get cron scheduler status
-    const cronStatus = getCronSchedulerStatus();
 
     // Calculate total response time
     const responseTime = Date.now() - startTime;
 
     const healthData = {
-      status: dbHealth === 'healthy' ? 'healthy' : 'unhealthy',
+      status: dbHealth === "healthy" ? "healthy" : "unhealthy",
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
       initialized: isAppInitialized(),
       services: {
         database: {
           status: dbHealth,
-          responseTime: dbResponseTime
         },
-        cronScheduler: cronStatus
       },
       metrics: {
         responseTime,
-        memoryUsage: process.memoryUsage(),
-        nodeVersion: process.version
-      }
+      },
     };
 
-    // Return appropriate HTTP status
-    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    const responsePayload = includeDetailedStatus
+      ? {
+          ...healthData,
+          uptime: process.uptime(),
+          version: process.env.npm_package_version || "1.0.0",
+          environment: process.env.NODE_ENV || "development",
+          services: {
+            ...healthData.services,
+            database: {
+              status: dbHealth,
+              responseTime: dbResponseTime,
+            },
+            cronScheduler: getCronSchedulerStatus(),
+          },
+          metrics: {
+            ...healthData.metrics,
+            memoryUsage: process.memoryUsage(),
+            nodeVersion: process.version,
+          },
+        }
+      : healthData;
 
-    return NextResponse.json(healthData, {
+    // Return appropriate HTTP status
+    const httpStatus = healthData.status === "healthy" ? 200 : 503;
+
+    return NextResponse.json(responsePayload, {
       status: httpStatus,
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
-
   } catch (error) {
-    console.error('Health check error:', error);
+    console.error("Health check error:", error);
 
-    return NextResponse.json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Erro desconhecido',
-      initialized: isAppInitialized()
-    }, {
-      status: 503,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+    return NextResponse.json(
+      {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        initialized: isAppInitialized(),
+      },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       }
-    });
+    );
   }
 }

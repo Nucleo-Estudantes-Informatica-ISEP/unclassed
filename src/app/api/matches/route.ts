@@ -25,9 +25,45 @@ interface RawParticipant {
   toClass?: string;
 }
 
+const matchStatuses = [
+  "PROPOSED",
+  "PROVISIONAL",
+  "ACCEPTED",
+  "COMPLETED",
+  "REJECTED",
+  "UPGRADED",
+] as const;
+
+const matchTypes = ["SINGLE", "BUNDLE"] as const;
+
 function coerceParticipants(value: unknown): RawParticipant[] {
   if (!Array.isArray(value)) return [];
   return value as RawParticipant[];
+}
+
+function sanitizeUserForMatch(
+  user:
+    | {
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        sharePhoneOnMatch: boolean | null;
+      }
+    | undefined,
+  sessionUserId: string
+) {
+  if (!user) {
+    return undefined;
+  }
+
+  const canSeePhone =
+    user.id === sessionUserId || Boolean(user.sharePhoneOnMatch);
+
+  return {
+    ...user,
+    phone: canSeePhone ? user.phone : null,
+  };
 }
 
 function getMatchSignature(match: MatchLike): string {
@@ -74,16 +110,24 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: Prisma.MatchWhereInput = {};
 
-    if (status) {
-      where.status = status as Prisma.EnumMatchStatusFilter<"Match"> | any;
+    if (
+      status &&
+      matchStatuses.includes(status as (typeof matchStatuses)[number])
+    ) {
+      const validatedStatus = status as (typeof matchStatuses)[number];
+      where.status = validatedStatus;
     } else {
       where.status = {
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
       };
     }
 
-    if (matchType) {
-      where.matchType = matchType as Prisma.EnumMatchTypeFilter<"Match"> | any;
+    if (
+      matchType &&
+      matchTypes.includes(matchType as (typeof matchTypes)[number])
+    ) {
+      const validatedMatchType = matchType as (typeof matchTypes)[number];
+      where.matchType = validatedMatchType;
     }
 
     const matches = await prisma.match.findMany({
@@ -95,7 +139,9 @@ export async function GET(request: NextRequest) {
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
-        coerceParticipants(match.participants).some((p) => p.userId === session.id)
+        coerceParticipants(match.participants).some(
+          (p) => p.userId === session.id
+        )
       );
     } else if (userId) {
       filteredMatches = matches.filter((match) =>
@@ -113,7 +159,9 @@ export async function GET(request: NextRequest) {
         const participants = coerceParticipants(match.participants);
 
         // Get user information for participants
-        const userIds = participants.map((p) => p.userId).filter((id): id is string => id !== undefined);
+        const userIds = participants
+          .map((p) => p.userId)
+          .filter((id): id is string => id !== undefined);
         const users = await prisma.user.findMany({
           where: { id: { in: userIds } },
           select: {
@@ -141,7 +189,7 @@ export async function GET(request: NextRequest) {
 
           return {
             ...p,
-            user,
+            user: sanitizeUserForMatch(user, session.id),
             fromClass,
             toClass,
           };

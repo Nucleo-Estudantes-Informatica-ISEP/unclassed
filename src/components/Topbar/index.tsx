@@ -33,7 +33,10 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
       }
 
       const data = (await response.json()) as { redirectTo?: string };
-      await signOut({ redirectTo: data.redirectTo || "/" });
+      const redirectTo = data.redirectTo || "/";
+
+      await signOut({ redirect: false });
+      window.location.href = redirectTo;
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Erro ao fazer logout");

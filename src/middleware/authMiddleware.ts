@@ -21,7 +21,7 @@ export interface AuthMiddlewareOptions {
 /**
  * Authentication middleware for API endpoints
  */
-export async function withAuth(
+export function withAuth(
   handler: (request: AuthenticatedRequest) => Promise<NextResponse>,
   options: AuthMiddlewareOptions = {}
 ) {
@@ -173,7 +173,7 @@ function getMaxRequestsForKey(key: string): number {
 /**
  * Cleanup old rate limit entries periodically
  */
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, value] of Array.from(rateLimitStore.entries())) {
     if (now > value.resetTime) {
@@ -182,6 +182,8 @@ setInterval(() => {
   }
 }, 300000); // Cleanup every 5 minutes
 
+cleanupTimer.unref?.();
+
 /**
  * Helper function to validate request origin
  */
@@ -189,30 +191,48 @@ export function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
 
-  // Allow requests from the same domain
-  const allowedOrigins = [
-    process.env.APP_BASE_URL,
-    process.env.NEXT_PUBLIC_APP_URL,
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-  ].filter(Boolean);
+  const allowedOrigins = new Set(
+    [
+      process.env.APP_BASE_URL,
+      process.env.NEXT_PUBLIC_APP_URL,
+      request.nextUrl.origin,
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ]
+      .map(normalizeOrigin)
+      .filter((value): value is string => Boolean(value))
+  );
 
-  if (
-    origin &&
-    allowedOrigins.some((allowed) => allowed && origin.startsWith(allowed))
-  ) {
-    return true;
+  if (origin) {
+    return matchesAllowedOrigin(origin, allowedOrigins);
   }
 
-  if (
-    referer &&
-    allowedOrigins.some((allowed) => allowed && referer.startsWith(allowed))
-  ) {
-    return true;
+  if (referer) {
+    return matchesAllowedOrigin(referer, allowedOrigins);
   }
 
   // Allow requests without origin (direct API calls, curl, etc.)
   return !origin && !referer;
+}
+
+function normalizeOrigin(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function matchesAllowedOrigin(
+  value: string,
+  allowedOrigins: Set<string>
+): boolean {
+  const normalizedOrigin = normalizeOrigin(value);
+  return Boolean(normalizedOrigin && allowedOrigins.has(normalizedOrigin));
 }
 
 /**

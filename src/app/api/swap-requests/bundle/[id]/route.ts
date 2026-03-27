@@ -12,18 +12,23 @@ interface Params {
   id: string;
 }
 
+type BundleSwapRequestRouteContext = {
+  params: Promise<Params>;
+};
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: BundleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const swapRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: { id: true, name: true, email: true }
@@ -64,9 +69,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: BundleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -76,7 +82,7 @@ export async function PUT(
     const validatedData = updateBundleSwapRequestSchema.parse(body);
 
     const existingRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         currentClass: true
       }
@@ -119,7 +125,7 @@ export async function PUT(
     }
 
     const updatedRequest = await prisma.bundleSwapRequest.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...validatedData,
         updatedAt: new Date()
@@ -147,7 +153,7 @@ export async function PUT(
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validação falhou", details: error.errors },
+        { error: "Validação falhou", details: error.issues },
         { status: 400 }
       );
     }
@@ -161,16 +167,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: BundleSwapRequestRouteContext
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession();
     if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const existingRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!existingRequest) {
@@ -186,7 +193,7 @@ export async function DELETE(
     }
 
     await prisma.bundleSwapRequest.delete({
-      where: { id: params.id }
+      where: { id }
     });
 
     return NextResponse.json({ message: "Pedido de permuta completa eliminado com sucesso" });
