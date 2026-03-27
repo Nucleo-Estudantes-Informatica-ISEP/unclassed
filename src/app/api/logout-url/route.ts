@@ -1,16 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import type { JWT } from "next-auth/jwt";
 
 import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
 
 const authDebugEnabled = process.env.AUTH_DEBUG === "true";
 
+async function getJwtTokenFromRequest(request: NextRequest) {
+  const allCookies = request.cookies.getAll();
+
+  if (!allCookies.length) {
+    return null;
+  }
+
+  const req = {
+    cookies: request.cookies,
+    headers: {
+      cookie: allCookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; "),
+    },
+  } as unknown as Parameters<typeof getToken>[0]["req"];
+
+  const sessionCookieVariants = [
+    {
+      cookieName: "__Secure-authjs.session-token",
+      secureCookie: true,
+    },
+    {
+      cookieName: "authjs.session-token",
+      secureCookie: false,
+    },
+    {
+      cookieName: "__Secure-next-auth.session-token",
+      secureCookie: true,
+    },
+    {
+      cookieName: "next-auth.session-token",
+      secureCookie: false,
+    },
+  ].filter(({ cookieName }) =>
+    allCookies.some(
+      (cookie) => cookie.name === cookieName || cookie.name.startsWith(`${cookieName}.`)
+    )
+  );
+
+  for (const variant of sessionCookieVariants) {
+    const token = (await getToken({
+      req,
+      secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+      cookieName: variant.cookieName,
+      secureCookie: variant.secureCookie,
+    })) as JWT | null;
+
+    if (token) {
+      return token;
+    }
+  }
+
+  return (await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  })) as JWT | null;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-    });
+    const token = await getJwtTokenFromRequest(request);
     const idTokenHint =
       typeof token?.idTokenHint === "string"
         ? token.idTokenHint
@@ -22,6 +76,7 @@ export async function GET(request: NextRequest) {
     if (authDebugEnabled) {
       console.info("[auth][logout-url]", {
         hasJwt: Boolean(token),
+        cookieNames: request.cookies.getAll().map((cookie) => cookie.name),
         hasIdTokenHint: typeof token?.idTokenHint === "string",
         hasIdToken: typeof token?.idToken === "string",
         hasEmail: typeof token?.email === "string",
