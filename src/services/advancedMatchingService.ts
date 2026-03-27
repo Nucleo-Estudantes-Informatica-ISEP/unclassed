@@ -1,6 +1,7 @@
+import type { Prisma } from "@prisma/client";
+
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
-import type { Prisma } from "@prisma/client";
 
 // ===== INTERFACES =====
 
@@ -128,6 +129,7 @@ interface UserRecord {
 }
 
 const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
+const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface ClassRecord {
   id: string;
@@ -1193,20 +1195,39 @@ export class AdvancedMatchingService {
 
         if (!notificationReserved) {
           console.log(
-            `⏭️ Match notification already sent for match ${matchId} to ${user.email}`
+            `⏭️ Match notification already handled or currently in progress for match ${matchId} to ${user.email}`
           );
           continue;
         }
 
-        const emailSent = await emailService.sendMatchNotification(
-          user.email,
-          notificationData
-        );
-        if (emailSent) {
-          console.log(`✅ Match notification sent to ${user.email}`);
-        } else {
-          await this.releaseMatchNotificationDelivery(matchId, user.id);
+        try {
+          const emailSent = await emailService.sendMatchNotification(
+            user.email,
+            notificationData
+          );
+
+          if (emailSent) {
+            await this.markMatchNotificationDeliverySent(matchId, user.id);
+            console.log(`✅ Match notification sent to ${user.email}`);
+            continue;
+          }
+
+          await this.markMatchNotificationDeliveryFailed(
+            matchId,
+            user.id,
+            "Email service returned false"
+          );
           console.log(`❌ Failed to send notification to ${user.email}`);
+        } catch (error) {
+          await this.markMatchNotificationDeliveryFailed(
+            matchId,
+            user.id,
+            this.getErrorMessage(error)
+          );
+          console.error(
+            `❌ Error sending notification to ${user.email} for match ${matchId}:`,
+            error
+          );
         }
       }
     } catch (error) {
@@ -1219,6 +1240,11 @@ export class AdvancedMatchingService {
     userId: string,
     email: string
   ): Promise<boolean> {
+    const now = new Date();
+    const staleReservationThreshold = new Date(
+      now.getTime() - MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS
+    );
+
     try {
       await prisma.matchNotificationDelivery.create({
         data: {
@@ -1226,33 +1252,120 @@ export class AdvancedMatchingService {
           userId,
           email,
           notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+          reservedAt: now,
+          sentAt: null,
+          lastError: null,
         },
       });
       return true;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        return false;
+        const existingDelivery = await prisma.matchNotificationDelivery.findUnique(
+          {
+            where: {
+              matchId_userId_notificationType: {
+                matchId,
+                userId,
+                notificationType: MATCH_NOTIFICATION_TYPE,
+              },
+            },
+            select: {
+              status: true,
+              updatedAt: true,
+            },
+          }
+        );
+
+        if (!existingDelivery) {
+          return false;
+        }
+
+        if (
+          existingDelivery.status === "SENT" ||
+          (existingDelivery.status === "SENDING" &&
+            existingDelivery.updatedAt > staleReservationThreshold)
+        ) {
+          return false;
+        }
+
+        const reclaimedReservation =
+          await prisma.matchNotificationDelivery.updateMany({
+            where: {
+              matchId,
+              userId,
+              notificationType: MATCH_NOTIFICATION_TYPE,
+              OR: [
+                { status: "FAILED" },
+                {
+                  status: "SENDING",
+                  updatedAt: { lte: staleReservationThreshold },
+                },
+              ],
+            },
+            data: {
+              email,
+              status: "SENDING",
+              reservedAt: now,
+              sentAt: null,
+              lastError: null,
+            },
+          });
+
+        return reclaimedReservation.count > 0;
       }
 
       throw error;
     }
   }
 
-  private async releaseMatchNotificationDelivery(
+  private async markMatchNotificationDeliverySent(
     matchId: string,
     userId: string
   ): Promise<void> {
     try {
-      await prisma.matchNotificationDelivery.deleteMany({
+      await prisma.matchNotificationDelivery.updateMany({
         where: {
           matchId,
           userId,
           notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+        },
+        data: {
+          status: "SENT",
+          sentAt: new Date(),
+          lastError: null,
         },
       });
     } catch (error) {
       console.warn(
-        `Failed to release match notification delivery lock for match ${matchId} and user ${userId}:`,
+        `Failed to mark match notification delivery as sent for match ${matchId} and user ${userId}:`,
+        error
+      );
+    }
+  }
+
+  private async markMatchNotificationDeliveryFailed(
+    matchId: string,
+    userId: string,
+    reason: string
+  ): Promise<void> {
+    try {
+      await prisma.matchNotificationDelivery.updateMany({
+        where: {
+          matchId,
+          userId,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+          status: "SENDING",
+        },
+        data: {
+          status: "FAILED",
+          lastError: reason.slice(0, 500),
+        },
+      });
+    } catch (error) {
+      console.warn(
+        `Failed to mark match notification delivery as failed for match ${matchId} and user ${userId}:`,
         error
       );
     }
@@ -1265,6 +1378,14 @@ export class AdvancedMatchingService {
       "code" in error &&
       error.code === "P2002"
     );
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return "Unknown delivery error";
   }
 
   private async createMatches(
