@@ -10,7 +10,11 @@ export async function GET(request: NextRequest) {
       secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
     });
     const idTokenHint =
-      typeof token?.idTokenHint === "string" ? token.idTokenHint : null;
+      typeof token?.idTokenHint === "string"
+        ? token.idTokenHint
+        : typeof token?.idToken === "string"
+          ? token.idToken
+          : null;
     const redirectTo = await buildZitadelLogoutUrl(idTokenHint);
 
     return NextResponse.json({ redirectTo });

@@ -111,12 +111,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, account, profile }) {
-      if (!account || !profile) {
-        return token;
+      if (
+        typeof account?.id_token === "string" &&
+        account.id_token.length > 0
+      ) {
+        token.idTokenHint = account.id_token;
+        token.idToken = account.id_token;
       }
 
-      if (typeof account.id_token === "string" && account.id_token.length > 0) {
-        token.idTokenHint = account.id_token;
+      if (!account || !profile) {
+        return token;
       }
 
       const claims = profile as Record<string, unknown>;
