@@ -168,6 +168,7 @@ export class AdvancedMatchingService {
   private readonly MAX_CYCLE_LENGTH = 10;
   private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds
   private readonly DIRECT_MATCH_TIMEOUT = 5000; // 5 seconds
+  private readonly PARTITION_LOCK_STALE_MS = 2 * 60 * 1000; // 2 minutes
 
   // ===== IMMEDIATE PROCESSING (<5 seconds) =====
 
@@ -860,9 +861,19 @@ export class AdvancedMatchingService {
     partitionId: string,
     processId: string
   ): Promise<boolean> {
-    // Attempt to acquire the lock only if not already locked
+    // Attempt to acquire lock if free or stale
+    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
     const res = await prisma.graphPartition.updateMany({
-      where: { id: partitionId, isLocked: false },
+      where: {
+        id: partitionId,
+        OR: [
+          { isLocked: false },
+          {
+            isLocked: true,
+            lockedAt: { lt: staleBefore },
+          },
+        ],
+      },
       data: {
         isLocked: true,
         lockedAt: new Date(),
@@ -885,10 +896,17 @@ export class AdvancedMatchingService {
   }
 
   private async getActivePartitions(): Promise<GraphPartition[]> {
+    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
     return await prisma.graphPartition.findMany({
       where: {
         activeRequests: { gt: 0 },
-        isLocked: false,
+        OR: [
+          { isLocked: false },
+          {
+            isLocked: true,
+            lockedAt: { lt: staleBefore },
+          },
+        ],
       },
       orderBy: [{ priority: "asc" }, { activeRequests: "desc" }],
     });
