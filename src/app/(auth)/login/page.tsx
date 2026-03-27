@@ -12,7 +12,8 @@ const Login: React.FC = () => {
   const [authConfigured, setAuthConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+  const callbackUrl =
+    searchParams.get("callbackUrl") || searchParams.get("redirectTo") || "/dashboard";
 
   useEffect(() => {
     let mounted = true;
@@ -49,7 +50,7 @@ const Login: React.FC = () => {
     void handleSignIn();
     // We intentionally want this to run once for the resolved redirect target.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authConfigLoaded, authConfigured, redirectTo]);
+  }, [authConfigLoaded, authConfigured, callbackUrl]);
 
   async function handleSignIn() {
     if (isLoading) {
@@ -59,20 +60,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await signIn("zitadel", {
-        redirectTo,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        throw new Error(result.error);
-      }
-
-      if (!result?.url) {
-        throw new Error("Missing redirect URL from auth provider");
-      }
-
-      window.location.assign(result.url);
+      await signIn("zitadel", { callbackUrl });
     } catch (error) {
       console.error("Login error:", error);
       setIsLoading(false);
