@@ -666,7 +666,7 @@ export default function UserDashboard({
           {/* Matches Tab */}
           <TabsContent value="matches" className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold">Matches Ativos</h2>
+              <h2 className="text-2xl font-bold">Matches</h2>
               <p className="text-muted-foreground">
                 Permutas encontradas pelo sistema que envolvem os teus pedidos
               </p>

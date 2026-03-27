@@ -1,8 +1,8 @@
-import { fontFamily } from "tailwindcss/defaultTheme";
+const defaultTheme = require("tailwindcss/defaultTheme");
+const tailwindcssAnimate = require("tailwindcss-animate");
 
-import type { Config } from "tailwindcss";
-
-const config = {
+/** @type {import("tailwindcss").Config} */
+module.exports = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -93,8 +93,8 @@ const config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", ...fontFamily.sans],
-        poppins: ["Poppins", ...fontFamily.sans],
+        sans: ["Inter", ...defaultTheme.fontFamily.sans],
+        poppins: ["Poppins", ...defaultTheme.fontFamily.sans],
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -107,7 +107,5 @@ const config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
-} satisfies Config;
-
-export default config;
+  plugins: [tailwindcssAnimate],
+};

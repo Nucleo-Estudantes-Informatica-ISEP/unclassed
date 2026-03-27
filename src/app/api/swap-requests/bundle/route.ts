@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validação falhou", details: error.errors },
+        { error: "Validação falhou", details: error.issues },
         { status: 400 }
       );
     }
