@@ -127,6 +127,8 @@ interface UserRecord {
   emailNotifications?: boolean | null;
 }
 
+const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
+
 interface ClassRecord {
   id: string;
   name: string;
@@ -1183,6 +1185,19 @@ export class AdvancedMatchingService {
           dashboardUrl: baseUrl,
         };
 
+        const notificationReserved = await this.reserveMatchNotificationDelivery(
+          matchId,
+          user.id,
+          user.email
+        );
+
+        if (!notificationReserved) {
+          console.log(
+            `⏭️ Match notification already sent for match ${matchId} to ${user.email}`
+          );
+          continue;
+        }
+
         const emailSent = await emailService.sendMatchNotification(
           user.email,
           notificationData
@@ -1190,12 +1205,66 @@ export class AdvancedMatchingService {
         if (emailSent) {
           console.log(`✅ Match notification sent to ${user.email}`);
         } else {
+          await this.releaseMatchNotificationDelivery(matchId, user.id);
           console.log(`❌ Failed to send notification to ${user.email}`);
         }
       }
     } catch (error) {
       console.error("Error sending match notifications:", error);
     }
+  }
+
+  private async reserveMatchNotificationDelivery(
+    matchId: string,
+    userId: string,
+    email: string
+  ): Promise<boolean> {
+    try {
+      await prisma.matchNotificationDelivery.create({
+        data: {
+          matchId,
+          userId,
+          email,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+        },
+      });
+      return true;
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  private async releaseMatchNotificationDelivery(
+    matchId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      await prisma.matchNotificationDelivery.deleteMany({
+        where: {
+          matchId,
+          userId,
+          notificationType: MATCH_NOTIFICATION_TYPE,
+        },
+      });
+    } catch (error) {
+      console.warn(
+        `Failed to release match notification delivery lock for match ${matchId} and user ${userId}:`,
+        error
+      );
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    );
   }
 
   private async createMatches(
