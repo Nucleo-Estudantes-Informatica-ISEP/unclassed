@@ -94,14 +94,14 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
   };
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background w-full py-8">
+      <div className="container mx-auto px-4 sm:px-10">
         <div className="space-y-6">
           {/* Header */}
           <div className="bg-card rounded-lg shadow-sm p-6">
             <div className="flex items-center space-x-4">
-              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
-                <User className="h-8 w-8 text-blue-600 dark:text-blue-300" />
+              <div className="bg-primary/10 p-3 rounded-full">
+                <User className="h-8 w-8 text-primary" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Perfil de Utilizador</h1>
@@ -220,9 +220,9 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
               </div>
 
               {!preferences.emailVerified && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Mail className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
+                <Alert className="border-primary/30 bg-primary/10">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-primary">
                     Para receber notificações por email, primeiro tens de verificar o teu endereço de email.
                   </AlertDescription>
                 </Alert>

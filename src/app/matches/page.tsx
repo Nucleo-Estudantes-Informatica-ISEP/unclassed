@@ -1,6 +1,7 @@
 import getServerSession from "@/services/getServerSession";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import { ArrowLeftRight, CheckCircle2, History, Zap, Search } from "lucide-react";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -162,26 +163,27 @@ export default async function MatchesPage() {
   const replacedMatches = matches.filter((m) => m.status === "UPGRADED");
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="w-full bg-background py-8">
+      <div className="container mx-auto px-4 sm:px-10 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Os Meus Matches</h1>
-            <p className="mt-2 text-gray-600 text-sm sm:text-base">
-              Gira os seus matches de permuta e acompanha o progresso
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Matches</h1>
+            <p className="text-sm text-muted-foreground sm:text-base mt-1">
+              Gere os teus matches de permuta e acompanha o progresso
             </p>
           </div>
           <div className="self-start sm:self-auto">
             <RefreshButton />
           </div>
         </div>
-      </div>
 
       {activeMatches.length === 0 &&
       completedMatches.length === 0 &&
       replacedMatches.length === 0 ? (
         <div className="py-12 text-center px-2">
-          <div className="mb-4 text-5xl sm:text-6xl">🔍</div>
+          <div className="mb-6 flex justify-center">
+            <Search className="h-16 w-16 text-muted-foreground/50" />
+          </div>
           <h3 className="mb-2 text-lg sm:text-xl font-semibold">
             Ainda não encontramos um match para ti...
           </h3>
@@ -205,7 +207,7 @@ export default async function MatchesPage() {
               currentUserId={session.id}
               title="Matches Ativos"
               emptyMessage="Nenhum match ativo"
-              iconEmoji="⚡"
+              icon={<Zap className="w-5 h-5" />}
               badgeColor="blue"
             />
           )}
@@ -214,7 +216,7 @@ export default async function MatchesPage() {
           {completedMatches.length > 0 && (
             <>
               {activeMatches.length > 0 && (
-                <div className="my-8 border-t border-gray-200"></div>
+                <div className="my-8 border-t border-border"></div>
               )}
               <MatchListClient
                 matches={completedMatches.map((match) => ({
@@ -228,7 +230,7 @@ export default async function MatchesPage() {
                 currentUserId={session.id}
                 title="Matches Completos"
                 emptyMessage="Nenhum match completo"
-                iconEmoji="🎉"
+                icon={<CheckCircle2 className="w-5 h-5" />}
                 badgeColor="green"
               />
             </>
@@ -238,7 +240,7 @@ export default async function MatchesPage() {
           {replacedMatches.length > 0 && (
             <>
               {(activeMatches.length > 0 || completedMatches.length > 0) && (
-                <div className="my-8 border-t border-gray-200"></div>
+                <div className="my-8 border-t border-border"></div>
               )}
               <MatchListClient
                 matches={replacedMatches.map((match) => ({
@@ -251,14 +253,15 @@ export default async function MatchesPage() {
                 }))}
                 currentUserId={session.id}
                 title="Matches Substituídos"
-                emptyMessage="Nenhum match substituído"
-                iconEmoji="🔁"
+                emptyMessage="Nenhum match substituído/atualizado"
+                icon={<History className="w-5 h-5" />}
                 badgeColor="yellow"
               />
             </>
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

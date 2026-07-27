@@ -56,10 +56,10 @@ interface DashboardMatch {
 export default function MatchCard({ match, currentUserId, showActions = true }: MatchCardProps) {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      PROPOSED: { variant: "outline" as const, icon: Clock, label: "Proposto", color: "text-blue-600" },
-      ACCEPTED: { variant: "default" as const, icon: CheckCircle, label: "Aceite", color: "text-green-600" },
+      PROPOSED: { variant: "outline" as const, icon: Clock, label: "Proposto", color: "text-primary" },
+      ACCEPTED: { variant: "default" as const, icon: CheckCircle, label: "Aceite", color: "text-accent-foreground" },
       REJECTED: { variant: "destructive" as const, icon: XCircle, label: "Rejeitado", color: "text-red-600" },
-      COMPLETED: { variant: "secondary" as const, icon: CheckCircle, label: "Completo", color: "text-gray-600" },
+      COMPLETED: { variant: "secondary" as const, icon: CheckCircle, label: "Completo", color: "text-muted-foreground" },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.PROPOSED;
@@ -75,7 +75,7 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
 
   const getPatternBadge = (pattern: string) => {
     const patternConfig = {
-      DIRECT: { label: "Direto", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300", description: "Troca simples entre 2 pessoas" },
+      DIRECT: { label: "Direto", color: "bg-primary/10 text-primary", description: "Troca simples entre 2 pessoas" },
       THREE_WAY: { label: "3 Vias", color: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300", description: "Ciclo de 3 pessoas" },
       MULTI_WAY: { label: "Multi-Vias", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300", description: "Ciclo complexo" },
     };
@@ -108,11 +108,11 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${match.matchType === 'SINGLE' ? 'bg-blue-100 dark:bg-blue-900/20' : 'bg-green-100 dark:bg-green-900/20'}`}>
+            <div className={`p-2 rounded-lg ${match.matchType === 'SINGLE' ? 'bg-primary/10' : 'bg-accent/30'}`}>
               {match.matchType === 'SINGLE' ? (
-                <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+                <ArrowLeftRight className="h-5 w-5 text-primary" />
               ) : (
-                <Package2 className="h-5 w-5 text-green-600" />
+                <Package2 className="h-5 w-5 text-accent-foreground" />
               )}
             </div>
             <div>
@@ -210,13 +210,13 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {participant.user?.sharePhoneOnMatch ? (
                           <>
-                            <Phone className="h-3 w-3 text-green-600" />
-                            <span className="text-green-600">Partilha telefone (sem número)</span>
+                            <Phone className="h-3 w-3 text-accent-foreground" />
+                            <span className="text-accent-foreground">Partilha telefone (sem número)</span>
                           </>
                         ) : (
                           <>
-                            <PhoneOff className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-400">Não partilha telefone</span>
+                            <PhoneOff className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Não partilha telefone</span>
                           </>
                         )}
                       </div>
@@ -227,7 +227,7 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium">{participant.fromClass?.name}</span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                    <span className="font-medium text-green-600">{participant.toClass?.name}</span>
+                    <span className="font-medium text-accent-foreground">{participant.toClass?.name}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {participant.requestType === 'single' ? 'Individual' : 'Completo'}
@@ -258,14 +258,14 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
 
         {/* Status Description */}
         {match.status === 'PROPOSED' && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-blue-600" />
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              <Clock className="h-4 w-4 text-primary" />
+              <p className="text-sm font-medium text-primary">
                 Aguarda Confirmação
               </p>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300">
+            <p className="text-xs text-primary">
               Este match foi proposto pelo sistema e aguarda a confirmação de todos os participantes.
             </p>
           </div>
@@ -274,12 +274,12 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
         {match.status === 'ACCEPTED' && (
           <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-accent-foreground" />
               <p className="text-sm font-medium text-green-800 dark:text-green-200">
                 Match Aceite
               </p>
             </div>
-            <p className="text-xs text-green-600 dark:text-green-300">
+            <p className="text-xs text-accent-foreground dark:text-green-300">
               Todos os participantes aceitaram esta permuta. Aguarda processamento administrativo.
             </p>
           </div>
@@ -288,12 +288,12 @@ export default function MatchCard({ match, currentUserId, showActions = true }: 
         {match.status === 'COMPLETED' && (
           <div className="p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle className="h-4 w-4 text-gray-600" />
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                 Permuta Completa
               </p>
             </div>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
+            <p className="text-xs text-muted-foreground dark:text-gray-300">
               Esta permuta foi processada com sucesso. As mudanças de turma foram aplicadas.
             </p>
           </div>

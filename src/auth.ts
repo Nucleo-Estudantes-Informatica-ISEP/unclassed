@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Zitadel from "next-auth/providers/zitadel";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
@@ -83,6 +84,22 @@ const providers = authConfigured
     ]
   : [];
 
+if (process.env.ALLOW_DEV_BYPASS === "true" || process.env.NEXT_PUBLIC_ALLOW_DEV_BYPASS === "true") {
+  providers.push(
+    CredentialsProvider({
+      name: "Dev Bypass",
+      credentials: {},
+      async authorize() {
+        return {
+          id: "dev-bypass-id",
+          name: "Dev Admin User",
+          email: "admin@unclassed.local",
+        };
+      },
+    })
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   trustHost: parseBooleanEnv(process.env.AUTH_TRUST_HOST, false),
@@ -111,7 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true;
     },
-    async jwt({ token, account, profile, trigger }) {
+    async jwt({ token, account, profile, user, trigger }) {
       if (
         typeof account?.id_token === "string" &&
         account.id_token.length > 0
@@ -125,44 +142,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           trigger,
           provider: account.provider,
           hasProfile: Boolean(profile),
-          hasIdToken: typeof account.id_token === "string",
-          hasAccessToken: typeof account.access_token === "string",
-          hasStoredIdTokenHint: typeof token.idTokenHint === "string",
-          hasStoredIdToken: typeof token.idToken === "string",
-          hasTokenEmail: typeof token.email === "string",
-          hasProfileEmail:
-            typeof (profile as Record<string, unknown> | undefined)?.email ===
-            "string",
+          hasUser: Boolean(user),
         });
       }
 
-      if (!account || !profile) {
-        return token;
+      // If it's the initial sign in
+      if (account) {
+        const isCredentials = account.provider === "credentials";
+        
+        const claims = (profile || {}) as Record<string, unknown>;
+        const sub =
+          getClaim(claims, "sub") ||
+          account.providerAccountId ||
+          user?.id ||
+          token.sub ||
+          null;
+
+        if (!sub) {
+          throw new Error("OIDC login did not include a subject claim.");
+        }
+
+        const email = getClaim(claims, "email") || user?.email || token.email;
+        const name = getClaim(claims, "name") || user?.name || token.name;
+
+        const localUser = await syncLocalUserFromOidc({
+          sub,
+          email,
+          name,
+          emailVerified: isCredentials ? true : parseEmailVerifiedClaim(claims),
+        });
+
+        token.localUserId = localUser.id;
+        token.role = localUser.role;
+        token.zitadelSub = sub;
+        token.name = localUser.name;
+        token.email = localUser.email;
       }
-
-      const claims = profile as Record<string, unknown>;
-      const sub =
-        getClaim(claims, "sub") ||
-        account.providerAccountId ||
-        token.sub ||
-        null;
-
-      if (!sub) {
-        throw new Error("OIDC login did not include a subject claim.");
-      }
-
-      const localUser = await syncLocalUserFromOidc({
-        sub,
-        email: getClaim(claims, "email") || token.email,
-        name: getClaim(claims, "name") || token.name,
-        emailVerified: parseEmailVerifiedClaim(claims),
-      });
-
-      token.localUserId = localUser.id;
-      token.role = localUser.role;
-      token.zitadelSub = sub;
-      token.name = localUser.name;
-      token.email = localUser.email;
 
       return token;
     },

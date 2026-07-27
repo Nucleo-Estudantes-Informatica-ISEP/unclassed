@@ -70,7 +70,7 @@ export default function UserMenu({ user }: UserMenuProps) {
         className="relative h-10 w-auto px-2"
         onClick={() => setShowMenu(!showMenu)}
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-medium text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
           {initials}
         </div>
         <div className="ml-2 hidden md:flex md:flex-col md:items-start">
@@ -78,7 +78,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           <span className="text-xs text-muted-foreground">{user.email}</span>
         </div>
         {user.role === "ADMIN" && (
-          <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
             Admin
           </span>
         )}
@@ -96,7 +96,7 @@ export default function UserMenu({ user }: UserMenuProps) {
                 {user.email}
               </p>
               {user.role === "ADMIN" && (
-                <span className="w-fit rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                <span className="w-fit rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
                   Admin
                 </span>
               )}

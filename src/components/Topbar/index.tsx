@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Home, User, LogOut } from "lucide-react";
+import { Home, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { Button } from "@/lib/components/ui/button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, signIn } from "next-auth/react";
 import { toast } from "sonner";
 
 import DarkModeToggle from "../DarkModeToggle";
@@ -56,8 +57,9 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
     .slice(0, 2);
 
   return (
-    <nav className="relative left-0 top-0 z-50 w-full bg-transparent">
-      <div className="flex h-20 min-h-[72px] flex-row items-center justify-between px-4 py-3 sm:px-10">
+    <header className="sticky top-0 left-0 z-30 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
+      <nav className="container flex h-16 md:h-[4.5rem] items-center justify-between gap-4">
+        {/* Left: Logo */}
         <Link
           href={user ? "/dashboard" : "/"}
           className="flex min-w-[120px] items-center gap-x-2"
@@ -80,42 +82,57 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
           />
         </Link>
 
-        {/* Navigation - Always visible */}
-        <div className="flex items-center justify-center gap-2 sm:gap-x-4">
+        {/* Center: Navigation Links */}
+        <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+          {user && (
+            <>
+              <Link
+                href="/dashboard"
+                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                Visão Geral
+              </Link>
+              <Link
+                href="/swap-requests"
+                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                Criar Pedido
+              </Link>
+              <Link
+                href="/requests"
+                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                Pedidos
+              </Link>
+              <Link
+                href="/matches"
+                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                Matches
+              </Link>
+              <Link
+                href="/statistics"
+                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              >
+                Estatísticas
+              </Link>
+            </>
+          )}
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center justify-end gap-2 sm:gap-x-4">
           <DarkModeToggle />
           {user ? (
             <>
-              {/* Navigation Links */}
-              <div className="hidden items-center gap-2 md:flex">
-                <Link
-                  href="/swap-requests"
-                  className="rounded-md border-none bg-[#101010] px-3 py-2 text-center text-sm font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                >
-                  Criar Pedido
-                </Link>
-                <Link
-                  href="/matches"
-                  className="rounded-md border-none bg-[#101010] px-3 py-2 text-center text-sm font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                >
-                  Meus Matches
-                </Link>
-              </div>
-
-              {/* Home Button */}
-              <Link
-                href="/dashboard"
-                className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-              >
-                <Home className="h-5 w-5" />
-              </Link>
-
+              {/* Removed redundant Home Button since it's now in the text links */}
               {/* User Menu */}
               <div className="relative">
                 <button
-                  className="flex h-10 items-center gap-2 rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex h-10 items-center gap-2 rounded-md px-2 py-1 hover:bg-accent/60"
                   onClick={() => setShowUserMenu(!showUserMenu)}
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-medium text-white">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
                     {initials}
                   </div>
                   <div className="hidden flex-col items-start lg:flex">
@@ -123,7 +140,7 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                     <span className="text-xs text-muted-foreground">{user.email}</span>
                   </div>
                   {user.role === "ADMIN" && (
-                    <span className="hidden rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-100 lg:block">
+                    <span className="hidden rounded-full bg-primary/10 px-2 py-1 text-xs text-primary lg:block">
                       Admin
                     </span>
                   )}
@@ -141,7 +158,7 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                           {user.email}
                         </p>
                         {user.role === "ADMIN" && (
-                          <span className="w-fit rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                          <span className="w-fit rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
                             Admin
                           </span>
                         )}
@@ -152,6 +169,13 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                       {/* Mobile Navigation Links */}
                       <div className="block md:hidden">
                         <Link
+                          href="/dashboard"
+                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          Visão Geral
+                        </Link>
+                        <Link
                           href="/swap-requests"
                           className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
                           onClick={() => setShowUserMenu(false)}
@@ -159,11 +183,25 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                           Criar Pedido
                         </Link>
                         <Link
+                          href="/requests"
+                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          Pedidos
+                        </Link>
+                        <Link
                           href="/matches"
                           className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
                           onClick={() => setShowUserMenu(false)}
                         >
-                          Meus Matches
+                          Matches
+                        </Link>
+                        <Link
+                          href="/statistics"
+                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          Estatísticas
                         </Link>
                       </div>
 
@@ -198,16 +236,24 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
               </div>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="rounded-md border-none bg-[#101010] px-4 py-2 text-center font-medium text-white hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-            >
-              Entrar
-            </Link>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/login">
+                  <LogIn className="size-4" />
+                  Entrar
+                </Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/register">
+                  <UserPlus className="size-4" />
+                  Criar conta
+                </Link>
+              </Button>
+            </div>
           )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 };
 

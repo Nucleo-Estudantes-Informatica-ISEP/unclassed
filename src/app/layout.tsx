@@ -10,6 +10,7 @@ import getServerSession from "@/services/getServerSession";
 import { Footer } from "@/components/Footer";
 import Topbar from "@/components/Topbar";
 import { ThemeProvider } from "@/context/ThemeContext";
+import CookieConsent from "@/components/CookieConsent";
 
 // Auto-initialize application services (cron scheduler, etc.)
 import "@/lib/startup";
@@ -43,16 +44,17 @@ export default async function RootLayout({
     : undefined;
 
   return (
-    <html lang="pt">
+    <html lang="pt" suppressHydrationWarning>
       <body
-        className={cn("bg-background font-sans antialiased", inter.variable)}
+        className={cn("min-h-screen bg-background text-foreground antialiased transition-colors font-sans", inter.variable)}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="flex min-h-screen flex-col">
+          <div className="relative flex min-h-screen flex-col">
             <Topbar user={userSession} />
-            <main className="grow pt-[0vh]">{children}</main>
+            <main className="flex-1 flex"><div className="flex items-stretch w-full">{children}</div></main>
             <Footer />
           </div>
+          <CookieConsent />
           <Toaster />
         </ThemeProvider>
       </body>

@@ -70,7 +70,7 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 px-6 py-8">
+    <div className="space-y-4 px-6 py-12 sm:px-12 sm:py-16">
       <h2 className="pb-2 text-2xl font-bold">Criar conta</h2>
       <p className="text-sm text-muted-foreground">
         O registo passa a ser gerido pelo sistema central de autenticação do NEI.
