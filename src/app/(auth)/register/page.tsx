@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { ArrowRight, UserPlus } from "lucide-react";
 
 import { Button } from "@/lib/components/ui/button";
 
@@ -42,8 +43,6 @@ const Register: React.FC = () => {
     };
   }, []);
 
-
-
   async function handleRegister() {
     if (isLoading) {
       return;
@@ -62,49 +61,49 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px] p-6">
-      <div className="flex flex-col space-y-2 text-center mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Criar nova conta
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Regista-te de forma segura com o sistema central do NEI-ISEP.
-        </p>
-      </div>
-
-      {!authConfigured ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <p className="font-semibold">Autenticação indisponível</p>
-          <p className="mt-1 opacity-90">Por favor, contacta a equipa técnica para configurar as variáveis de ambiente.</p>
+    <div className="flex flex-col items-center justify-center w-full px-6 py-12 sm:px-12 sm:py-16 min-h-[36rem]">
+      <div className="w-full max-w-sm space-y-8">
+        <div className="space-y-3">
+          <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-primary">
+            <UserPlus className="size-6" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Criar conta</h1>
+          <p className="text-sm leading-6 text-muted-foreground">
+            O registo passou para o portal oficial de autenticação do NEI. Continua no portal e
+            cria lá a tua conta para regressares automaticamente ao Unclassed.
+          </p>
         </div>
-      ) : null}
 
-      <div className="grid gap-4">
-        <Button
-          className="w-full"
-          onClick={handleRegister}
-          disabled={isLoading || !authConfigLoaded || !authConfigured}
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-r-transparent" />
-              Aguarde...
-            </span>
-          ) : (
-            "Registar com Auth NEI"
-          )}
-        </Button>
+        {authConfigLoaded && !authConfigured ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p className="font-semibold">Autenticação indisponível</p>
+            <p className="mt-1 opacity-90">Por favor, contacta a equipa técnica para configurar as variáveis de ambiente.</p>
+          </div>
+        ) : null}
+
+        <div className="space-y-3">
+          <Button
+            onClick={handleRegister}
+            size="lg"
+            className="w-full shadow-md shadow-primary/20"
+            disabled={isLoading || !authConfigLoaded || !authConfigured}
+          >
+            {isLoading ? "Aguarde..." : "Continuar para o portal"}
+            {!isLoading && <ArrowRight className="size-4" />}
+          </Button>
+        </div>
+
+        <div className="border-t border-border" />
+
+        <div className="text-center text-sm">
+          <Link
+            className="text-primary font-medium hover:underline"
+            href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+          >
+            Já tens conta? Inicia sessão
+          </Link>
+        </div>
       </div>
-
-      <p className="px-8 text-center text-sm text-muted-foreground">
-        Já tens uma conta?{" "}
-        <Link
-          href="/login"
-          className="underline underline-offset-4 hover:text-primary transition-colors font-medium"
-        >
-          Entrar aqui
-        </Link>
-      </p>
     </div>
   );
 };
