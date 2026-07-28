@@ -42,15 +42,7 @@ const Register: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!authConfigLoaded || !authConfigured) {
-      return;
-    }
 
-    void handleRegister();
-    // We intentionally want this to run once after checking config.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authConfigLoaded, authConfigured]);
 
   async function handleRegister() {
     if (isLoading) {
@@ -70,43 +62,49 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 px-6 py-12 sm:px-12 sm:py-16">
-      <h2 className="pb-2 text-2xl font-bold">Criar conta</h2>
-      <p className="text-sm text-muted-foreground">
-        O registo passa a ser gerido pelo sistema central de autenticação do NEI.
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Depois do primeiro login, o Unclassed cria ou liga automaticamente o teu
-        utilizador local e mantém os teus dados atuais se já tinhas conta.
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Se fores um utilizador novo, entra e completa os teus dados de perfil no
-        Unclassed após a autenticação.
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Estamos a redirecionar-te para o registo/login central.
-      </p>
+    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px] p-6">
+      <div className="flex flex-col space-y-2 text-center mb-4">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Criar nova conta
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Regista-te de forma segura com o sistema central do NEI-ISEP.
+        </p>
+      </div>
 
       {!authConfigured ? (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Auth is not configured. Contacta a equipa para configurar
-          AUTH_ISSUER_URL, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET e AUTH_SECRET.
-        </p>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="font-semibold">Autenticação indisponível</p>
+          <p className="mt-1 opacity-90">Por favor, contacta a equipa técnica para configurar as variáveis de ambiente.</p>
+        </div>
       ) : null}
 
-      <Button
-        className="mt-6 w-full"
-        onClick={handleRegister}
-        disabled={isLoading || !authConfigLoaded || !authConfigured}
-      >
-        {isLoading ? "A redirecionar para NEI Auth..." : "Continuar com NEI Auth"}
-      </Button>
-
-      <div className="flex flex-col gap-y-2 pt-2">
-        <Link className="text-sm underline" href="/login">
-          Já tens conta no sistema central? Entrar
-        </Link>
+      <div className="grid gap-4">
+        <Button
+          className="w-full"
+          onClick={handleRegister}
+          disabled={isLoading || !authConfigLoaded || !authConfigured}
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-r-transparent" />
+              Aguarde...
+            </span>
+          ) : (
+            "Registar com Auth NEI"
+          )}
+        </Button>
       </div>
+
+      <p className="px-8 text-center text-sm text-muted-foreground">
+        Já tens uma conta?{" "}
+        <Link
+          href="/login"
+          className="underline underline-offset-4 hover:text-primary transition-colors font-medium"
+        >
+          Entrar aqui
+        </Link>
+      </p>
     </div>
   );
 };
