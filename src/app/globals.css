@@ -1,112 +1,114 @@
 @import "tailwindcss";
 @config "../../tailwind.config.js";
- 
+
 @layer base {
   :root {
-    --background: 0 0% 81%;
-    --foreground: 0 0% 6%;
+    --background: 0 0% 100%;
+    --foreground: 210 10% 10%;
+
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 210 10% 10%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-    /* Accent hues for gradients */
-    --accent-blue: 221 83% 53%;
-    --accent-violet: 258 90% 66%;
-    --accent-pink: 330 81% 60%;
+    --popover-foreground: 210 10% 10%;
+
+    --primary: 193 77% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 5% 96%;
+    --secondary-foreground: 210 10% 10%;
+
+    --muted: 210 5% 96%;
+    --muted-foreground: 210 4% 46%;
+
+    --accent: 193 100% 96%;
+    --accent-foreground: 193 77% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 6% 90%;
+    --input: 210 6% 90%;
+    --ring: 193 77% 48%;
+
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 0 0% 6%;
+    --background: 210 8% 8%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 6%;
+
+    --card: 210 8% 11%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6%;
+
+    --popover: 210 8% 11%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
+
+    --primary: 193 88% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 6% 16%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    --muted: 210 6% 16%;
+    --muted-foreground: 210 5% 65%;
+
+    --accent: 193 80% 16%;
+    --accent-foreground: 193 100% 80%;
+
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+
+    --border: 210 6% 20%;
+    --input: 210 6% 20%;
+    --ring: 193 88% 56%;
   }
 }
- 
+
 @layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: 'Inter', 'Poppins', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
   body {
-    @apply bg-background text-foreground;
-    background-color: #CFCFCF;
-    background-attachment: fixed;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
   }
-  .dark body {
-    background-color: #101010;
+
+  /* hide scrollbar in every browser */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
-/* Exemplo para um rodapé com a classe .footer */
-.footer {
-  background-color: #CFCFCF;
-  color: #101010;
-}
-.dark .footer {
-  background-color: #101010;
-  color: #CFCFCF;
-}
-
-/* Utilities for the landing background and glass surfaces */
 @layer utilities {
-  .bg-radial {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-grid-pattern {
     background-image:
-      radial-gradient(1200px 600px at 20% -10%, hsl(var(--accent-blue) / 0.18), transparent 60%),
-      radial-gradient(1000px 600px at 80% 0%, hsl(var(--accent-pink) / 0.15), transparent 60%),
-      radial-gradient(800px 600px at 50% 100%, hsl(var(--accent-violet) / 0.14), transparent 60%);
+      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 48px 48px;
   }
-  .bg-grid {
-    background-size: 40px 40px;
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.08) 1px, transparent 1px);
-  }
-  .glass {
-    backdrop-filter: saturate(160%) blur(12px);
-    -webkit-backdrop-filter: saturate(160%) blur(12px);
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card) / 0.65),
-      hsl(var(--card) / 0.35)
-    );
-    border: 1px solid hsl(var(--border) / 0.45);
-  }
-  .text-gradient {
-    background: linear-gradient(90deg, hsl(var(--accent-blue)), hsl(var(--accent-violet)), hsl(var(--accent-pink)));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .glow-blue {
-    box-shadow: 0 0 250px rgba(27, 174, 217, 0.25);
+
+  .gradient-text {
+    @apply text-primary;
   }
 }

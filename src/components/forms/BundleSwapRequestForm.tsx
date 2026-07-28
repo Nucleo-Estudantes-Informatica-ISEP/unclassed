@@ -100,7 +100,7 @@ export default function BundleSwapRequestForm({ onSuccess, onCancel }: BundleSwa
   const availableClassOptions = classOptions.filter(option => option.id !== currentClassId);
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Criar Pedido de Permuta Completa

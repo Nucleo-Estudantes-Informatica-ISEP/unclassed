@@ -4,6 +4,46 @@ import { redirect } from "next/navigation";
 
 import { Button } from "@/lib/components/ui/button";
 import getServerSession from "@/services/getServerSession";
+import {
+  ArrowRight,
+  ArrowLeftRight,
+  Package2,
+  Users,
+  Sparkles,
+  FileText,
+  Search,
+  Calendar,
+} from "lucide-react";
+
+const features = [
+  {
+    icon: ArrowLeftRight,
+    title: "Permutas simples",
+    description:
+      "Troca de turma para disciplinas específicas de forma rápida e fácil.",
+    href: "/swap-requests",
+  },
+  {
+    icon: Package2,
+    title: "Permutas completas",
+    description:
+      "Muda todas as disciplinas para uma nova turma de uma só vez.",
+    href: "/swap-requests",
+  },
+  {
+    icon: Users,
+    title: "Matches inteligentes",
+    description:
+      "Sistema automático que encontra as melhores permutas para ti.",
+    href: "/matches",
+  },
+];
+
+const steps = [
+  { n: "1", icon: FileText, bold: "Cria", rest: " um pedido" },
+  { n: "2", icon: Search, bold: "Aguarda", rest: " pelo match" },
+  { n: "3", icon: Calendar, bold: "Agenda", rest: " a reunião com o DEI" },
+];
 
 const Home: React.FC = async () => {
   const session = await getServerSession();
@@ -14,184 +54,147 @@ const Home: React.FC = async () => {
   }
 
   return (
-    <div className="relative overflow-hidden">
-      {/* Background gradients + grid (deep layer) */}
-      <div className="pointer-events-none absolute inset-0 -z-30" />
+    <div className="w-full">
+      {/* Hero */}
+      <section className="relative w-full overflow-hidden">
+        <div className="absolute inset-0 bg-hero-gradient pointer-events-none" />
+        <div className="absolute inset-0 bg-grid-pattern opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)] pointer-events-none" />
 
-      {/* Montage layer (Group 1814) - Desktop */}
-      <div className="pointer-events-none absolute inset-x-0 top-[-12vh] -z-20 hidden justify-center md:flex">
-        <Image
-          src="/images/group-1814.png"
-          alt="Geometric montage"
-          width={1606}
-          height={944}
-          className="block select-none"
-          priority
-        />
-      </div>
+        <div className="container relative flex flex-col items-center text-center pt-20 pb-24 md:pt-28 md:pb-32">
+          <div className="inline-flex items-center gap-1.5 mb-6 rounded-full border border-transparent bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
+            <Sparkles className="size-3.5" />
+            Uma iniciativa do NEI-ISEP • Instituto Superior de Engenharia do
+            Porto
+          </div>
 
-      {/* Montage layer (Group 1814) - Mobile */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[-12vh] -z-20 flex justify-center md:hidden">
-        <Image
-          src="/images/group-1814-mobile.png"
-          alt="Geometric montage mobile"
-          width={800}
-          height={600}
-          className="block h-[100vh] w-full select-none object-cover object-top"
-          priority
-          style={{ maxHeight: "100vh" }}
-        />
-      </div>
+          <h1 className="text-balance text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight max-w-5xl">
+            A permuta de turmas,{" "}
+            <span className="gradient-text">simplificada</span>.
+          </h1>
 
-      {/* Removed extra floating shapes overlay to keep only section-specific decorations */}
+          <p className="mt-6 max-w-2xl text-base md:text-lg text-muted-foreground text-balance">
+            Cria pedidos, encontra matches e troca de turma de forma rápida e
+            inteligente.
+          </p>
 
-      {/* Content */}
-      <section className="w-full pb-16 pt-10 md:pt-14 lg:pt-20">
-        <div className="flex min-h-[70vh] flex-col items-center justify-center gap-8 text-center md:min-h-[75vh]">
-          <div className="max-w-3xl space-y-4">
-            <div className="glass inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
-              <span>🎓</span>
-              <span className="hidden sm:inline">Uma iniciativa do</span>
-              <span className="font-semibold text-blue-400">NEI-ISEP</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="hidden sm:inline">
-                Instituto Superior de Engenharia do Porto
-              </span>
-            </div>
-            <h1 className="text-balance text-3xl font-bold sm:text-5xl lg:text-[56px] lg:leading-[1.1] ">
-              A permuta de turmas,
-              <br />
-              <span
-                className="text-[#1BAED9]"
-                style={{ textShadow: "0 0 100px rgba(27, 176, 217, 1)" }}
-              >
-                simplificada
-              </span>
-            </h1>
-            <div className="pt-4">
+          <div className="mt-10 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <Button
+              asChild
+              size="xl"
+              className="w-full sm:w-auto shadow-lg shadow-primary/20"
+            >
               <Link href="/register">
-                <Button
-                  size="sm"
-                  className="rounded-md bg-[#101010] px-8 text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90"
-                >
-                  Quero registar-me
-                </Button>
+                Quero registar-me
+                <ArrowRight className="size-4" />
               </Link>
-            </div>
+            </Button>
+            <Button
+              asChild
+              size="xl"
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              <Link href="/login">Entrar na plataforma</Link>
+            </Button>
+          </div>
+
+          {/* Stats strip */}
+          <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-8 w-full max-w-4xl px-4">
+            {steps.map(({ n, icon: Icon, bold, rest }) => (
+              <div
+                key={n}
+                className="group relative flex flex-col items-center px-4 py-6 rounded-2xl border bg-card/40 backdrop-blur-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/10 hover:bg-card/80 hover:border-primary/30"
+              >
+                <div className="absolute -top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  {n}
+                </div>
+                <div className="mb-4 mt-2 rounded-full bg-primary/10 p-4 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+                  <Icon className="h-8 w-8" />
+                </div>
+                <p className="text-sm md:text-base text-foreground text-center">
+                  <span className="font-semibold">{bold}</span>
+                  {rest}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Feature bands (Figma-style) */}
-      <section className="relative w-full py-10 md:py-14">
-        <div className="absolute inset-x-0 bottom-0 top-0 -z-10 border-y border-[#101010]/[0.17] dark:border-white/10"></div>
-        <div className="relative w-full">
-          <Image
-            src="/images/lightning.png"
-            alt="Lightning"
-            width={140}
-            height={315}
-            className="-z-5 absolute left-2 top-24 hidden rotate-[10deg] scale-[.5] animate-float opacity-100 sm:block md:left-[30px] md:top-[20%] md:scale-110"
-            priority
-          />
-          <h2 className="relative z-10 text-center text-2xl font-semibold text-foreground dark:text-[#CFCFCF] sm:text-4xl">
-            Permutas simples
+      {/* Features */}
+      <section className="container py-20 md:py-28">
+        <div className="flex flex-col items-center text-center mb-12 md:mb-16">
+          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-foreground mb-4">
+            Tudo o que precisas
+          </div>
+          <h2 className="text-balance text-3xl md:text-4xl font-bold tracking-tight">
+            Permutas de forma{" "}
+            <span className="gradient-text">mais inteligente</span>
           </h2>
-          <p className="relative z-10 mx-auto mt-2 max-w-3xl text-center text-base text-foreground dark:text-[#CFCFCF] sm:text-xl">
-            Troca de turma para disciplinas específicas de forma rápida e fácil.
+          <p className="mt-4 max-w-2xl text-muted-foreground">
+            Uma plataforma pensada ao detalhe para simplificar o processo de
+            troca de turma no DEI-ISEP.
           </p>
         </div>
-      </section>
 
-      <section className="relative w-full py-10 md:py-14">
-        <div className="absolute inset-x-0 bottom-0 top-0 -z-10 border-b border-[#101010]/[0.17] dark:border-white/10"></div>
-        <div className="relative w-full">
-          <Image
-            src="/images/loop-abstract-shape.png"
-            alt="Loop"
-            width={190}
-            height={239}
-            className="-z-5 absolute right-6 top-1/2 hidden -translate-y-1/2 -rotate-[14deg] animate-float opacity-100 md:right-[12%] md:block md:scale-110"
-          />
-          <h2 className="relative z-10 text-center text-2xl font-semibold text-foreground dark:text-[#CFCFCF] sm:text-4xl">
-            Permutas completas
-          </h2>
-          <p className="relative z-10 mx-auto mt-2 max-w-3xl text-center text-base text-foreground dark:text-[#CFCFCF] sm:text-xl">
-            Muda todas as disciplinas para uma nova turma de uma só vez.
-          </p>
-        </div>
-      </section>
-
-      <section className="relative w-full py-10 md:py-14">
-        <div className="absolute inset-x-0 bottom-0 top-0 -z-10 border-b border-[#101010]/[0.17] dark:border-white/10"></div>
-        <div className="relative w-full">
-          <Image
-            src="/images/diamond-shape.png"
-            alt="Diamond"
-            width={214}
-            height={141}
-            className="-z-5 absolute left-6 top-1/2 hidden -translate-y-1/2 rotate-[9deg] animate-float opacity-100 md:left-[10%] md:block md:scale-110"
-          />
-          <h2 className="relative z-10 text-center text-2xl font-semibold text-foreground dark:text-[#CFCFCF] sm:text-4xl">
-            Matches inteligentes
-          </h2>
-          <p className="relative z-10 mx-auto mt-2 max-w-3xl text-center text-base text-foreground dark:text-[#CFCFCF] sm:text-xl">
-            Sistema automático que encontra as melhores permutas para ti.
-          </p>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="relative w-full py-10 md:py-14">
-        <div className="absolute inset-x-0 bottom-0 top-0 -z-10 border-b border-[#101010]/[0.17] dark:border-white/10"></div>
-        <div className="relative w-full">
-          <h3 className="relative z-10 mb-6 text-center text-2xl font-semibold text-[#101010] dark:text-white sm:text-4xl">
-            Como funciona?
-          </h3>
-          <div className="mx-auto flex max-w-5xl snap-x snap-mandatory gap-6 overflow-x-auto pb-6 md:grid md:grid-cols-3">
-            {[
-              { n: 1, bold: "Cria", rest: " um pedido" },
-              { n: 2, bold: "Aguarda", rest: " pelo match" },
-              { n: 3, bold: "Agenda", rest: " a reunião com o DEI" },
-            ].map((item) => (
-              <div
-                key={item.n}
-                className="relative flex min-h-[180px] min-w-[280px] shrink-0 snap-center flex-col items-center justify-center overflow-hidden rounded-[18px] border border-[#101010]/[0.17] bg-[#D9D9D9]/[0.14] p-6 dark:border-[#CFCFCF]/[0.17] md:min-h-[240px] md:min-w-0 md:shrink md:p-8"
-                style={{
-                  background:
-                    "radial-gradient(circle at center, rgba(27, 176, 217, 0.05) 0%, transparent 70%)",
-                  boxShadow: "none",
-                }}
-              >
-                <span
-                  className="absolute bottom-0 right-4 top-0 z-0 select-none text-[180px] font-extrabold leading-none sm:text-[240px] md:bottom-0 md:right-8 md:top-0 md:text-[300px]"
-                  style={{
-                    color: "#101010",
-                    opacity: 0.11,
-                    textShadow: "0 0 24px #1010101c",
-                  }}
-                  data-dark="true"
-                >
-                  <span className="dark:hidden">{item.n}</span>
-                  <span
-                    className="hidden dark:inline"
-                    style={{
-                      color: "#CFCFCF",
-                      opacity: 0.22,
-                      textShadow: "0 0 24px rgba(207,207,207,0.11)",
-                    }}
-                  >
-                    {item.n}
-                  </span>
-                </span>
-                <p className="relative z-[1] text-center text-[24px] font-semibold leading-[1.1] sm:text-[32px] md:text-[40px] md:leading-[1.05]">
-                  <span className="text-[#1BAED9]">{item.bold}</span>
-                  <span className="text-[#101010] dark:text-white">
-                    {item.rest}
-                  </span>
-                </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {features.map(({ icon: Icon, title, description, href }) => (
+            <Link key={title} href={href} className="group">
+              <div className="h-full rounded-xl border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1 hover:bg-accent/30">
+                <div className="p-6">
+                  <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <Icon className="size-6" />
+                  </div>
+                  <h3 className="font-semibold leading-none tracking-tight text-xl text-lg mb-2">
+                    {title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-6">
+                    {description}
+                  </p>
+                  <div className="mt-5 inline-flex items-center text-sm font-medium text-primary opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all">
+                    Explorar
+                    <ArrowRight className="ml-1.5 size-4" />
+                  </div>
+                </div>
               </div>
-            ))}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA banner */}
+      <section className="container pb-24">
+        <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary via-brand-500 to-brand-700 px-6 py-12 md:px-14 md:py-16 text-center text-white shadow-xl shadow-primary/20">
+          <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none" />
+          <div className="relative">
+            <h3 className="text-2xl md:text-4xl font-bold tracking-tight text-balance">
+              Pronto para trocar de turma?
+            </h3>
+            <p className="mt-3 max-w-xl mx-auto text-white/80 text-balance">
+              Cria a tua conta gratuita e começa a encontrar permutas com a
+              comunidade do DEI-ISEP.
+            </p>
+            <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                asChild
+                size="lg"
+                variant="secondary"
+                className="bg-white text-primary hover:bg-white/90 shadow-md"
+              >
+                <Link href="/register">
+                  Começar agora
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="ghost"
+                className="text-white hover:bg-white/10 hover:text-white"
+              >
+                <Link href="/login">Já tenho conta</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>

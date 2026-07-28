@@ -16,13 +16,12 @@ const DarkModeToggle: React.FC = () => {
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={handleThemeToggle}
-      className="border-[#101010]/30 dark:border-[#CFCFCF]/30"
     >
-      <Sun className="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-[#101010]/30 dark:text-[#CFCFCF]/30" />
-      <Moon className="absolute size-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-[#101010]/30 dark:text-[#CFCFCF]/30" />
+      <Sun className="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground" />
+      <Moon className="absolute size-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-muted-foreground" />
     </Button>
   );
 };

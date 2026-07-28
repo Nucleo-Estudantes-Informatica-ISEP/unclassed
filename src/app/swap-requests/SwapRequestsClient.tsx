@@ -29,20 +29,18 @@ export default function SwapRequestsClient() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Criar Pedido de Permuta
-          </h1>
-          <p className="mt-2 text-muted-foreground">
+    <div className="w-full bg-background py-8">
+      <div className="container mx-auto px-4 sm:px-10">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Criar Pedido de Permuta</h1>
+          <p className="text-sm text-muted-foreground sm:text-base mt-1">
             Cria um pedido para trocar de turma. Podes escolher entre permuta
             individual ou completa.
           </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 border-2 border-blue-500 rounded-lg">
+          <TabsList className="grid w-full grid-cols-2 mb-8 rounded-lg">
             <TabsTrigger value="single" className="flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4" />
               <span className="hidden sm:inline">
@@ -60,7 +58,7 @@ export default function SwapRequestsClient() {
           </TabsList>
 
           <TabsContent value="single" className="space-y-6">
-            <Card className="mb-6">
+            <Card className="mb-6 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <ArrowLeftRight className="size-5" />
@@ -78,7 +76,7 @@ export default function SwapRequestsClient() {
           </TabsContent>
 
           <TabsContent value="bundle" className="space-y-6">
-            <Card className="mb-6">
+            <Card className="mb-6 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <Package2 className="size-5" />
@@ -97,7 +95,7 @@ export default function SwapRequestsClient() {
         </Tabs>
 
         {/* Help Section */}
-        <Card className="mt-8">
+        <Card className="mt-8 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1">
           <CardHeader>
             <CardTitle className="text-lg">Precisa de Ajuda?</CardTitle>
           </CardHeader>

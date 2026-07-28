@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/lib/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/lib/components/ui/card";
-import { Clock, CheckCircle, XCircle, AlertTriangle, Users, ArrowRightLeft } from "lucide-react";
+import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowRightLeft, Phone, Mail, Info, RefreshCw, ClipboardList, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
 import { useRouter } from "next/navigation";
@@ -90,27 +90,27 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
 
   const getStatusBadge = () => {
     const statusClasses = {
-      'PROPOSED': 'bg-gray-100 text-gray-800',
-      'PROVISIONAL': 'bg-yellow-100 text-yellow-800',
-      'ACCEPTED': 'bg-blue-100 text-blue-800',
-      'COMPLETED': 'bg-green-100 text-green-800',
-      'REJECTED': 'bg-red-100 text-red-800',
-      'UPGRADED': 'bg-purple-100 text-purple-800'
+      'PROPOSED': 'bg-muted text-muted-foreground',
+      'PROVISIONAL': 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+      'ACCEPTED': 'bg-primary/10 text-primary',
+      'COMPLETED': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+      'REJECTED': 'bg-destructive/10 text-destructive',
+      'UPGRADED': 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
     };
 
-    const statusText = {
-      'PROPOSED': '📋 Proposto',
-      'PROVISIONAL': '⏳ Provisório',
-      'ACCEPTED': '✅ Aceite',
-      'COMPLETED': '🎉 Completo',
-      'REJECTED': '❌ Rejeitado',
-      'UPGRADED': '⬆️ Atualizado'
+    const statusContent = {
+      'PROPOSED': <><ClipboardList className="w-3 h-3 mr-1" /> Proposto</>,
+      'PROVISIONAL': <><Hourglass className="w-3 h-3 mr-1" /> Provisório</>,
+      'ACCEPTED': <><CheckCircle2 className="w-3 h-3 mr-1" /> Aceite</>,
+      'COMPLETED': <><CheckCircle className="w-3 h-3 mr-1" /> Completo</>,
+      'REJECTED': <><XCircle className="w-3 h-3 mr-1" /> Rejeitado</>,
+      'UPGRADED': <><RefreshCw className="w-3 h-3 mr-1" /> Atualizado</>
     };
 
     const className = statusClasses[match.status as keyof typeof statusClasses] || 'bg-gray-100 text-gray-800';
-    const text = statusText[match.status as keyof typeof statusText] || match.status;
+    const content = statusContent[match.status as keyof typeof statusContent] || match.status;
 
-    return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className} shrink-0`}>{text}</span>;
+    return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className} shrink-0`}>{content}</span>;
   };
 
   const getPatternIcon = () => {
@@ -133,7 +133,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
       return (
         <div
           key={index}
-          className={`p-4 rounded-lg border ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-muted border-border'}`}
+          className={`p-4 rounded-lg border ${isCurrentUser ? 'bg-primary/10 border-primary/30' : 'bg-muted border-border'}`}
         >
           <div className="space-y-2">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -141,7 +141,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
                 {participant.user?.name || `Utilizador ${participant.userId.slice(-4)}`}
               </p>
               {participant.status && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 self-start sm:self-auto">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground self-start sm:self-auto">
                   {participant.status}
                 </span>
               )}
@@ -165,21 +165,20 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
             {/* Contact Information */}
             {!isCurrentUser && participant.user && match.status === 'ACCEPTED' && (
               <div className="mt-3 pt-3 border-t border-border">
-                <p className="text-xs font-medium text-foreground mb-1">📞 Contacto:</p>
+                <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Contacto:</p>
                 <div className="space-y-1 break-words">
-                  <p className="text-xs text-muted-foreground">
-                    📧 {participant.user.email}
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Mail className="w-3 h-3 shrink-0" /> {participant.user.email}
                   </p>
-                  {participant.user.sharePhoneOnMatch && participant.user.phone && (
-                    <p className="text-xs text-muted-foreground">
-                      📱 {participant.user.phone}
+                  {participant.user.phone ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="w-3 h-3 shrink-0" /> {participant.user.phone}
                     </p>
-                  )}
-                  {!participant.user.sharePhoneOnMatch && (
-                    <p className="text-xs text-muted-foreground italic">
-                      📱 Telemóvel não partilhado
+                  ) : participant.user.sharePhoneOnMatch === false ? (
+                    <p className="text-xs text-muted-foreground italic flex items-center gap-1">
+                      <Phone className="w-3 h-3 shrink-0 opacity-50" /> Telemóvel não partilhado
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
@@ -241,8 +240,8 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
           );
         } else if (userStatus === 'accepted') {
           return (
-            <div className="text-center text-sm text-gray-600 w-full">
-              ✅ Aceitou este match. A aguardar pelos outros...
+            <div className="text-center text-sm text-muted-foreground w-full flex items-center justify-center gap-2">
+              <Hourglass className="w-4 h-4" /> Aceitou este match. A aguardar pelos outros...
             </div>
           );
         }
@@ -262,23 +261,23 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
           );
         } else {
           return (
-            <div className="text-center text-sm text-green-600 w-full">
-              ✅ Completou a sua parte. A aguardar pelos outros...
+            <div className="text-center text-sm text-green-600 w-full flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Completou a sua parte. A aguardar pelos outros...
             </div>
           );
         }
 
       case 'COMPLETED':
         return (
-          <div className="text-center text-sm text-green-600 font-medium w-full">
-            🎉 Permuta concluída com sucesso!
+          <div className="text-center text-sm text-green-600 font-medium w-full flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Permuta concluída com sucesso!
           </div>
         );
 
       case 'REJECTED':
         return (
-          <div className="text-center text-sm text-red-600 w-full">
-            ❌ Este match foi rejeitado
+          <div className="text-center text-sm text-red-600 w-full flex items-center justify-center gap-2">
+            <XCircle className="w-4 h-4" /> Este match foi rejeitado
           </div>
         );
     }
@@ -299,7 +298,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
                  match.swapPattern === 'MULTI_WAY' ? 'Permuta Múltipla' : match.swapPattern} {match.matchType === 'SINGLE' ? 'disciplina individual' : 'completa'}
               </h3>
               {match.subject && (
-                <p className="text-sm text-gray-600 font-medium break-words">
+                <p className="text-sm text-muted-foreground font-medium break-words">
                   {match.subject.code} - {match.subject.name}
                 </p>
               )}
@@ -308,14 +307,14 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
           {getStatusBadge()}
         </div>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mt-2">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-muted-foreground">
             {match.participants.length} participantes •
             {Math.round(match.satisfactionScore * 100)}% satisfação
           </span>
           <ClientDate
             date={match.createdAt}
             format="short"
-            className="text-xs text-gray-500"
+            className="text-xs text-muted-foreground"
           />
         </div>
       </CardHeader>
@@ -326,23 +325,23 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
         </div>
 
         {match.isProvisional && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center gap-2 text-sm text-blue-800 mb-2">
+          <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-primary mb-2">
               <AlertTriangle className="h-4 w-4" />
               <span>
                 <strong>Match Provisório:</strong> Este não é o seu match preferido.
               </span>
             </div>
-            <div className="text-xs text-blue-600">
-              <p className="mb-1">
-                🔍 O sistema continua à procura de um match melhor durante <strong>6 horas</strong>.
+            <div className="text-xs text-primary">
+              <p className="mb-1 flex gap-2">
+                <Hourglass className="w-4 h-4 shrink-0 mt-0.5" /> <span>O sistema continua à procura de um match melhor durante <strong>6 horas</strong>.</span>
               </p>
-              <p>
-                ✨ Se encontrarmos uma opção melhor, atualizamos automaticamente!
+              <p className="flex gap-2">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" /> <span>Se encontrarmos uma opção melhor, atualizamos automaticamente!</span>
               </p>
               {canRevoke && (
-                <p className="mt-2 font-medium">
-                  ⏰ Tempo restante: {hoursRemaining}h {minutesRemaining}m
+                <p className="mt-2 font-medium flex gap-2 items-center">
+                  <Hourglass className="w-4 h-4 shrink-0" /> Tempo restante: {hoursRemaining}h {minutesRemaining}m
                 </p>
               )}
             </div>

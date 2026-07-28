@@ -9,6 +9,10 @@ import {
   Shuffle,
   Trophy,
   X,
+  Lightbulb,
+  Target,
+  Dices,
+  Zap
 } from "lucide-react";
 
 import { Badge } from "@/lib/components/ui/badge";
@@ -275,22 +279,28 @@ export function ClassRankingSelector({
       )}
 
       {/* Help Text */}
-      <div className="space-y-1 text-xs text-muted-foreground">
+      <div className="space-y-2 text-xs text-muted-foreground mt-4">
         {orderMatters ? (
           <>
-            <p>
-              <strong>💡 Dica:</strong> Arrasta para reordenar. A primeira turma
-              tem prioridade máxima!
+            <p className="flex items-start gap-1.5">
+              <Lightbulb className="w-4 h-4 shrink-0 text-amber-500" />
+              <span><strong>Dica:</strong> Arrasta para reordenar. A primeira turma tem prioridade máxima!</span>
             </p>
-            <p>🎯 Matches perfeitos (1ª escolha) são criados imediatamente.</p>
+            <p className="flex items-start gap-1.5">
+              <Target className="w-4 h-4 shrink-0 text-primary" />
+              <span>Matches perfeitos (1ª escolha) são criados imediatamente.</span>
+            </p>
           </>
         ) : (
           <>
-            <p>
-              <strong>🎲 Ordem aleatória:</strong> Todas as turmas têm igual
-              prioridade.
+            <p className="flex items-start gap-1.5">
+              <Dices className="w-4 h-4 shrink-0 text-violet-500" />
+              <span><strong>Ordem aleatória:</strong> Todas as turmas têm igual prioridade.</span>
             </p>
-            <p>⚡ Ideal quando qualquer turma serve igualmente bem.</p>
+            <p className="flex items-start gap-1.5">
+              <Zap className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>Ideal quando qualquer turma serve igualmente bem.</span>
+            </p>
           </>
         )}
       </div>

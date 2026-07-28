@@ -33,7 +33,7 @@ interface MatchListClientProps {
   title: string;
   emptyMessage: string;
   showIcon?: boolean;
-  iconEmoji?: string;
+  icon?: React.ReactNode;
   badgeColor?: string;
 }
 
@@ -43,12 +43,12 @@ export function MatchListClient({
   title,
   emptyMessage,
   showIcon = true,
-  iconEmoji = "⚡",
+  icon,
   badgeColor = "blue",
 }: MatchListClientProps) {
   if (matches.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-600">
+      <div className="text-center py-8 text-muted-foreground">
         {emptyMessage}
       </div>
     );
@@ -58,8 +58,8 @@ export function MatchListClient({
   const getBadgeClasses = (color: string) => {
     const colorMap = {
       blue: {
-        text: 'text-blue-600',
-        bg: 'bg-blue-100 text-blue-800'
+        text: 'text-primary',
+        bg: 'bg-primary/10 text-primary'
       },
       green: {
         text: 'text-green-600',
@@ -82,7 +82,7 @@ export function MatchListClient({
   return (
     <section className="mb-8">
       <h2 className="text-2xl font-semibold mb-4 flex flex-wrap items-center gap-2">
-        {showIcon && <span className={badgeClasses.text}>{iconEmoji}</span>}
+        {showIcon && icon && <span className={`flex items-center justify-center w-6 h-6 ${badgeClasses.text}`}>{icon}</span>}
         <span className="min-w-0 break-words">{title}</span>
         <span className={`text-sm px-2 py-1 rounded-full ${badgeClasses.bg} shrink-0`}>
           {matches.length}

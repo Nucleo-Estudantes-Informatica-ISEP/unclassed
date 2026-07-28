@@ -194,14 +194,14 @@ export default function AdvancedMatchingDashboard() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="w-full">
+      <div className="w-full">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Advanced Matching Dashboard</h1>
-              <p className="text-muted-foreground mt-2">
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Advanced Matching Dashboard</h2>
+              <p className="text-sm text-muted-foreground sm:text-base mt-1">
                 Monitor and control the advanced matching system with per-class graph partitioning
               </p>
             </div>
@@ -467,7 +467,7 @@ export default function AdvancedMatchingDashboard() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Currently Running</span>
-                          <span className={cronStats.isRunning ? 'text-blue-600' : 'text-gray-600'}>
+                          <span className={cronStats.isRunning ? 'text-primary' : 'text-muted-foreground'}>
                             {cronStats.isRunning ? 'Yes' : 'No'}
                           </span>
                         </div>

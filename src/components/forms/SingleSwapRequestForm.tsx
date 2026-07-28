@@ -102,7 +102,7 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
   const availableClassOptions = classOptions.filter((option) => option.id !== currentClassId);
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Criar Pedido de Permuta Individual</CardTitle>
       </CardHeader>
@@ -285,7 +285,7 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
 
             {/* Submit Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button type="submit" disabled={isSubmitting || subjectsLoading || classesLoading} className="flex-1 h-11 bg-[#101010] text-[#CFCFCF] hover:bg-[#101010]/90 dark:bg-[#CFCFCF] dark:text-[#101010] dark:hover:bg-[#CFCFCF]/90">
+              <Button type="submit" disabled={isSubmitting || subjectsLoading || classesLoading} className="flex-1 h-11 shadow-lg shadow-primary/20">
                 {isSubmitting ? "A criar..." : "Criar Pedido"}
               </Button>
               {onCancel && (

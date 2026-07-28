@@ -113,8 +113,8 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      ACTIVE: { variant: "default" as const, icon: Clock, label: "Ativo", color: "text-blue-600" },
-      MATCHED: { variant: "secondary" as const, icon: CheckCircle, label: "Emparelhado", color: "text-green-600" },
+      ACTIVE: { variant: "default" as const, icon: Clock, label: "Ativo", color: "text-primary" },
+      MATCHED: { variant: "secondary" as const, icon: CheckCircle, label: "Emparelhado", color: "text-accent-foreground" },
       CANCELLED: { variant: "destructive" as const, icon: XCircle, label: "Cancelado", color: "text-red-600" },
       EXPIRED: { variant: "outline" as const, icon: AlertCircle, label: "Expirado", color: "text-yellow-600" },
     };
@@ -137,11 +137,11 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${type === 'single' ? 'bg-blue-100 dark:bg-blue-900/20' : 'bg-green-100 dark:bg-green-900/20'}`}>
+            <div className={`p-2 rounded-lg ${type === 'single' ? 'bg-primary/10' : 'bg-accent/30'}`}>
               {type === 'single' ? (
-                <ArrowLeftRight className={`h-5 w-5 ${type === 'single' ? 'text-blue-600' : 'text-green-600'}`} />
+                <ArrowLeftRight className={`h-5 w-5 ${type === 'single' ? 'text-primary' : 'text-accent-foreground'}`} />
               ) : (
-                <Package2 className={`h-5 w-5 ${type === 'bundle' ? 'text-green-600' : 'text-blue-600'}`} />
+                <Package2 className={`h-5 w-5 ${type === 'bundle' ? 'text-accent-foreground' : 'text-primary'}`} />
               )}
             </div>
             <div>
@@ -215,12 +215,12 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
         {request.status === 'MATCHED' && (
           <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-green-600" />
+              <Users className="h-4 w-4 text-accent-foreground" />
               <p className="text-sm font-medium text-green-800 dark:text-green-200">
                 Match Encontrado!
               </p>
             </div>
-            <p className="text-xs text-green-600 dark:text-green-300 mb-2">
+            <p className="text-xs text-accent-foreground dark:text-green-300 mb-2">
               O sistema encontrou uma permuta compatível. Verifique a secção Matches para mais detalhes.
             </p>
             <Button 
@@ -239,14 +239,14 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
         )}
 
         {request.status === 'ACTIVE' && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-blue-600" />
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              <Clock className="h-4 w-4 text-primary" />
+              <p className="text-sm font-medium text-primary">
                 À Procura de Match
               </p>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300">
+            <p className="text-xs text-primary">
               O sistema está a procurar ativamente por permutas compatíveis.
             </p>
           </div>
