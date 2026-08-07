@@ -263,6 +263,7 @@ export function ClassRankingSelector({
 
                   {/* Remove Button */}
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveClass(option.id)}

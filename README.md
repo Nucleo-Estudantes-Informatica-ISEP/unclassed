@@ -6,8 +6,8 @@ The application is built as a Next.js App Router project with Prisma, MongoDB, N
 
 ## Key Features
 
-- Single-subject swap requests with ordered class preferences
-- Full bundle swaps that move a student to a different class across all subjects in the same year
+- Guided request wizard with branch-specific single-subject and full-bundle flows
+- Ordered class preferences for both request types
 - Automated graph-based matching with direct, three-way, and multi-way swap patterns
 - Provisional matches that can later be upgraded into better outcomes
 - Admin dashboard for monitoring matching, cron runs, and partition health
