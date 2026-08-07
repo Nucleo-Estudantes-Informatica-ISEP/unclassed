@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/lib/components/ui/button";
 import { Switch } from "@/lib/components/ui/switch";
@@ -17,7 +17,7 @@ export function RefreshButton({ autoRefreshInterval = 30 }: RefreshButtonProps =
   const [secondsLeft, setSecondsLeft] = useState(autoRefreshInterval);
   const router = useRouter();
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       router.refresh();
@@ -28,7 +28,7 @@ export function RefreshButton({ autoRefreshInterval = 30 }: RefreshButtonProps =
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [autoRefreshInterval, router]);
 
   // Auto-refresh logic
   useEffect(() => {
@@ -49,7 +49,7 @@ export function RefreshButton({ autoRefreshInterval = 30 }: RefreshButtonProps =
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, autoRefreshInterval]);
+  }, [autoRefresh, autoRefreshInterval, handleRefresh]);
 
   return (
     <div className="flex items-center gap-4">

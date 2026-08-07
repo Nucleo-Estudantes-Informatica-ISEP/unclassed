@@ -8,7 +8,6 @@
 import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from 'next/server';
 import getServerSession from '@/services/getServerSession';
-import { AdvancedMatchingService } from '@/services/advancedMatchingService';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/emailService';
 
@@ -132,23 +131,21 @@ export async function PATCH(
     }
 
     let updatedMatch;
-    const matchingService = new AdvancedMatchingService();
-
     switch (action) {
       case 'accept':
         updatedMatch = await handleMatchAccept(match, session.id);
         break;
         
       case 'reject':
-        updatedMatch = await handleMatchReject(match, session.id, matchingService);
+        updatedMatch = await handleMatchReject(match, session.id);
         break;
         
       case 'complete':
-        updatedMatch = await handleMatchComplete(match, session.id, matchingService);
+        updatedMatch = await handleMatchComplete(match, session.id);
         break;
         
       case 'revoke':
-        updatedMatch = await handleMatchRevoke(match, session.id, matchingService);
+        updatedMatch = await handleMatchRevoke(match, session.id);
         break;
         
       default:
@@ -215,7 +212,7 @@ async function handleMatchAccept(match: MatchRecord, userId: string) {
 /**
  * Handle match rejection - clean up graph and reactivate requests
  */
-async function handleMatchReject(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchReject(match: MatchRecord, userId: string) {
   console.log(`❌ User ${userId} rejected match ${match.id} - cleaning up graph`);
 
   // Mark match as rejected
@@ -241,7 +238,7 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
   await reactivateRequestsFromMatch(match);
   
   // Update graph partitions
-  await updateGraphPartitionsFromMatch(match, matchingService);
+  await updateGraphPartitionsFromMatch(match);
 
   return updatedMatch;
 }
@@ -249,7 +246,7 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
 /**
  * Handle match completion - finalize the swap
  */
-async function handleMatchComplete(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchComplete(match: MatchRecord, userId: string) {
   console.log(`🏁 User ${userId} completed match ${match.id} - finalizing swap`);
 
   // Update participant status
@@ -304,7 +301,7 @@ async function handleMatchComplete(match: MatchRecord, userId: string, matchingS
 /**
  * Handle match revocation - user changes mind within 6-hour window
  */
-async function handleMatchRevoke(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchRevoke(match: MatchRecord, userId: string) {
   // Check if revocation is still allowed (within 6 hours)
   const provisionalUntil = match.provisionalUntil ? new Date(match.provisionalUntil) : null;
   const now = new Date();
@@ -337,7 +334,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
   await reactivateRequestsFromMatch(match);
   
   // Update graph partitions
-  await updateGraphPartitionsFromMatch(match, matchingService);
+  await updateGraphPartitionsFromMatch(match);
 
   return updatedMatch;
 }
@@ -411,7 +408,7 @@ async function removeRequestsFromGraph(match: MatchRecord) {
 /**
  * Update graph partition counts after match changes
  */
-async function updateGraphPartitionsFromMatch(match: MatchRecord, matchingService: AdvancedMatchingService) {
+async function updateGraphPartitionsFromMatch(match: MatchRecord) {
   console.log(`📊 Updating graph partitions affected by match ${match.id}`);
 
   // Get unique graph partitions affected

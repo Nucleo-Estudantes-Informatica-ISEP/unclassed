@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Home, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { User, LogOut, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/lib/components/ui/button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut, signIn } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
 import DarkModeToggle from "../DarkModeToggle";
