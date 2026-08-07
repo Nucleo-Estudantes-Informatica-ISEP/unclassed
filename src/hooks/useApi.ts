@@ -39,23 +39,6 @@ export type BundleSwapRequest = {
   preferredClasses?: ClassLite[];
 };
 
-export type MatchParticipant = {
-  user?: UserLite | null;
-  fromClass?: ClassLite | null;
-  toClass?: ClassLite | null;
-  // allow passthrough of other server-provided fields, but don't use `any` here
-  [key: string]: unknown;
-};
-
-export type MatchDto = {
-  id: string;
-  matchType: string;
-  status: string;
-  swapPattern: string;
-  participants: MatchParticipant[];
-  createdAt: string;
-};
-
 export function useApi<T>(url: string): ApiState<T> {
   const [state, setState] = useState<ApiState<T>>({
     data: null,
@@ -159,5 +142,5 @@ export function useMatches(
   if (matchType) params.append("matchType", matchType);
   if (userId) params.append("userId", userId);
   const url = `/api/matches${params.toString() ? `?${params.toString()}` : ""}`;
-  return useApi<MatchDto[]>(url);
+  return useApi<unknown[]>(url);
 }

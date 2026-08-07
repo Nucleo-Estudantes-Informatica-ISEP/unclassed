@@ -35,9 +35,10 @@ interface Match {
 interface MatchCardProps {
   match: Match;
   currentUserId: string;
+  showActions?: boolean;
 }
 
-export function MatchCard({ match, currentUserId }: MatchCardProps) {
+export function MatchCard({ match, currentUserId, showActions = true }: MatchCardProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -349,9 +350,11 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
         )}
       </CardContent>
 
-      <CardFooter className="w-full">
-        {renderActionButtons()}
-      </CardFooter>
+      {showActions && (
+        <CardFooter className="w-full">
+          {renderActionButtons()}
+        </CardFooter>
+      )}
     </Card>
   );
 }
