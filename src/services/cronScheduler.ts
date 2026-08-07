@@ -1,7 +1,12 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
 import { CronExecution, Prisma } from "@prisma/client";
+import { CronExpressionParser } from "cron-parser";
 import prisma from "@/lib/prisma";
 import { getCache } from "./cache";
+
+export function getNextCronRun(cronExpression: string, currentDate = new Date()): Date {
+  return CronExpressionParser.parse(cronExpression, { currentDate }).next().toDate();
+}
 
 interface JobExecutionResult {
   processedPartitions: number;
@@ -218,7 +223,7 @@ export class CronScheduler {
    */
   private scheduleJob(job: ScheduledJob) {
     // Calculate next run time
-    job.nextRun = this.getNextRunTime(job.schedule);
+    job.nextRun = getNextCronRun(job.schedule);
 
     // Use more precise interval based on job schedule
     const checkIntervalMs = this.getCheckInterval(job.schedule);
@@ -232,11 +237,11 @@ export class CronScheduler {
 
         if (lockAcquired) {
           this.runJob(job);
-          job.nextRun = this.getNextRunTime(job.schedule);
+          job.nextRun = getNextCronRun(job.schedule);
         } else {
           console.log(`🔒 Job '${job.name}' skipped - another instance is running`);
           // Recalculate next run to avoid immediate retry
-          job.nextRun = this.getNextRunTime(job.schedule);
+          job.nextRun = getNextCronRun(job.schedule);
         }
       }
     }, checkIntervalMs);
@@ -416,140 +421,6 @@ export class CronScheduler {
       // Release the lock
       await this.releaseLock(job.id);
     }
-  }
-
-  /**
-   * Parse cron expression and get next run time with improved precision
-   */
-  private getNextRunTime(cronExpression: string): Date {
-    const now = new Date();
-
-    if (cronExpression === '*/5 * * * *') {
-      // Every 5 minutes - align to exact 5-minute boundaries
-      const next = new Date(now);
-      const currentMinutes = next.getMinutes();
-      const nextMinutes = Math.ceil(currentMinutes / 5) * 5;
-
-      if (nextMinutes >= 60) {
-        next.setHours(next.getHours() + 1);
-        next.setMinutes(0, 0, 0);
-      } else {
-        next.setMinutes(nextMinutes, 0, 0);
-      }
-
-      // Ensure we're at least 10 seconds in the future to avoid immediate execution
-      if (next.getTime() - now.getTime() < 10000) {
-        next.setMinutes(next.getMinutes() + 5);
-      }
-
-      return next;
-    }
-
-    if (cronExpression === '*/30 * * * *') {
-      // Every 30 minutes - align to 0 or 30 minutes
-      const next = new Date(now);
-      const currentMinutes = next.getMinutes();
-      const nextMinutes = currentMinutes < 30 ? 30 : 60;
-
-      if (nextMinutes >= 60) {
-        next.setHours(next.getHours() + 1);
-        next.setMinutes(0, 0, 0);
-      } else {
-        next.setMinutes(nextMinutes, 0, 0);
-      }
-
-      return next;
-    }
-
-    if (cronExpression === '0 * * * *') {
-      // Every hour
-      const next = new Date(now);
-      next.setMinutes(0, 0, 0);
-      next.setHours(next.getHours() + 1);
-      return next;
-    }
-
-    // Fallback: next hour
-    const next = new Date(now);
-    next.setHours(next.getHours() + 1, 0, 0, 0);
-    return next;
-  }
-
-  private getNextWeekdayRun(now: Date, hourRange: [number, number], intervalMinutes: number): Date {
-    const [startHour, endHour] = hourRange;
-    const next = new Date(now);
-
-    // Check if we're in a weekday
-    const dayOfWeek = next.getDay(); // 0 = Sunday, 6 = Saturday
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // It's weekend, go to next Monday
-      const daysUntilMonday = dayOfWeek === 0 ? 1 : 2;
-      next.setDate(next.getDate() + daysUntilMonday);
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    }
-
-    // We're on a weekday
-    const currentHour = next.getHours();
-
-    if (currentHour < startHour) {
-      // Before work hours
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    } else if (currentHour >= endHour) {
-      // After work hours, go to next day
-      next.setDate(next.getDate() + 1);
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    } else {
-      // During work hours, next interval
-      return this.getNextInterval(now, intervalMinutes);
-    }
-  }
-
-  private getNextWeekendRun(now: Date, hours: number[]): Date {
-    const next = new Date(now);
-    const dayOfWeek = next.getDay();
-    const currentHour = next.getHours();
-
-    // If it's weekend
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // Find next hour
-      for (const hour of hours) {
-        if (currentHour < hour || (currentHour === hour && next.getMinutes() === 0)) {
-          next.setHours(hour, 0, 0, 0);
-          return next;
-        }
-      }
-
-      // No more hours today, go to next weekend day or next weekend
-      if (dayOfWeek === 6) {
-        // Saturday -> Sunday
-        next.setDate(next.getDate() + 1);
-      } else {
-        // Sunday -> next Saturday
-        next.setDate(next.getDate() + 6);
-      }
-      next.setHours(hours[0], 0, 0, 0);
-      return next;
-    } else {
-      // It's weekday, go to next weekend
-      const daysUntilSaturday = 6 - dayOfWeek;
-      next.setDate(next.getDate() + daysUntilSaturday);
-      next.setHours(hours[0], 0, 0, 0);
-      return next;
-    }
-  }
-
-  private getNextInterval(now: Date, intervalMinutes: number): Date {
-    const next = new Date(now);
-    next.setMinutes(Math.ceil(next.getMinutes() / intervalMinutes) * intervalMinutes, 0, 0);
-
-    if (next <= now) {
-      next.setMinutes(next.getMinutes() + intervalMinutes);
-    }
-
-    return next;
   }
 
   /**
