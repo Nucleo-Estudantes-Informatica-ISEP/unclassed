@@ -33,16 +33,6 @@ export default async function RootLayout({
 }>) {
   const session = await getServerSession();
 
-  // Convert the Prisma user object to the Session type expected by Topbar
-  const userSession = session
-    ? {
-        id: session.id,
-        name: session.name,
-        email: session.email,
-        role: session.role,
-      }
-    : undefined;
-
   return (
     <html lang="pt" suppressHydrationWarning>
       <body
@@ -50,7 +40,7 @@ export default async function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="relative flex min-h-screen flex-col">
-            <Topbar user={userSession} />
+            <Topbar user={session} />
             <main className="flex-1 flex"><div className="flex items-stretch w-full">{children}</div></main>
             <Footer />
           </div>
