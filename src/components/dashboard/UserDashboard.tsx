@@ -138,7 +138,7 @@ export default function UserDashboard({
     data: matches,
     loading: matchesLoading,
     error: matchesError,
-  } = useMatches(
+  } = useMatches<DashboardMatch>(
     undefined,
     undefined,
     userRole === "ADMIN" ? undefined : userId
@@ -154,7 +154,7 @@ export default function UserDashboard({
     ...(bundleRequests?.filter((r) => r.status === "MATCHED") || []),
   ];
 
-  const dedupedMatches = dedupeMatches((matches || []) as DashboardMatch[]);
+  const dedupedMatches = dedupeMatches(matches || []);
   const visibleMatches = dedupedMatches.filter((m) =>
     ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"].includes(m.status)
   );

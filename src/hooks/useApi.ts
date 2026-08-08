@@ -132,7 +132,7 @@ export function useBundleSwapRequests(userId?: string, status?: string) {
   return useApi<BundleSwapRequest[]>(url);
 }
 
-export function useMatches(
+export function useMatches<T>(
   status?: string,
   matchType?: string,
   userId?: string
@@ -142,5 +142,5 @@ export function useMatches(
   if (matchType) params.append("matchType", matchType);
   if (userId) params.append("userId", userId);
   const url = `/api/matches${params.toString() ? `?${params.toString()}` : ""}`;
-  return useApi<unknown[]>(url);
+  return useApi<T[]>(url);
 }
