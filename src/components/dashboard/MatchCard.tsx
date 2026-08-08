@@ -12,7 +12,6 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  AlertTriangle,
   Phone,
   PhoneOff,
   Mail

@@ -10,7 +10,6 @@ import { Button } from "@/lib/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,8 +23,7 @@ import {
   SelectValue,
 } from "@/lib/components/ui/select";
 import { ClassRankingSelector } from "@/components/ui/class-ranking-selector";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
-import { Badge } from "@/lib/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/lib/components/ui/card";
 
 import { bundleSwapRequestSchema, BundleSwapRequestForm as FormType } from "@/schemas/swapRequestSchema";
 import { useClasses } from "@/hooks/useApi";

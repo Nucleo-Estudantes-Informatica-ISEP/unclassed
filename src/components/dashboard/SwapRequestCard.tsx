@@ -12,7 +12,6 @@ import {
   XCircle, 
   AlertCircle,
   Trash2,
-  Edit3,
   Users,
   Calendar
 } from "lucide-react";

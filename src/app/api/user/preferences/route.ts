@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import getServerSession from "@/services/getServerSession";
 import prisma from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession();
     

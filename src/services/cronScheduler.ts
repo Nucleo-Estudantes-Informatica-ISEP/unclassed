@@ -344,7 +344,7 @@ export class CronScheduler {
       await this.prisma.cronLock.delete({
         where: { jobId }
       });
-    } catch (error) {
+    } catch {
       // Ignore errors - lock might have expired or been deleted already
       console.debug(`Lock release for job ${jobId} had no effect (likely already expired)`);
     }
@@ -689,18 +689,13 @@ export class CronScheduler {
     try {
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      const [recentExecutions, last24hExecutions, lastWeekExecutions, lastExecution] = await Promise.all([
+      const [recentExecutions, last24hExecutions, lastExecution] = await Promise.all([
         this.prisma.cronExecution.findMany({
           where: { startedAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) } }, // Last hour
           orderBy: { startedAt: 'desc' }
         }),
         this.prisma.cronExecution.findMany({
           where: { startedAt: { gte: last24Hours } }
-        }),
-        this.prisma.cronExecution.findMany({
-          where: { startedAt: { gte: lastWeek } }
         }),
         this.prisma.cronExecution.findFirst({
           where: { status: 'COMPLETED' },
