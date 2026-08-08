@@ -13,8 +13,10 @@ import type getServerSession from "@/services/getServerSession";
 
 import DarkModeToggle from "../DarkModeToggle";
 
+type SessionUser = NonNullable<Awaited<ReturnType<typeof getServerSession>>>;
+
 interface TopbarProps {
-  user: Awaited<ReturnType<typeof getServerSession>>;
+  user: Pick<SessionUser, "name" | "email" | "role"> | null;
 }
 
 const Topbar: React.FC<TopbarProps> = ({ user }) => {
