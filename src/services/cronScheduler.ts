@@ -5,7 +5,12 @@ import prisma from "@/lib/prisma";
 import { getCache } from "./cache";
 
 export function getNextCronRun(cronExpression: string, currentDate = new Date()): Date {
-  return CronExpressionParser.parse(cronExpression, { currentDate }).next().toDate();
+  try {
+    return CronExpressionParser.parse(cronExpression, { currentDate }).next().toDate();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid cron expression "${cronExpression}": ${message}`);
+  }
 }
 
 interface JobExecutionResult {

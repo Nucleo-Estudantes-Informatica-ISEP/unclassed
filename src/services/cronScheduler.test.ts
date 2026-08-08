@@ -10,5 +10,8 @@ test("computes custom cron schedules without an hourly fallback", () => {
     getNextCronRun("*/10 * * * *", currentDate).toISOString(),
     "2026-08-07T12:10:00.000Z"
   );
-  assert.throws(() => getNextCronRun("invalid", currentDate));
+  assert.throws(
+    () => getNextCronRun("invalid", currentDate),
+    /Invalid cron expression "invalid":/
+  );
 });
