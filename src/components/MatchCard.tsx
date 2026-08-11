@@ -7,33 +7,10 @@ import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowR
 import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
 import { useRouter } from "next/navigation";
-
-interface MatchParticipant {
-  userId: string;
-  fromClass: string | { id: string; name: string; year: number };
-  toClass: string | { id: string; name: string; year: number };
-  requestId: string;
-  requestType: 'single' | 'bundle';
-  satisfactionScore: number;
-  status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  user?: { id: string; name: string; email: string; phone?: string | null; sharePhoneOnMatch?: boolean };
-}
-
-interface Match {
-  id: string;
-  matchType: 'SINGLE' | 'BUNDLE';
-  swapPattern: 'DIRECT' | 'THREE_WAY' | 'MULTI_WAY';
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'PROVISIONAL' | 'UPGRADED';
-  isProvisional: boolean;
-  provisionalUntil?: string | null;
-  satisfactionScore: number;
-  participants: MatchParticipant[];
-  createdAt: string;
-  subject?: { id: string; code: string; name: string; year: number; semester: number };
-}
+import type { MatchDto } from "@/types/match";
 
 interface MatchCardProps {
-  match: Match;
+  match: MatchDto;
   currentUserId: string;
   showActions?: boolean;
 }
@@ -310,7 +287,7 @@ export function MatchCard({ match, currentUserId, showActions = true }: MatchCar
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mt-2">
           <span className="text-sm text-muted-foreground">
             {match.participants.length} participantes •
-            {Math.round(match.satisfactionScore * 100)}% satisfação
+            {Math.round((match.satisfactionScore ?? 0) * 100)}% satisfação
           </span>
           <ClientDate
             date={match.createdAt}

@@ -10,7 +10,6 @@ import { Button } from "@/lib/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,7 +23,7 @@ import {
   SelectValue,
 } from "@/lib/components/ui/select";
 import { ClassRankingSelector } from "@/components/ui/class-ranking-selector";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/lib/components/ui/card";
 
 import { singleSwapRequestSchema, SingleSwapRequestForm as FormType } from "@/schemas/swapRequestSchema";
 import { useSubjects, useClasses } from "@/hooks/useApi";
@@ -47,7 +46,7 @@ export default function SingleSwapRequestForm({ onSuccess, onCancel }: SingleSwa
     },
   });
 
-  const { data: subjects, loading: subjectsLoading, error: subjectsError } = useSubjects();
+  const { data: subjects, loading: subjectsLoading } = useSubjects();
   const { data: classes, loading: classesLoading, error: classesError } = useClasses(selectedYear);
 
   // Get unique years from subjects

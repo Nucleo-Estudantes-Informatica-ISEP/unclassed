@@ -1,6 +1,6 @@
 import { Badge } from "@/lib/components/ui/badge";
 import { Card, CardContent } from "@/lib/components/ui/card";
-import { Code2, History, Info, Mail, ShieldCheck } from "lucide-react";
+import { Info, Mail, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 const links = [

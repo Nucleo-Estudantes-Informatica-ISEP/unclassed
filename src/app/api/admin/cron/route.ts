@@ -14,7 +14,7 @@ interface CachedCronStats {
  * Get comprehensive cron statistics and execution history
  * Admin-only endpoint
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession();
     

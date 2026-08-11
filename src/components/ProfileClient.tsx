@@ -59,7 +59,7 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
       } else {
         toast.error(data.error || 'Erro ao atualizar preferências');
       }
-    } catch (error) {
+    } catch {
       toast.error('Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);
@@ -86,7 +86,7 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
       } else {
         toast.error(data.error || 'Erro ao atualizar telemóvel');
       }
-    } catch (error) {
+    } catch {
       toast.error('Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);

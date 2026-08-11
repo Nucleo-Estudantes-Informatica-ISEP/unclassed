@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+import type { MatchDto } from "@/types/match";
+
 interface ApiState<T> {
   data: T | null;
   loading: boolean;
@@ -8,14 +10,6 @@ interface ApiState<T> {
 
 // Shared DTOs
 export type ClassLite = { id: string; name: string; year: number };
-export type UserLite = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  phone?: string | null;
-  sharePhoneOnMatch?: boolean | null;
-};
-
 export type SingleSwapRequest = {
   id: string;
   userId: string;
@@ -132,7 +126,7 @@ export function useBundleSwapRequests(userId?: string, status?: string) {
   return useApi<BundleSwapRequest[]>(url);
 }
 
-export function useMatches<T>(
+export function useMatches(
   status?: string,
   matchType?: string,
   userId?: string
@@ -142,5 +136,5 @@ export function useMatches<T>(
   if (matchType) params.append("matchType", matchType);
   if (userId) params.append("userId", userId);
   const url = `/api/matches${params.toString() ? `?${params.toString()}` : ""}`;
-  return useApi<T[]>(url);
+  return useApi<MatchDto[]>(url);
 }

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import getServerSession from "@/services/getServerSession";
 import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await getServerSession();
     if (!session || session.role !== "ADMIN") {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession();
     if (!session) {

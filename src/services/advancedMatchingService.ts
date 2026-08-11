@@ -425,7 +425,7 @@ export class AdvancedMatchingService {
       );
 
       // Build graph for this partition
-      const graph = await this.buildPartitionGraph(partition, context);
+      const graph = await this.buildPartitionGraph(partition);
 
       // Find direct and 3-way matches with greedy approach so simple swaps
       // are still recovered when immediate matching skips due to a lock.
@@ -1664,8 +1664,7 @@ export class AdvancedMatchingService {
 
   // Graph building and cycle detection methods
   private async buildPartitionGraph(
-    partition: GraphPartition,
-    context: ProcessingContext
+    partition: GraphPartition
   ): Promise<Map<string, GraphEdge[]>> {
     const graph = new Map<string, GraphEdge[]>();
 
