@@ -96,15 +96,20 @@ export class CronScheduler {
     console.log("🚀 Starting internal cron scheduler...");
     this.isStarted = true;
 
-    // Schedule all enabled jobs
-    for (const job of this.jobs.values()) {
-      if (job.enabled) {
-        this.scheduleJob(job);
+    try {
+      // Schedule all enabled jobs
+      for (const job of this.jobs.values()) {
+        if (job.enabled) {
+          this.scheduleJob(job);
+        }
       }
-    }
 
-    // Schedule cleanup task
-    this.scheduleCleanup();
+      // Schedule cleanup task
+      this.scheduleCleanup();
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
 
     console.log(`✅ Cron scheduler started with ${Array.from(this.jobs.values()).filter(j => j.enabled).length} active jobs`);
   }
@@ -179,11 +184,11 @@ export class CronScheduler {
    * Add a new cron job
    */
   addJob(job: ScheduledJob) {
-    this.jobs.set(job.id, job);
-
     if (this.isStarted && job.enabled) {
       this.scheduleJob(job);
     }
+
+    this.jobs.set(job.id, job);
   }
 
   /**
@@ -192,8 +197,6 @@ export class CronScheduler {
   setJobEnabled(jobId: string, enabled: boolean) {
     const job = this.jobs.get(jobId);
     if (!job) return;
-
-    job.enabled = enabled;
 
     if (this.isStarted) {
       if (enabled) {
@@ -206,6 +209,8 @@ export class CronScheduler {
         }
       }
     }
+
+    job.enabled = enabled;
   }
 
   /**
@@ -223,6 +228,10 @@ export class CronScheduler {
     }));
   }
 
+  isRunning() {
+    return this.isStarted;
+  }
+
   /**
    * Schedule a specific job with improved precision
    */
@@ -230,8 +239,8 @@ export class CronScheduler {
     // Calculate next run time
     job.nextRun = getNextCronRun(job.schedule);
 
-    // Use more precise interval based on job schedule
-    const checkIntervalMs = this.getCheckInterval(job.schedule);
+    // Cron expressions can include seconds, so poll at one-second precision.
+    const checkIntervalMs = 1000;
 
     const checkInterval = setInterval(async () => {
       const now = new Date();
@@ -253,22 +262,6 @@ export class CronScheduler {
 
     this.intervals.set(job.id, checkInterval);
     console.log(`📅 Scheduled job '${job.name}' - next run: ${job.nextRun?.toISOString()}, check interval: ${checkIntervalMs}ms`);
-  }
-
-  /**
-   * Get appropriate check interval based on cron schedule
-   */
-  private getCheckInterval(cronExpression: string): number {
-    if (cronExpression.includes('*/5 * * * *')) {
-      return 30000; // Check every 30 seconds for 5-minute jobs
-    }
-    if (cronExpression.includes('*/30 * * * *')) {
-      return 60000; // Check every minute for 30-minute jobs
-    }
-    if (cronExpression.includes('0 * * * *')) {
-      return 60000; // Check every minute for hourly jobs
-    }
-    return 60000; // Default: check every minute
   }
 
   /**
