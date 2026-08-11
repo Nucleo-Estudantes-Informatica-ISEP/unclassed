@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test --require ts-node/register/transpile-only src/**/*.test.ts",
+    "test": "find src -type f -name '*.test.ts' -exec node --test --require ts-node/register/transpile-only {} +",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "sync": "prisma db push",
