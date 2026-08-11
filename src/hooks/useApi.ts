@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+import type { MatchDto } from "@/types/match";
+
 interface ApiState<T> {
   data: T | null;
   loading: boolean;
@@ -8,14 +10,6 @@ interface ApiState<T> {
 
 // Shared DTOs
 export type ClassLite = { id: string; name: string; year: number };
-export type UserLite = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  phone?: string | null;
-  sharePhoneOnMatch?: boolean | null;
-};
-
 export type SingleSwapRequest = {
   id: string;
   userId: string;
@@ -37,23 +31,6 @@ export type BundleSwapRequest = {
   createdAt: string;
   currentClass?: ClassLite;
   preferredClasses?: ClassLite[];
-};
-
-export type MatchParticipant = {
-  user?: UserLite | null;
-  fromClass?: ClassLite | null;
-  toClass?: ClassLite | null;
-  // allow passthrough of other server-provided fields, but don't use `any` here
-  [key: string]: unknown;
-};
-
-export type MatchDto = {
-  id: string;
-  matchType: string;
-  status: string;
-  swapPattern: string;
-  participants: MatchParticipant[];
-  createdAt: string;
 };
 
 export function useApi<T>(url: string): ApiState<T> {

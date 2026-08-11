@@ -1,34 +1,10 @@
 "use client";
 
 import { MatchCard } from "./MatchCard";
-
-interface MatchParticipant {
-  userId: string;
-  fromClass: string | { id: string; name: string; year: number };
-  toClass: string | { id: string; name: string; year: number };
-  requestId: string;
-  requestType: 'single' | 'bundle';
-  satisfactionScore: number;
-  status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  user?: { id: string; name: string; email: string; phone?: string | null; sharePhoneOnMatch?: boolean };
-}
-
-interface Match {
-  id: string;
-  matchType: 'SINGLE' | 'BUNDLE';
-  swapPattern: 'DIRECT' | 'THREE_WAY' | 'MULTI_WAY';
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'PROVISIONAL' | 'UPGRADED';
-  isProvisional: boolean;
-  provisionalUntil?: string | null;
-  satisfactionScore: number;
-  participants: MatchParticipant[];
-  createdAt: string;
-  updatedAt: string;
-  subject?: { id: string; code: string; name: string; year: number; semester: number };
-}
+import type { MatchDto } from "@/types/match";
 
 interface MatchListClientProps {
-  matches: Match[];
+  matches: MatchDto[];
   currentUserId: string;
   title: string;
   emptyMessage: string;

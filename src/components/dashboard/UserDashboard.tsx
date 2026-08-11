@@ -2,15 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeftRight,
-  Clock,
-  Eye,
-  Package2,
-  Plus,
-} from "lucide-react";
+import { Clock, Eye, Plus } from "lucide-react";
 
-import { Badge } from "@/lib/components/ui/badge";
+import { MatchCard } from "@/components/MatchCard";
 import { Button } from "@/lib/components/ui/button";
 import {
   Card,
@@ -30,31 +24,18 @@ import {
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
 import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
-import { ClientDate } from "@/components/ClientDate";
+import type { MatchDto, MatchParticipant } from "@/types/match";
 
 interface UserDashboardProps {
   userId: string;
   userRole: "USER" | "ADMIN";
 }
 
-type DashboardMatch = {
-  id: string;
-  matchType: string;
-  status: string;
-  swapPattern: string;
-  participants: Array<{
-    userId?: string;
-    status?: string;
-    user?: { name?: string; email?: string };
-    fromClass?: { name?: string };
-    toClass?: { name?: string };
-  }>;
-  createdAt: string;
-  singleSwapRequestIds?: string[];
-  bundleSwapRequestIds?: string[];
-};
+function getClassName(value: MatchParticipant["fromClass"]): string {
+  return typeof value === "string" ? value : value.name;
+}
 
-function getMatchSignature(match: DashboardMatch): string {
+function getMatchSignature(match: MatchDto): string {
   return buildMatchSignature({
     matchType: match.matchType,
     swapPattern: match.swapPattern,
@@ -62,14 +43,14 @@ function getMatchSignature(match: DashboardMatch): string {
     bundleSwapRequestIds: match.bundleSwapRequestIds,
     participants: match.participants.map((p) => ({
       userId: p.userId,
-      fromClass: p.fromClass?.name,
-      toClass: p.toClass?.name,
+      fromClass: getClassName(p.fromClass),
+      toClass: getClassName(p.toClass),
     })),
   });
 }
 
-function dedupeMatches(matches: DashboardMatch[]): DashboardMatch[] {
-  const bySignature = new Map<string, DashboardMatch>();
+function dedupeMatches(matches: MatchDto[]): MatchDto[] {
+  const bySignature = new Map<string, MatchDto>();
 
   for (const match of matches) {
     const signature = getMatchSignature(match);
@@ -118,7 +99,7 @@ export default function UserDashboard({
     ...(bundleRequests?.filter((r) => r.status === "ACTIVE") || []),
   ];
 
-  const dedupedMatches = dedupeMatches((matches || []) as DashboardMatch[]);
+  const dedupedMatches = dedupeMatches(matches || []);
   const visibleMatches = dedupedMatches.filter((m) =>
     ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"].includes(m.status)
   );
@@ -126,51 +107,6 @@ export default function UserDashboard({
   const activeMatches = visibleMatches.filter((m) =>
     ["PROPOSED", "PROVISIONAL", "ACCEPTED"].includes(m.status)
   );
-  const getMatchStatusBadge = (status: string) => {
-    const statusConfig = {
-      PROPOSED: {
-        variant: "outline" as const,
-        label: "Proposto",
-        color: "text-primary",
-      },
-      PROVISIONAL: {
-        variant: "outline" as const,
-        label: "Provisório",
-        color: "text-amber-600",
-      },
-      ACCEPTED: {
-        variant: "default" as const,
-        label: "Aceite",
-        color: "text-green-600",
-      },
-      REJECTED: {
-        variant: "destructive" as const,
-        label: "Rejeitado",
-        color: "text-red-600",
-      },
-      COMPLETED: {
-        variant: "secondary" as const,
-        label: "Completo",
-        color: "text-gray-600",
-      },
-      UPGRADED: {
-        variant: "secondary" as const,
-        label: "Substituído",
-        color: "text-gray-500",
-      },
-    };
-
-    const config =
-      statusConfig[status as keyof typeof statusConfig] ||
-      statusConfig.PROPOSED;
-
-    return (
-      <Badge variant={config.variant} className={config.color}>
-        {config.label}
-      </Badge>
-    );
-  };
-
   if (singleLoading || bundleLoading || matchesLoading) {
     return (
       <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-8">
@@ -231,39 +167,12 @@ export default function UserDashboard({
               ) : (
                 <div className="space-y-4">
                   {activeMatches.slice(0, 3).map((match) => (
-                    <div
+                    <MatchCard
                       key={match.id}
-                      className="flex cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
-                      onClick={() => router.push("/matches")}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`rounded-full p-2 ${
-                            match.matchType === "SINGLE" ? "bg-primary/10" : "bg-accent/30"
-                          }`}
-                        >
-                          {match.matchType === "SINGLE" ? (
-                            <ArrowLeftRight className="h-4 w-4 text-primary" />
-                          ) : (
-                            <Package2 className="h-4 w-4 text-accent-foreground" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium break-words">
-                            Match {match.swapPattern.toLowerCase()}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {match.participants.length} participantes • <ClientDate date={match.createdAt} format="short" />
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-                        {getMatchStatusBadge(match.status)}
-                        <Button variant="ghost" size="sm" className="w-full text-xs sm:w-auto">
-                          Ver match →
-                        </Button>
-                      </div>
-                    </div>
+                      match={match}
+                      currentUserId={userId}
+                      showActions={false}
+                    />
                   ))}
                   {activeMatches.length > 3 && (
                     <div className="pt-4 text-center">
