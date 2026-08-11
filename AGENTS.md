@@ -84,7 +84,7 @@ docs/domain-model/ # PlantUML domain diagram
 Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
-- `CronScheduler` is the intentional exception: `src/services/cronScheduler.ts` owns a separate `new PrismaClient()` for scheduler lifecycle work. Do not silently replace it with the shared singleton or add more clients without first handling scheduler start/stop lifecycle and connection impact.
+- `CronScheduler` uses the shared Prisma singleton. Scheduler start/stop manages job timers, not the application-owned database connection.
 - Prisma and server services belong only in server-side code—never client components or browser hooks.
 - Put reusable non-HTTP logic in `src/services/`; do not duplicate it across API routes.
 - Put reusable Zod schemas in `src/schemas/`. Legacy inline schemas exist, but do not create a second copy of a rule already defined there.
@@ -161,7 +161,7 @@ No committed automated test suite exists yet. Add a focused regression test for 
 
 ## Gotchas
 
-- `CronScheduler` has its own Prisma client and uses database locks. Its lifecycle is distinct from the app singleton.
+- `CronScheduler` uses the shared Prisma client and database locks. Its start/stop lifecycle only manages scheduled jobs.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not proof of type safety: Next ignores build-time TypeScript errors.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.

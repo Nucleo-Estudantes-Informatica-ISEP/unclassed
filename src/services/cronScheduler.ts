@@ -1,5 +1,6 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
-import { CronExecution, Prisma, PrismaClient } from "@prisma/client";
+import { CronExecution, Prisma } from "@prisma/client";
+import prisma from "../lib/prisma";
 import { getCache } from "./cache";
 
 interface JobExecutionResult {
@@ -53,7 +54,7 @@ export class CronScheduler {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private isStarted = false;
   private matchingService = new AdvancedMatchingService();
-  private prisma = new PrismaClient();
+  private prisma = prisma;
   private readonly LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes default lock timeout
 
   /**
