@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import getServerSession from "@/services/getServerSession";
+
+import { authorizeRequest } from "@/lib/apiAccess";
+import { CacheKeys, getCache } from "@/services/cache";
 import { getCronScheduler } from "@/services/cronScheduler";
-import { getCache, CacheKeys } from "@/services/cache";
 
 interface CachedCronStats {
   schedulerStatus?: string;
@@ -14,16 +15,11 @@ interface CachedCronStats {
  * Get comprehensive cron statistics and execution history
  * Admin-only endpoint
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
-
-    if (session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Acesso de administrador necessário" }, { status: 403 });
+    const authResult = await authorizeRequest(request, { requireAdmin: true });
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     const cache = getCache();
@@ -97,14 +93,12 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
-
-    if (session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Acesso de administrador necessário" }, { status: 403 });
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     const body = await request.json();

@@ -4,11 +4,11 @@
  * Creates sample matches for testing the accept/reject/provisional functionality
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { Class, SingleSwapRequest, Subject, User } from "@prisma/client";
 
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
-import getServerSession from "@/services/getServerSession";
 
 import bcrypt from "bcryptjs";
 
@@ -16,11 +16,14 @@ import bcrypt from "bcryptjs";
  * POST /api/test-matches
  * Create sample matches for testing
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     if (process.env.NODE_ENV === "production") {
@@ -28,10 +31,6 @@ export async function POST() {
         { error: "Endpoint indisponível em produção" },
         { status: 403 }
       );
-    }
-
-    if (session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
 
     // Create sample users if they don't exist

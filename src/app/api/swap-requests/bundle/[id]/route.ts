@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import getServerSession from "@/services/getServerSession";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
 
 const updateBundleSwapRequestSchema = z.object({
@@ -22,10 +23,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const swapRequest = await prisma.bundleSwapRequest.findUnique({
       where: { id },
@@ -73,10 +75,13 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = updateBundleSwapRequestSchema.parse(body);
@@ -171,10 +176,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const existingRequest = await prisma.bundleSwapRequest.findUnique({
       where: { id }
