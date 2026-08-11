@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
 import { exclude } from "@/lib/exclude";
 import prisma from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const getServerSession = async () => {
   const session = await auth();
@@ -17,7 +17,15 @@ const getServerSession = async () => {
     return null;
   }
 
-  return exclude(user, ["password", "verificationToken", "verificationTokenExpiry"]);
+  return exclude(user, [
+    "password",
+    "verificationToken",
+    "verificationTokenExpiry",
+  ]);
 };
+
+export type SessionUser = NonNullable<
+  Awaited<ReturnType<typeof getServerSession>>
+>;
 
 export default getServerSession;

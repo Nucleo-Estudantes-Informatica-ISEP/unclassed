@@ -9,11 +9,9 @@ import { useRouter } from "next/navigation";
 import { signOut, signIn } from "next-auth/react";
 import { toast } from "sonner";
 
-import type getServerSession from "@/services/getServerSession";
+import type { SessionUser } from "@/services/getServerSession";
 
 import DarkModeToggle from "../DarkModeToggle";
-
-type SessionUser = NonNullable<Awaited<ReturnType<typeof getServerSession>>>;
 
 interface TopbarProps {
   user: Pick<SessionUser, "name" | "email" | "role"> | null;

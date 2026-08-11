@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import getServerSession from "@/services/getServerSession";
+import getServerSession, {
+  type SessionUser,
+} from "@/services/getServerSession";
 import { validateOrigin } from "@/middleware/authMiddleware";
-
-type SessionUser = NonNullable<Awaited<ReturnType<typeof getServerSession>>>;
 
 type AuthorizationSuccess = {
   ok: true;
