@@ -9,11 +9,12 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
+import type { SessionUser } from "@/services/getServerSession";
+
 import DarkModeToggle from "../DarkModeToggle";
-import type { Session } from "@/types/Session";
 
 interface TopbarProps {
-  user?: Session;
+  user: Pick<SessionUser, "name" | "email" | "role"> | null;
 }
 
 const Topbar: React.FC<TopbarProps> = ({ user }) => {
