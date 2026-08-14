@@ -16,6 +16,7 @@ import BundleSwapRequestForm from "@/components/forms/BundleSwapRequestForm";
 import SingleSwapRequestForm from "@/components/forms/SingleSwapRequestForm";
 import { RequestStatusPanel } from "@/components/swap-requests/RequestStatusPanel";
 import { MatchReviewStep } from "@/components/swap-requests/MatchReviewStep";
+import { ContactRevealStep } from "@/components/swap-requests/ContactRevealStep";
 
 import { getRequestWizardSteps, type RequestType } from "./requestWizardSteps";
 
@@ -150,6 +151,10 @@ export default function SwapRequestsClient({
               canAdvance={steps.length > 4}
               onAdvance={() => setCurrentStepIndex(4)}
             />
+          )}
+
+          {currentStepIndex === 4 && matchId && (
+            <ContactRevealStep matchId={matchId} currentUserId={currentUserId} />
           )}
 
           {requestType === "single" && !(currentStepIndex === 2 && trackedRequestId) && (
