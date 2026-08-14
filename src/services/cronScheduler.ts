@@ -1,6 +1,6 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
 import { CronExecution, Prisma } from "@prisma/client";
-import prisma from "../lib/prisma";
+import prisma from "@/lib/prisma";
 import { getCache } from "./cache";
 
 interface JobExecutionResult {
