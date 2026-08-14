@@ -1,12 +1,19 @@
-import { NextResponse } from "next/server";
-import getServerSession from "@/services/getServerSession";
+import { NextRequest, NextResponse } from "next/server";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session || session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    // requireAdmin implies requireAuth, so an authenticated non-admin gets
+    // 403 (forbidden) here rather than 401 (unauthenticated) — intentional,
+    // and more accurate than this route's previous manual check returned.
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     const matchingService = new AdvancedMatchingService();
@@ -35,11 +42,11 @@ export async function POST() {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     const matchingService = new AdvancedMatchingService();

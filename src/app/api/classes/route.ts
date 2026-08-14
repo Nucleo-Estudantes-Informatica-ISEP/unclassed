@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import getServerSession from "@/services/getServerSession";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
 
     const { searchParams } = new URL(request.url);

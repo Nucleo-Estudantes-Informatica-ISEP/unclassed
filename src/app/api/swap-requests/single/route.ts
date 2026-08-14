@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
-import getServerSession from "@/services/getServerSession";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 
@@ -18,10 +18,11 @@ const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -84,10 +85,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = createSingleSwapRequestSchema.parse(body);

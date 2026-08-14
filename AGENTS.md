@@ -67,9 +67,8 @@ src/
 ├── config/       # app configuration
 ├── context/      # React context providers
 ├── hooks/        # client hooks
-├── lib/          # Prisma singleton, OIDC helpers, startup, generic utilities
+├── lib/          # Prisma singleton, OIDC helpers, startup, request-auth (apiAccess), generic utilities
 │   └── components/ui/ # reusable UI primitives
-├── middleware/   # request-auth helpers
 ├── schemas/      # reusable Zod schemas
 ├── services/     # matching, cron, mail, session, cache, trigger logic
 └── types/        # shared and NextAuth type declarations
@@ -111,8 +110,8 @@ Rules:
 
 - Preserve the ZITADEL `email_verified` gate.
 - Local `User.password` exists for compatibility but active sign-in is OIDC. Do not add a parallel password-login flow without an explicit product decision.
-- Use `authorizeRequest()` for new routes needing the standard session/admin/cron decision and same-origin checks. `withAuth()` is legacy-compatible middleware; do not introduce a third wrapper.
-- For session-authenticated writes, enable same-origin enforcement when the route accepts browser requests.
+- Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
+- For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
 
 ## API conventions
@@ -137,7 +136,7 @@ Documentation should answer a future contributor's first question without duplic
 - Document why for non-obvious constraints, especially auth boundaries, lifecycle-managed clients, cron locks, data integrity rules, and security decisions. Do not restate code line-by-line.
 - Keep examples runnable and command names synchronized with `package.json`.
 - In the same change that alters behavior, update relevant docs. Do not defer known documentation drift to a follow-up.
-- Refresh this guide when the matching-engine or auth-layer refactor lands; its layer map and gotchas describe the current implementation, not a planned target architecture.
+- Refresh this guide when the matching-engine refactor lands; its layer map and gotchas describe the current implementation, not a planned target architecture.
 
 ## Database and environment
 

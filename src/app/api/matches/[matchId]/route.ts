@@ -7,7 +7,8 @@
 
 import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from 'next/server';
-import getServerSession from '@/services/getServerSession';
+
+import { authorizeRequest } from '@/lib/apiAccess';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/emailService';
 
@@ -61,10 +62,11 @@ export async function GET(
 ) {
   try {
     const { matchId } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const match = (await prisma.match.findUnique({
       where: { id: matchId }
@@ -103,10 +105,13 @@ export async function PATCH(
 ) {
   try {
     const { matchId } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const { action } = await request.json();
     

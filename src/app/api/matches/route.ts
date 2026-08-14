@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { authorizeRequest } from "@/lib/apiAccess";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
 import prisma from "@/lib/prisma";
-import getServerSession from "@/services/getServerSession";
 
 interface MatchLike {
   id: string;
@@ -97,10 +97,11 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
