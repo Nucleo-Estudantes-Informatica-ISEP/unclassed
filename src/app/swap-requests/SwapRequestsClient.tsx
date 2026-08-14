@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeftRight, Check, Package2 } from "lucide-react";
 
 import {
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { StepWizard, WizardNavigation } from "@/components/ui/step-wizard";
 import BundleSwapRequestForm from "@/components/forms/BundleSwapRequestForm";
 import SingleSwapRequestForm from "@/components/forms/SingleSwapRequestForm";
+import { RequestStatusPanel } from "@/components/swap-requests/RequestStatusPanel";
 
 import { getRequestWizardSteps, type RequestType } from "./requestWizardSteps";
 
@@ -32,11 +34,39 @@ const requestTypes = [
   },
 ];
 
-export default function SwapRequestsClient() {
+interface SwapRequestsClientProps {
+  currentUserId: string;
+}
+
+export default function SwapRequestsClient({
+  currentUserId,
+}: SwapRequestsClientProps) {
+  const searchParams = useSearchParams();
   const [requestType, setRequestType] = useState<RequestType | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [trackedRequestId, setTrackedRequestId] = useState<string | null>(
+    null
+  );
+  const [matchId, setMatchId] = useState<string | null>(null);
   const steps = getRequestWizardSteps(requestType);
   const currentStep = steps[currentStepIndex];
+
+  // Restore an in-progress/completed request from its bookmarkable URL
+  // (?type=...&requestId=...) so a student who closes the tab mid-flow, or
+  // returns later to check status, lands back where they left off instead
+  // of restarting the create flow.
+  useEffect(() => {
+    const type = searchParams.get("type");
+    const requestId = searchParams.get("requestId");
+
+    if ((type === "single" || type === "bundle") && requestId) {
+      setRequestType(type);
+      setTrackedRequestId(requestId);
+      setCurrentStepIndex(2);
+    }
+    // Only meant to run once, off the URL present on first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="bg-background w-full py-8">
@@ -99,7 +129,20 @@ export default function SwapRequestsClient() {
             </div>
           )}
 
-          {requestType === "single" && (
+          {currentStepIndex === 2 && trackedRequestId && requestType && (
+            <RequestStatusPanel
+              requestId={trackedRequestId}
+              requestType={requestType}
+              onMatchFound={(foundMatchId) => {
+                setMatchId(foundMatchId);
+                if (steps.length > 3) {
+                  setCurrentStepIndex(3);
+                }
+              }}
+            />
+          )}
+
+          {requestType === "single" && !(currentStepIndex === 2 && trackedRequestId) && (
             <div className={cn(currentStepIndex === 0 && "hidden")}>
               <SingleSwapRequestForm
                 step={currentStepIndex === 2 ? "preferences" : "details"}
@@ -109,7 +152,7 @@ export default function SwapRequestsClient() {
             </div>
           )}
 
-          {requestType === "bundle" && (
+          {requestType === "bundle" && !(currentStepIndex === 2 && trackedRequestId) && (
             <div className={cn(currentStepIndex === 0 && "hidden")}>
               <BundleSwapRequestForm
                 step={currentStepIndex === 2 ? "preferences" : "details"}

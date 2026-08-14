@@ -68,7 +68,14 @@ export function useSwapRequestWizardForm<T extends FieldValues & SwapRequestForm
 
       toast.success(successMessage);
       form.reset();
-      setTimeout(() => router.push("/matches"), 1500);
+      const requestType = endpoint.includes("/bundle") ? "bundle" : "single";
+      setTimeout(
+        () =>
+          router.push(
+            `/swap-requests?type=${requestType}&requestId=${result.id}`
+          ),
+        1200
+      );
     } catch (error) {
       console.error(errorLogLabel, error);
       toast.error(error instanceof Error ? error.message : "Erro inesperado");
