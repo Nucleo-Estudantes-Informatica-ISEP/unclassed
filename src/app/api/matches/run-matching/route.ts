@@ -5,6 +5,9 @@ import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 
 export async function POST(request: NextRequest) {
   try {
+    // requireAdmin implies requireAuth, so an authenticated non-admin gets
+    // 403 (forbidden) here rather than 401 (unauthenticated) — intentional,
+    // and more accurate than this route's previous manual check returned.
     const authResult = await authorizeRequest(request, {
       requireAdmin: true,
       enforceSameOriginForSessionWrites: true,
