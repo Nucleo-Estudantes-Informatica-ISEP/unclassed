@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { useForm, useWatch } from "react-hook-form";
 
 import {
   Form,
@@ -14,7 +11,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/lib/components/ui/form";
-import { Label } from "@/lib/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -23,7 +19,12 @@ import {
   SelectValue,
 } from "@/lib/components/ui/select";
 import { useClasses, useSubjects } from "@/hooks/useApi";
-import { ClassRankingSelector } from "@/components/ui/class-ranking-selector";
+import { useSwapRequestWizardForm } from "@/hooks/useSwapRequestWizardForm";
+import {
+  CurrentClassField,
+  PreferredClassesField,
+  YearSelect,
+} from "@/components/forms/swapRequestFields";
 import { WizardNavigation } from "@/components/ui/step-wizard";
 import {
   singleSwapRequestSchema,
@@ -41,10 +42,6 @@ export default function SingleSwapRequestForm({
   onBack,
   onNext,
 }: SingleSwapRequestFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number>();
-  const [yearError, setYearError] = useState<string>();
-  const router = useRouter();
   const form = useForm<FormType>({
     resolver: zodResolver(singleSwapRequestSchema),
     defaultValues: {
@@ -54,6 +51,29 @@ export default function SingleSwapRequestForm({
       preferenceOrderMatters: true,
     },
   });
+
+  const {
+    isSubmitting,
+    selectedYear,
+    setSelectedYear,
+    yearError,
+    setYearError,
+    handleDetailsSubmit,
+    onSubmit,
+  } = useSwapRequestWizardForm({
+    form,
+    endpoint: "/api/swap-requests/single",
+    successMessage:
+      "Pedido de permuta criado com sucesso! A redirecionar para os matches...",
+    errorLogLabel: "Error creating swap request:",
+    detailFields: ["subjectId", "currentClassId"],
+    onNext,
+  });
+
+  // Single-swap has a separate, always-unfiltered "years" source (subjects),
+  // so the class list itself can be fetched pre-filtered server-side once a
+  // year is picked. Bundle has no subjects endpoint to lean on, so it fetches
+  // all classes and filters client-side instead — see BundleSwapRequestForm.
   const {
     data: subjects,
     loading: subjectsLoading,
@@ -75,51 +95,10 @@ export default function SingleSwapRequestForm({
       id: currentClass.id,
       name: currentClass.name,
     })) ?? [];
-  const currentClassId = form.watch("currentClassId");
+  const currentClassId = useWatch({ control: form.control, name: "currentClassId" });
   const availableClassOptions = classOptions.filter(
     (option) => option.id !== currentClassId
   );
-
-  const handleDetailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedYear) {
-      setYearError("Por favor seleciona o ano académico");
-      return;
-    }
-
-    const isValid = await form.trigger(["subjectId", "currentClassId"], {
-      shouldFocus: true,
-    });
-    if (isValid) onNext();
-  };
-
-  const onSubmit = async (data: FormType) => {
-    setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/swap-requests/single", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao criar pedido de permuta");
-      }
-
-      toast.success(
-        "Pedido de permuta criado com sucesso! A redirecionar para os matches..."
-      );
-      form.reset();
-      setTimeout(() => router.push("/matches"), 1500);
-    } catch (error) {
-      console.error("Error creating swap request:", error);
-      toast.error(error instanceof Error ? error.message : "Erro inesperado");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <Form {...form}>
@@ -140,42 +119,23 @@ export default function SingleSwapRequestForm({
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="single-request-year">Ano Académico</Label>
-              <Select
-                value={selectedYear?.toString() ?? ""}
-                onValueChange={(value) => {
-                  setSelectedYear(Number(value));
-                  setYearError(undefined);
-                  form.reset({
-                    subjectId: "",
-                    currentClassId: "",
-                    preferredClassIds: [],
-                    preferenceOrderMatters: true,
-                  });
-                }}
-                disabled={subjectsLoading}
-              >
-                <SelectTrigger id="single-request-year" className="w-full">
-                  <SelectValue placeholder="Seleciona o ano académico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}º Ano
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {yearError && (
-                <p
-                  className="text-destructive text-sm font-medium"
-                  role="alert"
-                >
-                  {yearError}
-                </p>
-              )}
-            </div>
+            <YearSelect
+              id="single-request-year"
+              years={years}
+              value={selectedYear}
+              disabled={subjectsLoading}
+              error={yearError}
+              onChange={(year) => {
+                setSelectedYear(year);
+                setYearError(undefined);
+                form.reset({
+                  subjectId: "",
+                  currentClassId: "",
+                  preferredClassIds: [],
+                  preferenceOrderMatters: true,
+                });
+              }}
+            />
 
             <FormField
               control={form.control}
@@ -206,44 +166,10 @@ export default function SingleSwapRequestForm({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="currentClassId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Turma Atual</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      form.setValue(
-                        "preferredClassIds",
-                        form
-                          .getValues("preferredClassIds")
-                          .filter((classId) => classId !== value)
-                      );
-                    }}
-                    value={field.value}
-                    disabled={classesLoading || !selectedYear}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleciona a tua turma atual" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {classes?.map((currentClass) => (
-                        <SelectItem
-                          key={currentClass.id}
-                          value={currentClass.id}
-                        >
-                          {currentClass.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <CurrentClassField
+              form={form}
+              classes={classOptions}
+              disabled={classesLoading || !selectedYear}
             />
 
             <WizardNavigation
@@ -259,50 +185,12 @@ export default function SingleSwapRequestForm({
           </>
         ) : (
           <>
-            <FormField
-              control={form.control}
-              name="preferredClassIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Turmas Preferidas</FormLabel>
-                  {classesError ? (
-                    <div
-                      className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-4 text-sm"
-                      role="alert"
-                    >
-                      Erro ao carregar turmas: {classesError}
-                    </div>
-                  ) : classesLoading ? (
-                    <div className="text-muted-foreground rounded-lg border-2 border-dashed py-8 text-center">
-                      A carregar turmas...
-                    </div>
-                  ) : classOptions.length === 0 ? (
-                    <div className="text-muted-foreground rounded-lg border-2 border-dashed py-8 text-center">
-                      Nenhuma turma disponível para este ano.
-                    </div>
-                  ) : availableClassOptions.length === 0 ? (
-                    <div className="text-muted-foreground rounded-lg border-2 border-dashed py-8 text-center">
-                      Não há outras turmas disponíveis para trocar.
-                    </div>
-                  ) : (
-                    <FormControl>
-                      <ClassRankingSelector
-                        options={availableClassOptions}
-                        value={field.value}
-                        onChange={field.onChange}
-                        preferenceOrderMatters={form.watch(
-                          "preferenceOrderMatters"
-                        )}
-                        onPreferenceOrderChange={(orderMatters) =>
-                          form.setValue("preferenceOrderMatters", orderMatters)
-                        }
-                        placeholder="Seleciona as turmas para as quais gostarias de mudar"
-                      />
-                    </FormControl>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
+            <PreferredClassesField
+              form={form}
+              classOptions={classOptions}
+              availableClassOptions={availableClassOptions}
+              loading={classesLoading}
+              error={classesError}
             />
 
             <WizardNavigation
