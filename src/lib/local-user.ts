@@ -107,6 +107,9 @@ export async function syncLocalUserFromOidc({
           ...(resolvedEmailVerified !== null
             ? { emailVerified: resolvedEmailVerified }
             : {}),
+          ...(existingIdentity.user.onboardingSeenAt === null
+            ? { onboardingSeenAt: new Date() }
+            : {}),
           verificationToken: null,
           verificationTokenExpiry: null,
         },
@@ -142,6 +145,9 @@ export async function syncLocalUserFromOidc({
           ...(resolvedEmailVerified !== null
             ? { emailVerified: resolvedEmailVerified }
             : {}),
+          ...(existingUser.onboardingSeenAt === null
+            ? { onboardingSeenAt: new Date() }
+            : {}),
           verificationToken: null,
           verificationTokenExpiry: null,
         },
@@ -154,6 +160,7 @@ export async function syncLocalUserFromOidc({
         name: normalizedName,
         password: buildManagedPassword(sub),
         emailVerified: true,
+        onboardingSeenAt: new Date(),
         verificationToken: null,
         verificationTokenExpiry: null,
         identities: {
