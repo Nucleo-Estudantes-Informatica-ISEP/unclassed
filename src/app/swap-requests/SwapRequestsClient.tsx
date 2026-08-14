@@ -15,6 +15,7 @@ import { StepWizard, WizardNavigation } from "@/components/ui/step-wizard";
 import BundleSwapRequestForm from "@/components/forms/BundleSwapRequestForm";
 import SingleSwapRequestForm from "@/components/forms/SingleSwapRequestForm";
 import { RequestStatusPanel } from "@/components/swap-requests/RequestStatusPanel";
+import { MatchReviewStep } from "@/components/swap-requests/MatchReviewStep";
 
 import { getRequestWizardSteps, type RequestType } from "./requestWizardSteps";
 
@@ -139,6 +140,15 @@ export default function SwapRequestsClient({
                   setCurrentStepIndex(3);
                 }
               }}
+            />
+          )}
+
+          {currentStepIndex === 3 && matchId && (
+            <MatchReviewStep
+              matchId={matchId}
+              currentUserId={currentUserId}
+              canAdvance={steps.length > 4}
+              onAdvance={() => setCurrentStepIndex(4)}
             />
           )}
 
