@@ -62,7 +62,7 @@ export function getCronSchedulerStatus() {
     
     return {
       enabled: enableScheduler,
-      running: true, // If we can get the scheduler, it's running
+      running: cronScheduler.isRunning(),
       jobs: jobStatus.map(job => ({
         id: job.id,
         name: job.name,

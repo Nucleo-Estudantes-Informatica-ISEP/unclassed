@@ -505,10 +505,11 @@ Before merging changes, run:
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-This repository does not currently expose a formal automated test suite in the checked-in package scripts.
+`pnpm test` runs Node's built-in test runner over every `*.test.ts` file under `src/`. Coverage is still limited to a handful of focused regression tests, not a full suite.
 
 ## Troubleshooting
 

@@ -47,6 +47,7 @@ Node.js `>=20.9.0` required. Prefer `pnpm`; `package-lock.json` is legacy and `p
 pnpm dev        # Next.js development server
 pnpm lint       # ESLint
 pnpm typecheck  # tsc --noEmit
+pnpm test       # node:test over every src/**/*.test.ts, via run-tests.mjs
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
 pnpm sync       # prisma db push to MongoDB
@@ -152,11 +153,12 @@ Before finishing a change:
 
 1. Run `pnpm lint`.
 2. Run `pnpm typecheck`.
-3. Run `pnpm build` for configuration, route, or rendering changes. It can pass with type errors because `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; typecheck is mandatory.
-4. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
-5. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
+3. Run `pnpm test` if you touched or added `*.test.ts` files, or pure logic that should have one.
+4. Run `pnpm build` for configuration, route, or rendering changes. It can pass with type errors because `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; typecheck is mandatory.
+5. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
+6. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
-No committed automated test suite exists yet. Add a focused regression test for non-trivial pure logic or a regression fix; do not claim `pnpm test` exists.
+`pnpm test` runs Node's built-in `node:test` runner (via `ts-node/register/transpile-only`) over every `*.test.ts` file under `src/`, discovered recursively by `run-tests.mjs` at the repo root (kept out of `scripts/`, which is gitignored — see Gotchas). Colocate a test next to the file it covers; follow the `node:test`/`node:assert` style already used in `cronScheduler.test.ts`, not a bare top-level `assert()` script. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
 
 ## Gotchas
 
@@ -165,5 +167,5 @@ No committed automated test suite exists yet. Add a focused regression test for 
 - A green `pnpm build` is not proof of type safety: Next ignores build-time TypeScript errors.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
 - `src/app/api/test-matches/route.ts` and `prisma/reset.ts` are development/destructive surfaces. Treat them as unsafe outside an explicit, confirmed local task.
-- `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
+- `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task — this is why `run-tests.mjs` lives at the repo root instead.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
