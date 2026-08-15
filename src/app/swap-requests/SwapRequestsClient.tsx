@@ -157,25 +157,25 @@ export default function SwapRequestsClient({
             <ContactRevealStep matchId={matchId} currentUserId={currentUserId} />
           )}
 
-          {requestType === "single" && !(currentStepIndex === 2 && trackedRequestId) && (
-            <div className={cn(currentStepIndex === 0 && "hidden")}>
+          {requestType === "single" &&
+            (currentStepIndex === 1 ||
+              (currentStepIndex === 2 && !trackedRequestId)) && (
               <SingleSwapRequestForm
                 step={currentStepIndex === 2 ? "preferences" : "details"}
                 onBack={() => setCurrentStepIndex((step) => step - 1)}
                 onNext={() => setCurrentStepIndex(2)}
               />
-            </div>
-          )}
+            )}
 
-          {requestType === "bundle" && !(currentStepIndex === 2 && trackedRequestId) && (
-            <div className={cn(currentStepIndex === 0 && "hidden")}>
+          {requestType === "bundle" &&
+            (currentStepIndex === 1 ||
+              (currentStepIndex === 2 && !trackedRequestId)) && (
               <BundleSwapRequestForm
                 step={currentStepIndex === 2 ? "preferences" : "details"}
                 onBack={() => setCurrentStepIndex((step) => step - 1)}
                 onNext={() => setCurrentStepIndex(2)}
               />
-            </div>
-          )}
+            )}
         </StepWizard>
 
         <Card className="mt-8">
