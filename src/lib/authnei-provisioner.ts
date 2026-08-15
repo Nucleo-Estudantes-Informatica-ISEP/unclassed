@@ -6,11 +6,11 @@ export async function provisionStudentForNormalOnboarding(
 ): Promise<"already-student" | "provisioned"> {
   if (currentRoles.includes("student")) return "already-student";
 
-  // Company onboarding classifies employee-only identities. Unclassed must not
-  // silently turn that classification into student access.
+  // Company onboarding can classify an identity as employee without student.
+  // Unclassed must not silently turn that classification into student access.
   if (currentRoles.includes("employee")) {
     throw new Error(
-      "AuthNEI employee-only identities cannot be provisioned as students."
+      "AuthNEI identities with employee but without student cannot be provisioned."
     );
   }
 

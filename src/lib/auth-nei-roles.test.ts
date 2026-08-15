@@ -30,10 +30,10 @@ test("accepts ZITADEL project-id and explicitly configured claim variants", () =
   assert.deepEqual(roles, ["student", "nei_member", "employee"]);
 });
 
-test("never provisions an employee-only identity as a student", async () => {
+test("never provisions an employee identity without student", async () => {
   await assert.rejects(
     provisionStudentForNormalOnboarding("employee-subject", ["employee"]),
-    /employee-only identities/
+    /employee but without student/
   );
 });
 
