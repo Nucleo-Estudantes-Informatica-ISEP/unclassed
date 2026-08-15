@@ -187,9 +187,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (session.onboardingCompletedAt === null) {
-      void prisma.user
-        .update({
-          where: { id: session.id },
+      await prisma.user
+        .updateMany({
+          where: { id: session.id, onboardingCompletedAt: null },
           data: { onboardingCompletedAt: new Date() },
         })
         .catch((error) => {
