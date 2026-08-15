@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut, RefreshCw, User } from "lucide-react";
 import { signOut } from "next-auth/react";
-import { LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  signOutFromApp,
+  switchAuthNeiAccount,
+} from "@/lib/client-auth-actions";
 import { Button } from "@/lib/components/ui/button";
 
 interface UserMenuProps {
@@ -54,6 +58,14 @@ export default function UserMenu({ user }: UserMenuProps) {
     }
   };
 
+  const handleAppLogout = async () => {
+    await signOutFromApp("/");
+  };
+
+  const handleSwitchAccount = async () => {
+    await switchAuthNeiAccount("/dashboard");
+  };
+
   // Get initials for avatar
   const initials = user.name
     .split(" ")
@@ -70,15 +82,15 @@ export default function UserMenu({ user }: UserMenuProps) {
         className="relative h-10 w-auto px-2"
         onClick={() => setShowMenu(!showMenu)}
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
+        <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white">
           {initials}
         </div>
         <div className="ml-2 hidden md:flex md:flex-col md:items-start">
           <span className="text-sm font-medium">{user.name}</span>
-          <span className="text-xs text-muted-foreground">{user.email}</span>
+          <span className="text-muted-foreground text-xs">{user.email}</span>
         </div>
         {user.role === "ADMIN" && (
-            <span className="ml-2 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+          <span className="bg-primary/10 text-primary ml-2 rounded-full px-2 py-1 text-xs">
             Admin
           </span>
         )}
@@ -86,17 +98,17 @@ export default function UserMenu({ user }: UserMenuProps) {
 
       {/* Simple Dropdown Menu - Desktop only */}
       {showMenu && (
-        <div className="absolute right-0 top-12 z-50 w-64 rounded-lg border border-border bg-background shadow-lg">
-          <div className="border-b border-border p-3">
+        <div className="border-border bg-background absolute top-12 right-0 z-50 w-64 rounded-lg border shadow-lg">
+          <div className="border-border border-b p-3">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none text-foreground">
+              <p className="text-foreground text-sm leading-none font-medium">
                 {user.name}
               </p>
-              <p className="text-xs leading-none text-muted-foreground">
+              <p className="text-muted-foreground text-xs leading-none">
                 {user.email}
               </p>
               {user.role === "ADMIN" && (
-                <span className="w-fit rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+                <span className="bg-primary/10 text-primary w-fit rounded-full px-2 py-1 text-xs">
                   Admin
                 </span>
               )}
@@ -106,10 +118,26 @@ export default function UserMenu({ user }: UserMenuProps) {
           <div className="p-2">
             <button
               onClick={handleProfile}
-              className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+              className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
             >
               <User className="mr-2 h-4 w-4" />
               <span>Perfil</span>
+            </button>
+
+            <button
+              onClick={handleAppLogout}
+              className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sair apenas do Unclassed</span>
+            </button>
+
+            <button
+              onClick={handleSwitchAccount}
+              className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              <span>Trocar de conta</span>
             </button>
 
             <button
@@ -118,7 +146,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              <span>{isLoggingOut ? "A sair..." : "Sair"}</span>
+              <span>{isLoggingOut ? "A sair..." : "Sair do AuthNEI"}</span>
             </button>
           </div>
         </div>

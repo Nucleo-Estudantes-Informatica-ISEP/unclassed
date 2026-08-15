@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isAdmin } from "@/lib/auth-nei-roles";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
@@ -90,7 +91,7 @@ export async function authorizeRequest(
     };
   }
 
-  if (requireAdmin && session.role !== "ADMIN") {
+  if (requireAdmin && !isAdmin(session)) {
     return {
       ok: false,
       response: NextResponse.json(

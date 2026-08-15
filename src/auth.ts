@@ -2,6 +2,8 @@ import NextAuth from "next-auth";
 import Zitadel from "next-auth/providers/zitadel";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
+import { getAuthNeiRoles, isAdmin, isStudent } from "@/lib/auth-nei-roles";
+import { provisionStudentForNormalOnboarding } from "@/lib/authnei-provisioner";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 
 function getClaim(
@@ -57,7 +59,11 @@ const isProductionBuild =
   process.env.NEXT_PHASE === "phase-production-build" ||
   process.env.npm_lifecycle_event === "build";
 
-if (!authConfigured && process.env.NODE_ENV === "production" && !isProductionBuild) {
+if (
+  !authConfigured &&
+  process.env.NODE_ENV === "production" &&
+  !isProductionBuild
+) {
   throw new Error(
     `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
   );
@@ -109,7 +115,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false;
       }
 
-      return true;
+      const sub = getClaim(claims, "sub") || account.providerAccountId || null;
+      if (!sub) return false;
+
+      try {
+        const result = await provisionStudentForNormalOnboarding(
+          sub,
+          getAuthNeiRoles(claims)
+        );
+        // Do not authorize from a locally injected role: the current token was
+        // issued before the grant. A second SSO round-trip obtains fresh claims.
+        return result === "provisioned"
+          ? "/login?studentProvisioned=true"
+          : true;
+      } catch (error) {
+        if (authDebugEnabled) {
+          console.warn("[auth][provisioning]", {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unknown provisioning failure",
+          });
+        }
+        return false;
+      }
     },
     async jwt({ token, account, profile, trigger }) {
       if (
@@ -151,6 +180,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         throw new Error("OIDC login did not include a subject claim.");
       }
 
+      const authNeiRoles = getAuthNeiRoles(claims);
+      if (!isStudent({ authNeiRoles })) {
+        throw new Error(
+          "OIDC login did not include the required student role."
+        );
+      }
+
       const localUser = await syncLocalUserFromOidc({
         sub,
         email: getClaim(claims, "email") || token.email,
@@ -159,7 +195,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
 
       token.localUserId = localUser.id;
-      token.role = localUser.role;
+      token.authNeiRoles = authNeiRoles;
+      token.role = isAdmin({ authNeiRoles }) ? "ADMIN" : "USER";
       token.zitadelSub = sub;
       token.name = localUser.name;
       token.email = localUser.email;
@@ -183,6 +220,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ...session.user,
         id: token.localUserId as string,
         role: token.role as "USER" | "ADMIN",
+        roles: token.authNeiRoles ?? [],
         zitadelSub: token.zitadelSub as string,
         name: (token.name as string) || session.user?.name,
         email: (token.email as string) || session.user?.email,

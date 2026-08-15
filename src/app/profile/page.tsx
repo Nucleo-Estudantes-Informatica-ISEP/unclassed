@@ -1,13 +1,14 @@
-import { redirect } from 'next/navigation';
-import getServerSession from '@/services/getServerSession';
-import { ProfileClient } from '@/components/ProfileClient';
-import prisma from '@/lib/prisma';
+import { redirect } from "next/navigation";
+
+import prisma from "@/lib/prisma";
+import getServerSession from "@/services/getServerSession";
+import { ProfileClient } from "@/components/ProfileClient";
 
 export default async function ProfilePage() {
   const session = await getServerSession();
 
   if (!session) {
-    redirect('/login');
+    redirect("/login");
   }
 
   // Get user preferences
@@ -18,30 +19,29 @@ export default async function ProfilePage() {
       name: true,
       email: true,
       phone: true,
-      role: true,
       emailVerified: true,
       emailNotifications: true,
-      sharePhoneOnMatch: true
-    }
+      sharePhoneOnMatch: true,
+    },
   });
 
   if (!user) {
-    redirect('/login');
+    redirect("/login");
   }
 
   return (
-    <ProfileClient 
+    <ProfileClient
       user={{
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: session.role,
       }}
       preferences={{
         phone: user.phone,
         emailNotifications: user.emailNotifications,
         emailVerified: user.emailVerified,
-        sharePhoneOnMatch: user.sharePhoneOnMatch
+        sharePhoneOnMatch: user.sharePhoneOnMatch,
       }}
     />
   );

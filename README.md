@@ -130,6 +130,9 @@ The main variables are:
 | `AUTH_CLIENT_ID` | Yes | OIDC client ID |
 | `AUTH_CLIENT_SECRET` | Yes | OIDC client secret |
 | `AUTH_SCOPES` | Usually | OIDC scopes, default is `openid email profile` |
+| `AUTH_ROLE_CLAIM` | No | Override for the shared-project ZITADEL role claim |
+| `AUTHNEI_PROVISIONER_URL` | For unclassified users | Server-only AuthNEI Role Provisioner base URL |
+| `AUTHNEI_PROVISIONER_TOKEN` | For unclassified users | Server-only provisioner caller credential |
 | `AUTH_SECRET` | Yes | NextAuth secret |
 | `AUTH_POST_LOGOUT_REDIRECT_URI` | Yes | Redirect target after sign-out |
 | `AUTH_TRUST_HOST` | Depends | Enable only behind a trusted proxy |
@@ -569,3 +572,26 @@ Check:
 - `ENABLE_CRON_SCHEDULER` matches the deployment model
 - Health checks are wired to `/api/health`
 - Admin access is available for cron and matching supervision
+
+## AuthNEI shared-project authorization
+
+Unclassed consumes the shared NEI Platform project roles and normalizes them to `student`,
+`nei_member`, `admin`, and `employee`. Normal application access requires `student`; administration
+requires `admin`. The existing `User.role` field remains as migration compatibility data only.
+Runtime `USER`/`ADMIN` projections and all server authorization decisions are derived from the
+signed Auth.js session's AuthNEI roles.
+
+`UserIdentity(provider, providerSubject)` remains the stable link to the AuthNEI `sub`. A first
+Unclassed login without `student` calls the fixed, server-only
+`POST /roles/ensure-student` provisioner operation before creating/linking local data. Configure
+`AUTHNEI_PROVISIONER_URL` and `AUTHNEI_PROVISIONER_TOKEN` in the deployment secret manager to
+support unclassified users. The client cannot submit an arbitrary role, and failures stop login.
+An `employee`-only identity is already classified and is denied rather than automatically receiving
+`student`; an identity that legitimately already has both roles keeps both.
+After a successful grant, Unclassed cancels the stale pre-grant login and requires one new SSO
+round-trip. It never authorizes a session by locally injecting `student` into old token claims.
+
+Normal login allows AuthNEI SSO without forcing an account picker. User menus expose app-only
+logout, explicit account switching with `prompt=select_account`, and central AuthNEI logout.
+`AUTH_ROLE_CLAIM` optionally overrides the standard
+`urn:zitadel:iam:org:project:roles` claim name.
