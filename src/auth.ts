@@ -4,6 +4,7 @@ import Zitadel from "next-auth/providers/zitadel";
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { getAuthNeiRoles, isAdmin, isStudent } from "@/lib/auth-nei-roles";
 import { provisionStudentForNormalOnboarding } from "@/lib/authnei-provisioner";
+import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 
 function getClaim(
@@ -12,23 +13,6 @@ function getClaim(
 ): string | null {
   const value = claims?.[key];
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function parseBooleanEnv(value: string | undefined, defaultValue: boolean) {
-  if (typeof value !== "string") {
-    return defaultValue;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "true") {
-    return true;
-  }
-
-  if (normalized === "false") {
-    return false;
-  }
-
-  return defaultValue;
 }
 
 function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
@@ -40,13 +24,8 @@ function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
 
   if (typeof raw === "string") {
     const normalized = raw.trim().toLowerCase();
-    if (normalized === "true") {
-      return true;
-    }
-
-    if (normalized === "false") {
-      return false;
-    }
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
   }
 
   return undefined;
@@ -54,16 +33,12 @@ function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
 
 const missingAuthEnvVars = getMissingAuthEnvVars();
 const authConfigured = isAuthConfigured();
-const authDebugEnabled = process.env.AUTH_DEBUG === "true";
+const authDebugEnabled = env.AUTH_DEBUG;
 const isProductionBuild =
-  process.env.NEXT_PHASE === "phase-production-build" ||
-  process.env.npm_lifecycle_event === "build";
+  env.NEXT_PHASE === "phase-production-build" ||
+  env.npm_lifecycle_event === "build";
 
-if (
-  !authConfigured &&
-  process.env.NODE_ENV === "production" &&
-  !isProductionBuild
-) {
+if (!authConfigured && env.NODE_ENV === "production" && !isProductionBuild) {
   throw new Error(
     `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
   );
@@ -73,17 +48,11 @@ const providers = authConfigured
   ? [
       {
         ...Zitadel({
-          issuer: process.env.AUTH_ISSUER_URL,
-          clientId: process.env.AUTH_CLIENT_ID,
-          clientSecret: process.env.AUTH_CLIENT_SECRET,
-          authorization: {
-            params: {
-              scope: process.env.AUTH_SCOPES || "openid email profile",
-            },
-          },
+          issuer: env.AUTH_ISSUER_URL,
+          clientId: env.AUTH_CLIENT_ID,
+          clientSecret: env.AUTH_CLIENT_SECRET,
+          authorization: { params: { scope: env.AUTH_SCOPES } },
         }),
-        // ZITADEL may omit profile/email claims from the ID token when an
-        // access token is issued. Fetch user data from userinfo instead.
         idToken: false,
       },
     ]
@@ -91,24 +60,16 @@ const providers = authConfigured
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
-  trustHost: parseBooleanEnv(process.env.AUTH_TRUST_HOST, false),
-  secret: process.env.AUTH_SECRET,
-  pages: {
-    signIn: "/login",
-  },
-  session: {
-    strategy: "jwt",
-  },
+  trustHost: env.AUTH_TRUST_HOST,
+  secret: env.AUTH_SECRET,
+  pages: { signIn: "/login" },
+  session: { strategy: "jwt" },
   callbacks: {
     async signIn({ account, profile }) {
-      if (account?.provider !== "zitadel") {
-        return true;
-      }
+      if (account?.provider !== "zitadel") return true;
 
       const claims = (profile ?? {}) as Record<string, unknown>;
-      const emailVerified = parseEmailVerifiedClaim(claims);
-
-      if (emailVerified !== true) {
+      if (parseEmailVerifiedClaim(claims) !== true) {
         console.warn(
           "Blocking ZITADEL sign-in because email_verified claim is missing or false."
         );
@@ -121,10 +82,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const result = await provisionStudentForNormalOnboarding(
           sub,
-          getAuthNeiRoles(claims)
+          getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM)
         );
-        // Do not authorize from a locally injected role: the current token was
-        // issued before the grant. A second SSO round-trip obtains fresh claims.
         return result === "provisioned"
           ? "/login?studentProvisioned=true"
           : true;
@@ -141,10 +100,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     },
     async jwt({ token, account, profile, trigger }) {
-      if (
-        typeof account?.id_token === "string" &&
-        account.id_token.length > 0
-      ) {
+      if (typeof account?.id_token === "string" && account.id_token.length > 0) {
         token.idTokenHint = account.id_token;
         token.idToken = account.id_token;
       }
@@ -165,9 +121,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
       }
 
-      if (!account || !profile) {
-        return token;
-      }
+      if (!account || !profile) return token;
 
       const claims = profile as Record<string, unknown>;
       const sub =
@@ -180,11 +134,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         throw new Error("OIDC login did not include a subject claim.");
       }
 
-      const authNeiRoles = getAuthNeiRoles(claims);
+      const authNeiRoles = getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM);
       if (!isStudent({ authNeiRoles })) {
-        throw new Error(
-          "OIDC login did not include the required student role."
-        );
+        throw new Error("OIDC login did not include the required student role.");
       }
 
       const localUser = await syncLocalUserFromOidc({

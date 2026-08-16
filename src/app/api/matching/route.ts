@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       requireAdmin: true,
       allowCronSecret: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "matching",
     });
 
     if (!authResult.ok) {
@@ -82,6 +83,7 @@ export async function PUT(request: NextRequest) {
       requireAdmin: true,
       allowCronSecret: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "batch",
     });
 
     if (!authResult.ok) {
@@ -126,6 +128,7 @@ export async function GET(request: NextRequest) {
     const authResult = await authorizeRequest(request, {
       requireAdmin: true,
       allowCronSecret: true,
+      rateLimit: "stats",
     });
 
     if (!authResult.ok) {

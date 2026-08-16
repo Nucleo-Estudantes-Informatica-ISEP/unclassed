@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAdmin } from "@/lib/auth-nei-roles";
+import { env } from "@/lib/env";
 import { validateOrigin } from "@/lib/originValidation";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
+import {
+  checkRateLimit,
+  resolveRateLimitIdentifier,
+  type RateLimitPolicy,
+} from "@/services/rateLimit";
 
 export { validateOrigin } from "@/lib/originValidation";
 
@@ -30,6 +36,7 @@ type AuthorizationOptions = {
   requireAdmin?: boolean;
   allowCronSecret?: boolean;
   enforceSameOriginForSessionWrites?: boolean;
+  rateLimit?: RateLimitPolicy;
 };
 
 type SessionAuthorizationOptions = AuthorizationOptions & {
@@ -45,8 +52,39 @@ function isSafeMethod(method: string) {
   return method === "GET" || method === "HEAD" || method === "OPTIONS";
 }
 
+async function enforceRateLimit(
+  request: NextRequest,
+  policy: RateLimitPolicy,
+  identity: { sessionId?: string; authenticatedBy?: "cron" }
+): Promise<AuthorizationFailure | null> {
+  const result = await checkRateLimit(
+    policy,
+    resolveRateLimitIdentifier({ ...identity, headers: request.headers })
+  );
+
+  if (result.allowed) return null;
+
+  return {
+    ok: false,
+    response: NextResponse.json(
+      {
+        error: "Limite de pedidos excedido",
+        retryAfter: result.retryAfter,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(result.retryAfter),
+          "X-RateLimit-Limit": String(result.limit),
+          "X-RateLimit-Remaining": String(result.remaining),
+        },
+      }
+    ),
+  };
+}
+
 export function hasValidCronSecret(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
   return Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
@@ -67,25 +105,30 @@ export async function authorizeRequest(
     requireAdmin = false,
     allowCronSecret = false,
     enforceSameOriginForSessionWrites = false,
+    rateLimit,
   }: AuthorizationOptions = {}
 ): Promise<AuthorizationSuccess | AuthorizationFailure> {
   if (allowCronSecret && hasValidCronSecret(request)) {
-    return {
-      ok: true,
-      authenticatedBy: "cron",
-      session: null,
-    };
+    if (rateLimit) {
+      const limited = await enforceRateLimit(request, rateLimit, {
+        authenticatedBy: "cron",
+      });
+      if (limited) return limited;
+    }
+
+    return { ok: true, authenticatedBy: "cron", session: null };
   }
 
   const session = await getServerSession().catch(() => null);
 
   if (!session) {
+    if (rateLimit) {
+      const limited = await enforceRateLimit(request, rateLimit, {});
+      if (limited) return limited;
+    }
+
     if (!requireAuth && !requireAdmin) {
-      return {
-        ok: true,
-        authenticatedBy: "public",
-        session: null,
-      };
+      return { ok: true, authenticatedBy: "public", session: null };
     }
 
     return {
@@ -118,9 +161,12 @@ export async function authorizeRequest(
     };
   }
 
-  return {
-    ok: true,
-    authenticatedBy: "session",
-    session,
-  };
+  if (rateLimit) {
+    const limited = await enforceRateLimit(request, rateLimit, {
+      sessionId: session.id,
+    });
+    if (limited) return limited;
+  }
+
+  return { ok: true, authenticatedBy: "session", session };
 }

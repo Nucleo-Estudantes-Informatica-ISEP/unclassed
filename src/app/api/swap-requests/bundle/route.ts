@@ -4,14 +4,12 @@ import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
+import { bundleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
-
-const createBundleSwapRequestSchema = z.object({
-  currentClassId: z.string(),
-  preferredClassIds: z.array(z.string()).min(1),
-  preferenceOrderMatters: z.boolean().default(true),
-});
+import { buildPartitionKey } from "@/services/partitionKey";
+import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
+import { toBundleSwapRequestDto } from "@/services/swapRequestDto";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -65,7 +63,7 @@ export async function GET(request: NextRequest) {
           where: { id: { in: request.preferredClassIds } },
           select: { id: true, name: true, year: true },
         });
-        return { ...request, preferredClasses };
+        return toBundleSwapRequestDto(request, preferredClasses);
       })
     );
 
@@ -83,6 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await authorizeRequest(request, {
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "create",
     });
     if (!authResult.ok) {
       return authResult.response;
@@ -90,7 +89,10 @@ export async function POST(request: NextRequest) {
     const { session } = authResult;
 
     const body = await request.json();
-    const validatedData = createBundleSwapRequestSchema.parse(body);
+    const validatedData = bundleSwapRequestSchema.parse({
+      preferenceOrderMatters: true,
+      ...body,
+    });
 
     // Verify the classes exist
     const [currentClass, preferredClasses] = await Promise.all([
@@ -163,7 +165,10 @@ export async function POST(request: NextRequest) {
         ticketType: "ALL_CLASSES",
         priority: 1, // Default priority
         status: "ACTIVE",
-        graphPartition: `year-${currentClass.year}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "ALL_CLASSES",
+          year: currentClass.year,
+        }),
       },
       include: {
         user: {
@@ -199,8 +204,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        ...swapRequest,
-        preferredClasses: preferredClassesInfo,
+        ...toBundleSwapRequestDto(swapRequest, preferredClassesInfo),
         message:
           "Pedido de permuta completa criado! A procurar matches imediatos...",
       },
@@ -208,6 +212,15 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating bundle swap request:", error);
+
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        {
+          error: "Já tens um pedido de permuta completa ativo para esta turma",
+        },
+        { status: 409 }
+      );
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

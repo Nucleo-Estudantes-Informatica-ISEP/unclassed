@@ -1,4 +1,5 @@
 import type { AuthNeiRole } from "@/lib/auth-nei-roles";
+import { env } from "@/lib/env";
 
 export async function provisionStudentForNormalOnboarding(
   subject: string,
@@ -14,11 +15,8 @@ export async function provisionStudentForNormalOnboarding(
     );
   }
 
-  const baseUrl = process.env.AUTHNEI_PROVISIONER_URL?.trim().replace(
-    /\/+$/,
-    ""
-  );
-  const serviceToken = process.env.AUTHNEI_PROVISIONER_TOKEN?.trim();
+  const baseUrl = env.AUTHNEI_PROVISIONER_URL?.replace(/\/+$/, "");
+  const serviceToken = env.AUTHNEI_PROVISIONER_TOKEN;
 
   if (!baseUrl || !serviceToken) {
     throw new Error(
@@ -27,7 +25,7 @@ export async function provisionStudentForNormalOnboarding(
   }
 
   const url = new URL(`${baseUrl}/roles/ensure-student`);
-  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+  if (env.NODE_ENV === "production" && url.protocol !== "https:") {
     throw new Error("AUTHNEI_PROVISIONER_URL must use HTTPS in production.");
   }
 

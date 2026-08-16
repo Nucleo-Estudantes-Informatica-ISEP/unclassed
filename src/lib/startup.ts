@@ -6,6 +6,7 @@
  */
 
 import { initializeCronScheduler } from './cronInit';
+import { env } from './env';
 
 let isInitialized = false;
 
@@ -29,7 +30,7 @@ export function initializeApplication(): void {
   } catch (error) {
     console.error('❌ Application initialization failed:', error);
     // Don't exit in production, just log the error
-    if (process.env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production') {
       process.exit(1);
     }
   }
@@ -40,15 +41,4 @@ export function initializeApplication(): void {
  */
 export function isAppInitialized(): boolean {
   return isInitialized;
-}
-
-// Auto-initialize on import in production or when explicitly enabled
-if (process.env.NODE_ENV === 'production' || process.env.ENABLE_CRON_SCHEDULER === 'true') {
-  // Use setTimeout to ensure this runs after all modules are loaded
-  setTimeout(() => {
-    if (!isInitialized) {
-      console.log('🔄 Auto-initializing application...');
-      initializeApplication();
-    }
-  }, 1000);
 }
