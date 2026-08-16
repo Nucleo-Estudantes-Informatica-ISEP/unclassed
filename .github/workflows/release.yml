@@ -8,14 +8,11 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/release.yml"
+  workflow_dispatch:
 
 concurrency:
   group: release-main
   cancel-in-progress: false
-
-env:
-  PRODUCT_NAME: Unclassed
-  BOOTSTRAP_SHA: d43a4be455be4ce6302a5fa13cf518e766ee3c3b
 
 jobs:
   validate-release-label:
@@ -39,7 +36,7 @@ jobs:
             }
 
   bootstrap-v2:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,12 +44,10 @@ jobs:
     steps:
       - name: Publish v2 baseline and create release labels
         uses: actions/github-script@v9
-        env:
-          BOOTSTRAP_SHA: ${{ env.BOOTSTRAP_SHA }}
         with:
           script: |
             const { owner, repo } = context.repo;
-            const bootstrapSha = process.env.BOOTSTRAP_SHA;
+            const bootstrapSha = "d43a4be455be4ce6302a5fa13cf518e766ee3c3b";
             const v2Tag = "v2.0.0";
             const refs = await github.paginate(github.rest.git.listMatchingRefs, { owner, repo, ref: "tags/", per_page: 100 });
             const releaseLabels = [
@@ -107,10 +102,10 @@ From this release onward, PRs into \`main\` select exactly one semantic-version 
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
-          PRODUCT_NAME: ${{ env.PRODUCT_NAME }}
         with:
           script: |
             const { owner, repo } = context.repo;
+            const productName = "Unclassed";
             const releaseLabels = ["release:major", "release:minor", "release:patch"];
             const labels = JSON.parse(process.env.LABELS_JSON || "[]");
             const selected = labels.filter((label) => releaseLabels.includes(label));
@@ -133,9 +128,4 @@ From this release onward, PRs into \`main\` select exactly one semantic-version 
             const mergeSha = process.env.MERGE_SHA;
             const notes = await github.rest.repos.generateReleaseNotes({ owner, repo, tag_name: nextTag, target_commitish: mergeSha, previous_tag_name: latest.name });
             await github.rest.git.createRef({ owner, repo, ref: `refs/tags/${nextTag}`, sha: mergeSha });
-            await github.rest.repos.createRelease({
-              owner, repo, tag_name: nextTag, target_commitish: mergeSha,
-              name: `${process.env.PRODUCT_NAME} ${nextTag}`,
-              body: `Released automatically from PR #${process.env.PR_NUMBER}: ${process.env.PR_TITLE}.\n\n${notes.data.body}`,
-              draft: false, prerelease: false, make_latest: "true",
-            });
+            await github.rest.repos.createRelease({ owner, repo, tag_name: nextTag, target_commitish: mergeSha, name: `${productName} ${nextTag}`, body: `Released automatically from PR #${process.env.PR_NUMBER}: ${process.env.PR_TITLE}.\n\n${notes.data.body}`, draft: false, prerelease: false, make_latest: "true" });
