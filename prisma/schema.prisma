@@ -25,6 +25,7 @@ model User {
   emailNotifications      Boolean             @default(true) // Match notifications
   sharePhoneOnMatch       Boolean             @default(false) // Share phone number with match partners
   createdAt               DateTime            @default(now())
+  onboardingCompletedAt   DateTime?
   role                    Role                @default(USER)
   identities              UserIdentity[]
   singleSwapRequests      SingleSwapRequest[]
