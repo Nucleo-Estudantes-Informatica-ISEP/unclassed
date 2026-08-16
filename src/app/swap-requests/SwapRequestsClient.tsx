@@ -11,7 +11,11 @@ import {
   CardTitle,
 } from "@/lib/components/ui/card";
 import { cn } from "@/lib/utils";
-import { StepWizard, WizardNavigation } from "@/components/ui/step-wizard";
+import {
+  StepWizard,
+  WizardNavigation,
+  type WizardGuidanceMode,
+} from "@/components/ui/step-wizard";
 import BundleSwapRequestForm from "@/components/forms/BundleSwapRequestForm";
 import SingleSwapRequestForm from "@/components/forms/SingleSwapRequestForm";
 import { RequestStatusPanel } from "@/components/swap-requests/RequestStatusPanel";
@@ -38,10 +42,12 @@ const requestTypes = [
 
 interface SwapRequestsClientProps {
   currentUserId: string;
+  initialGuidanceMode: WizardGuidanceMode;
 }
 
 export default function SwapRequestsClient({
   currentUserId,
+  initialGuidanceMode,
 }: SwapRequestsClientProps) {
   const searchParams = useSearchParams();
   const [requestType, setRequestType] = useState<RequestType | null>(null);
@@ -83,7 +89,11 @@ export default function SwapRequestsClient({
           </p>
         </div>
 
-        <StepWizard steps={steps} currentStepId={currentStep.id}>
+        <StepWizard
+          steps={steps}
+          currentStepId={currentStep.id}
+          initialGuidanceMode={initialGuidanceMode}
+        >
           {currentStepIndex === 0 && (
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">

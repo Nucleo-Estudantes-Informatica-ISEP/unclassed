@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, Check } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Check, CircleHelp, EyeOff } from "lucide-react";
 
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -13,30 +14,38 @@ import {
 import { Progress } from "@/lib/components/ui/progress";
 import { cn } from "@/lib/utils";
 
+export type WizardGuidanceMode = "guided" | "basic";
+
 export interface WizardStep {
   id: string;
   label: string;
   title: string;
   description: string;
+  guidance: string;
 }
 
 interface StepWizardProps {
   steps: WizardStep[];
   currentStepId: string;
+  initialGuidanceMode?: WizardGuidanceMode;
   children: React.ReactNode;
 }
 
 export function StepWizard({
   steps,
   currentStepId,
+  initialGuidanceMode = "basic",
   children,
 }: StepWizardProps) {
+  const [guidanceMode, setGuidanceMode] =
+    useState<WizardGuidanceMode>(initialGuidanceMode);
   const currentStepIndex = Math.max(
     steps.findIndex((step) => step.id === currentStepId),
     0
   );
   const currentStep = steps[currentStepIndex];
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  const guidanceVisible = guidanceMode === "guided";
 
   return (
     <Card className="w-full">
@@ -95,12 +104,49 @@ export function StepWizard({
           })}
         </ol>
 
-        <div>
-          <CardTitle>{currentStep.title}</CardTitle>
-          <CardDescription className="mt-2">
-            {currentStep.description}
-          </CardDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{currentStep.title}</CardTitle>
+            <CardDescription className="mt-2">
+              {currentStep.description}
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0 self-start"
+            onClick={() =>
+              setGuidanceMode((mode) =>
+                mode === "guided" ? "basic" : "guided"
+              )
+            }
+            aria-pressed={guidanceVisible}
+          >
+            {guidanceVisible ? (
+              <EyeOff aria-hidden="true" />
+            ) : (
+              <CircleHelp aria-hidden="true" />
+            )}
+            {guidanceVisible ? "Ignorar ajuda" : "Mostrar ajuda"}
+          </Button>
         </div>
+
+        {guidanceVisible && (
+          <div
+            className="border-primary/20 bg-primary/5 rounded-lg border p-4"
+            role="note"
+            aria-label="Ajuda deste passo"
+          >
+            <div className="text-primary flex items-center gap-2 text-sm font-semibold">
+              <CircleHelp className="size-4" aria-hidden="true" />
+              Ajuda deste passo
+            </div>
+            <p className="text-muted-foreground mt-2 text-sm leading-6">
+              {currentStep.guidance}
+            </p>
+          </div>
+        )}
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>

@@ -20,3 +20,17 @@ test("resolves branch-specific request wizard steps", () => {
   assert.equal(singleSteps[3], bundleSteps[3]);
   assert.equal(singleSteps[4], bundleSteps[4]);
 });
+
+test("provides guidance for every wizard step and keeps branch-specific help", () => {
+  const pendingSteps = getRequestWizardSteps(null);
+  const singleSteps = getRequestWizardSteps("single");
+  const bundleSteps = getRequestWizardSteps("bundle");
+
+  for (const step of [...pendingSteps, ...singleSteps, ...bundleSteps]) {
+    assert.ok(step.guidance.trim().length > 0, `${step.id} should have guidance`);
+  }
+
+  assert.match(singleSteps[1].guidance, /disciplina/i);
+  assert.match(bundleSteps[1].guidance, /troca completa/i);
+  assert.notEqual(singleSteps[1].guidance, bundleSteps[1].guidance);
+});
