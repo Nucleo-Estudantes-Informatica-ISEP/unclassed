@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+import { buildPartitionKey } from "../src/services/partitionKey";
+
 const prisma = new PrismaClient();
 
 // Subject data from ISEP courses
@@ -187,7 +189,10 @@ async function main() {
         status: "ACTIVE",
         ticketType: "SPECIFIC_CLASS",
         priority: 1,
-        graphPartition: `subject-${subject.id}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "SPECIFIC_CLASS",
+          subjectId: subject.id,
+        }),
       },
     });
   }
@@ -207,7 +212,10 @@ async function main() {
         status: "ACTIVE",
         ticketType: "ALL_CLASSES",
         priority: 1,
-        graphPartition: `year-${currentClass.year}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "ALL_CLASSES",
+          year: currentClass.year,
+        }),
       },
     });
   }*/

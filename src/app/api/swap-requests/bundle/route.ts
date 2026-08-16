@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { bundleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
+import { buildPartitionKey } from "@/services/partitionKey";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -161,7 +162,10 @@ export async function POST(request: NextRequest) {
         ticketType: "ALL_CLASSES",
         priority: 1, // Default priority
         status: "ACTIVE",
-        graphPartition: `year-${currentClass.year}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "ALL_CLASSES",
+          year: currentClass.year,
+        }),
       },
       include: {
         user: {

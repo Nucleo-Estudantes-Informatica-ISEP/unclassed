@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
+import { buildPartitionKey } from "./partitionKey";
 
 // ===== INTERFACES =====
 
@@ -608,13 +609,19 @@ export class AdvancedMatchingService {
     let year: number | undefined;
 
     if (request.requestType === "single") {
+      if (!request.subjectId) {
+        throw new Error(`Subject missing for request ${request.requestId}`);
+      }
       // Get subject info
       const subject = await prisma.subject.findUnique({
         where: { id: request.subjectId },
         select: { id: true, year: true },
       });
 
-      partitionKey = `subject-${request.subjectId}`;
+      partitionKey = buildPartitionKey({
+        ticketType: "SPECIFIC_CLASS",
+        subjectId: request.subjectId,
+      });
       ticketType = "SPECIFIC_CLASS";
       subjectId = request.subjectId;
       year = subject?.year ?? undefined;
@@ -625,7 +632,13 @@ export class AdvancedMatchingService {
         select: { year: true },
       });
 
-      partitionKey = `year-${currentClass?.year as number | undefined}`;
+      if (!currentClass) {
+        throw new Error(`Current class ${request.currentClassId} not found`);
+      }
+      partitionKey = buildPartitionKey({
+        ticketType: "ALL_CLASSES",
+        year: currentClass.year,
+      });
       ticketType = "ALL_CLASSES";
       year = currentClass?.year ?? undefined;
     }

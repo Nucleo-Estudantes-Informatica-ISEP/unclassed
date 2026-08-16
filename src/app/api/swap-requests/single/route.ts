@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
+import { buildPartitionKey } from "@/services/partitionKey";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -161,7 +162,10 @@ export async function POST(request: NextRequest) {
         ticketType: "SPECIFIC_CLASS",
         priority: 1, // Default priority
         status: "ACTIVE",
-        graphPartition: `subject-${validatedData.subjectId}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "SPECIFIC_CLASS",
+          subjectId: validatedData.subjectId,
+        }),
       },
       include: {
         user: {
