@@ -22,6 +22,16 @@ const preferenceStep: WizardStep = {
     "Adiciona todas as turmas para as quais aceitarias mudar. Se a ordem importar, coloca primeiro as preferidas; quanto mais opções deres, maior a hipótese de o sistema encontrar uma permuta compatível.",
 };
 
+const statusStep: WizardStep = {
+  id: "status",
+  label: "Estado",
+  title: "Acompanha o teu pedido",
+  description:
+    "O pedido foi criado. Aqui podes acompanhar o estado enquanto o sistema procura uma permuta compatível.",
+  guidance:
+    "Não precisas de manter esta página aberta. Podes voltar mais tarde através do mesmo pedido; quando surgir um match, o wizard leva-te para a revisão da proposta.",
+};
+
 const matchStep: WizardStep = {
   id: "match",
   label: "Match",
@@ -73,12 +83,13 @@ const pendingDetailStep: WizardStep = {
 };
 
 export function getRequestWizardSteps(
-  requestType: RequestType | null
+  requestType: RequestType | null,
+  trackingRequest = false
 ): WizardStep[] {
   return [
     typeStep,
     requestType ? detailSteps[requestType] : pendingDetailStep,
-    preferenceStep,
+    trackingRequest ? statusStep : preferenceStep,
     matchStep,
     contactStep,
   ];

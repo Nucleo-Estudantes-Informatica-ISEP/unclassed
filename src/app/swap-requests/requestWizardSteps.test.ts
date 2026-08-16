@@ -21,16 +21,33 @@ test("resolves branch-specific request wizard steps", () => {
   assert.equal(singleSteps[4], bundleSteps[4]);
 });
 
+test("switches the third wizard step to request status after submission", () => {
+  const trackedSteps = getRequestWizardSteps("single", true);
+
+  assert.deepEqual(
+    trackedSteps.map((step) => step.id),
+    ["type", "single-details", "status", "match", "contact"]
+  );
+  assert.match(trackedSteps[2].title, /acompanha/i);
+});
+
 test("provides guidance for every wizard step and keeps branch-specific help", () => {
   const pendingSteps = getRequestWizardSteps(null);
   const singleSteps = getRequestWizardSteps("single");
   const bundleSteps = getRequestWizardSteps("bundle");
+  const trackedSteps = getRequestWizardSteps("single", true);
 
-  for (const step of [...pendingSteps, ...singleSteps, ...bundleSteps]) {
+  for (const step of [
+    ...pendingSteps,
+    ...singleSteps,
+    ...bundleSteps,
+    ...trackedSteps,
+  ]) {
     assert.ok(step.guidance.trim().length > 0, `${step.id} should have guidance`);
   }
 
   assert.match(singleSteps[1].guidance, /disciplina/i);
   assert.match(bundleSteps[1].guidance, /troca completa/i);
   assert.notEqual(singleSteps[1].guidance, bundleSteps[1].guidance);
+  assert.match(trackedSteps[2].guidance, /voltar mais tarde/i);
 });

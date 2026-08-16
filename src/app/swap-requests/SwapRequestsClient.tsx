@@ -56,7 +56,7 @@ export default function SwapRequestsClient({
     null
   );
   const [matchId, setMatchId] = useState<string | null>(null);
-  const steps = getRequestWizardSteps(requestType);
+  const steps = getRequestWizardSteps(requestType, Boolean(trackedRequestId));
   const currentStep = steps[currentStepIndex];
 
   // Restore an in-progress/completed request from its bookmarkable URL
