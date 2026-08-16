@@ -4,6 +4,10 @@ import { validateOrigin } from "@/lib/originValidation";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
+import {
+  checkRateLimit,
+  type RateLimitPolicy,
+} from "@/services/rateLimit";
 
 export { validateOrigin } from "@/lib/originValidation";
 
@@ -29,6 +33,7 @@ type AuthorizationOptions = {
   requireAdmin?: boolean;
   allowCronSecret?: boolean;
   enforceSameOriginForSessionWrites?: boolean;
+  rateLimit?: RateLimitPolicy;
 };
 
 type SessionAuthorizationOptions = AuthorizationOptions & {
@@ -66,8 +71,38 @@ export async function authorizeRequest(
     requireAdmin = false,
     allowCronSecret = false,
     enforceSameOriginForSessionWrites = false,
+    rateLimit,
   }: AuthorizationOptions = {}
 ): Promise<AuthorizationSuccess | AuthorizationFailure> {
+  if (rateLimit) {
+    const identifier =
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-real-ip") ||
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      "unknown";
+    const rateLimitResult = await checkRateLimit(rateLimit, identifier);
+
+    if (!rateLimitResult.allowed) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            error: "Limite de pedidos excedido",
+            retryAfter: rateLimitResult.retryAfter,
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(rateLimitResult.retryAfter),
+              "X-RateLimit-Limit": String(rateLimitResult.limit),
+              "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+            },
+          }
+        ),
+      };
+    }
+  }
+
   if (allowCronSecret && hasValidCronSecret(request)) {
     return {
       ok: true,

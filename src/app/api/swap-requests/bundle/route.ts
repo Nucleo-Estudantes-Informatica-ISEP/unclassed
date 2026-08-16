@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await authorizeRequest(request, {
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "create",
     });
     if (!authResult.ok) {
       return authResult.response;

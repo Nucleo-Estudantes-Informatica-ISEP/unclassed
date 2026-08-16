@@ -24,6 +24,7 @@ async function handleBatchMatching(
       requireAdmin: true,
       allowCronSecret: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "batch",
     });
 
     if (!authResult.ok) {

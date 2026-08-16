@@ -10,7 +10,10 @@ import { getCronScheduler } from "@/services/cronScheduler";
  */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await authorizeRequest(request, { requireAdmin: true });
+    const authResult = await authorizeRequest(request, {
+      requireAdmin: true,
+      rateLimit: "stats",
+    });
     if (!authResult.ok) {
       return authResult.response;
     }
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
     const authResult = await authorizeRequest(request, {
       requireAdmin: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "batch",
     });
     if (!authResult.ok) {
       return authResult.response;

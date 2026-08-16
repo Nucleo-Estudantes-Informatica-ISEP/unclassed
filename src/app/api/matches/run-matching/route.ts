@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     const authResult = await authorizeRequest(request, {
       requireAdmin: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "batch",
     });
     if (!authResult.ok) {
       return authResult.response;
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await authorizeRequest(request);
+    const authResult = await authorizeRequest(request, { rateLimit: "stats" });
     if (!authResult.ok) {
       return authResult.response;
     }
