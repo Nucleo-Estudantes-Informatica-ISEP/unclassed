@@ -264,6 +264,16 @@ model CronLock {
   @@index([expiresAt])
 }
 
+model RateLimitBucket {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  count     Int      @default(1)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
 enum CronStatus {
   RUNNING
   COMPLETED

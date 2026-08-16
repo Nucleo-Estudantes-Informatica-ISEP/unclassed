@@ -9,8 +9,8 @@ export function validateOrigin(request: OriginRequest): boolean {
 
   const allowedOrigins = new Set(
     [
-      process.env.APP_BASE_URL,
-      process.env.NEXT_PUBLIC_APP_URL,
+      env.APP_BASE_URL,
+      env.NEXT_PUBLIC_APP_URL,
       request.nextUrl.origin,
       "http://localhost:3000",
       "http://127.0.0.1:3000",
@@ -49,3 +49,4 @@ function matchesAllowedOrigin(
   const normalizedOrigin = normalizeOrigin(value);
   return Boolean(normalizedOrigin && allowedOrigins.has(normalizedOrigin));
 }
+import { env } from "@/lib/env";

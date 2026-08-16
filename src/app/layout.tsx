@@ -12,9 +12,6 @@ import Topbar from "@/components/Topbar";
 import { ThemeProvider } from "@/context/ThemeContext";
 import CookieConsent from "@/components/CookieConsent";
 
-// Auto-initialize application services (cron scheduler, etc.)
-import "@/lib/startup";
-
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {

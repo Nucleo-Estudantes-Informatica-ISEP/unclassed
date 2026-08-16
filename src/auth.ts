@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Zitadel from "next-auth/providers/zitadel";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
+import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 
 function getClaim(
@@ -10,23 +11,6 @@ function getClaim(
 ): string | null {
   const value = claims?.[key];
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function parseBooleanEnv(value: string | undefined, defaultValue: boolean) {
-  if (typeof value !== "string") {
-    return defaultValue;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "true") {
-    return true;
-  }
-
-  if (normalized === "false") {
-    return false;
-  }
-
-  return defaultValue;
 }
 
 function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
@@ -52,12 +36,12 @@ function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
 
 const missingAuthEnvVars = getMissingAuthEnvVars();
 const authConfigured = isAuthConfigured();
-const authDebugEnabled = process.env.AUTH_DEBUG === "true";
+const authDebugEnabled = env.AUTH_DEBUG;
 const isProductionBuild =
-  process.env.NEXT_PHASE === "phase-production-build" ||
-  process.env.npm_lifecycle_event === "build";
+  env.NEXT_PHASE === "phase-production-build" ||
+  env.npm_lifecycle_event === "build";
 
-if (!authConfigured && process.env.NODE_ENV === "production" && !isProductionBuild) {
+if (!authConfigured && env.NODE_ENV === "production" && !isProductionBuild) {
   throw new Error(
     `Auth is not configured. Missing environment variables: ${missingAuthEnvVars.join(", ")}`
   );
@@ -67,12 +51,12 @@ const providers = authConfigured
   ? [
       {
         ...Zitadel({
-          issuer: process.env.AUTH_ISSUER_URL,
-          clientId: process.env.AUTH_CLIENT_ID,
-          clientSecret: process.env.AUTH_CLIENT_SECRET,
+          issuer: env.AUTH_ISSUER_URL,
+          clientId: env.AUTH_CLIENT_ID,
+          clientSecret: env.AUTH_CLIENT_SECRET,
           authorization: {
             params: {
-              scope: process.env.AUTH_SCOPES || "openid email profile",
+              scope: env.AUTH_SCOPES,
             },
           },
         }),
@@ -85,8 +69,8 @@ const providers = authConfigured
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
-  trustHost: parseBooleanEnv(process.env.AUTH_TRUST_HOST, false),
-  secret: process.env.AUTH_SECRET,
+  trustHost: env.AUTH_TRUST_HOST,
+  secret: env.AUTH_SECRET,
   pages: {
     signIn: "/login",
   },

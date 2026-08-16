@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { CronScheduler, getNextCronRun } from "./cronScheduler";
+import { env } from "@/lib/env";
+import {
+  CronScheduler,
+  getLeaseHeartbeatInterval,
+  getNextCronRun,
+} from "./cronScheduler";
+
+test("renews cron leases well before their expiry", () => {
+  assert.equal(getLeaseHeartbeatInterval(8 * 60 * 1_000), 160_000);
+  assert.equal(getLeaseHeartbeatInterval(2_000), 1_000);
+});
 
 test("computes custom cron schedules without an hourly fallback", () => {
   const currentDate = new Date("2026-08-07T12:03:00.000Z");
@@ -17,8 +27,8 @@ test("computes custom cron schedules without an hourly fallback", () => {
 });
 
 test("recovers after an invalid schedule fails startup", () => {
-  const originalSchedule = process.env.CRON_BATCH_MATCHING;
-  process.env.CRON_BATCH_MATCHING = "invalid";
+  const originalSchedule = env.CRON_BATCH_MATCHING;
+  env.CRON_BATCH_MATCHING = "invalid";
   const scheduler = new CronScheduler();
 
   try {
@@ -43,10 +53,6 @@ test("recovers after an invalid schedule fails startup", () => {
     assert.equal(scheduler.getJobStatus().some((job) => job.id === "invalid"), false);
   } finally {
     scheduler.stop();
-    if (originalSchedule === undefined) {
-      delete process.env.CRON_BATCH_MATCHING;
-    } else {
-      process.env.CRON_BATCH_MATCHING = originalSchedule;
-    }
+    env.CRON_BATCH_MATCHING = originalSchedule;
   }
 });

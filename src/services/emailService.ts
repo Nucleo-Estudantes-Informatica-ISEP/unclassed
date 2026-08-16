@@ -1,32 +1,20 @@
 import nodemailer from "nodemailer";
 
-export interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  auth: {
-    user: string;
-    pass: string;
-  };
-}
+import { env } from "@/lib/env";
+import {
+  getMatchNotificationTemplate,
+  getMatchStatusUpdateTemplate,
+  type MatchNotificationData,
+} from "./emailTemplates";
 
-export interface MatchNotificationData {
-  userName: string;
-  matchType: string;
-  subjects: string[];
-  fromClass: string;
-  toClass: string;
-  otherParticipants: string[];
-  matchId: string;
-  dashboardUrl: string;
-}
+export type { MatchNotificationData } from "./emailTemplates";
 
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private fromEmail: string;
 
   constructor() {
-    this.fromEmail = process.env.EMAIL_FROM || "noreply@unclassed.isep.ipp.pt";
+    this.fromEmail = env.EMAIL_FROM;
     this.initializeTransporter();
   }
 
@@ -34,35 +22,23 @@ class EmailService {
     try {
       // Check if we have email credentials configured
       if (
-        process.env.EMAIL_HOST &&
-        process.env.EMAIL_USER &&
-        process.env.EMAIL_PASS
+        env.EMAIL_HOST &&
+        env.EMAIL_USER &&
+        env.EMAIL_PASS
       ) {
         // Use configured email service
         this.transporter = nodemailer.createTransport({
-          host: process.env.EMAIL_HOST,
-          port: parseInt(process.env.EMAIL_PORT || "587"),
-          secure: process.env.EMAIL_SECURE === "true",
+          host: env.EMAIL_HOST,
+          port: env.EMAIL_PORT,
+          secure: env.EMAIL_SECURE,
           auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
+            user: env.EMAIL_USER,
+            pass: env.EMAIL_PASS,
           },
         });
         console.log(
-          `📧 Email service initialized with ${process.env.EMAIL_HOST}`
+          `📧 Email service initialized with ${env.EMAIL_HOST}`
         );
-      } else if (process.env.NODE_ENV === "development") {
-        // For development without credentials, use Ethereal Email (test account)
-        this.transporter = nodemailer.createTransport({
-          host: "smtp.ethereal.email",
-          port: 587,
-          secure: false,
-          auth: {
-            user: "ethereal.user@ethereal.email",
-            pass: "ethereal.pass",
-          },
-        });
-        console.log("📧 Using Ethereal Email for development (test emails)");
       } else {
         console.warn(
           "⚠️ No email configuration found - emails will not be sent"
@@ -71,64 +47,6 @@ class EmailService {
     } catch (error) {
       console.error("Failed to initialize email transporter:", error);
     }
-  }
-
-  private getMatchNotificationTemplate(data: MatchNotificationData): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #ffffff; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }
-            .header { background: #059669; color: #ffffff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f0fdf4; padding: 30px; border: 1px solid #dcfce7; border-top: none; color: #333333; }
-            .match-details { background: #ffffff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669; color: #333333; }
-            .button { display: inline-block; background: #059669; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-            .footer { text-align: center; margin-top: 20px; font-size: 14px; color: #6b7280; }
-            .warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 15px 0; color: #333333; }
-            h1, h2, h3 { color: #333333; }
-            p { color: #333333; }
-            strong { color: #333333; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🎯 Match Encontrado!</h1>
-              <p>Nova troca disponível</p>
-            </div>
-            <div class="content">
-              <h2>Olá ${data.userName}!</h2>
-              <p>Ótimas notícias! Encontramos um match para a tua solicitação de troca:</p>
-              
-              <div class="match-details">
-                <h3>📋 Detalhes da Troca</h3>
-                <p><strong>Tipo:</strong> ${data.matchType}</p>
-                ${data.subjects.length > 0 ? `<p><strong>Disciplinas:</strong> ${data.subjects.join(", ")}</p>` : ""}
-                <p><strong>Da turma:</strong> ${data.fromClass}</p>
-                <p><strong>Para a turma:</strong> ${data.toClass}</p>
-                <p><strong>Outros participantes:</strong> ${data.otherParticipants.join(", ")}</p>
-              </div>
-
-              <div class="warning">
-                <p><strong>⏰ Ação Necessária!</strong></p>
-                <p>Por favor, revisa e aceita esta troca o mais rápido possível. Outros estudantes estão à espera da tua resposta.</p>
-              </div>
-
-              <p style="text-align: center;">
-                <a href="${data.dashboardUrl}/matches" class="button">Ver Match</a>
-              </p>
-              
-              <p>Podes ver todos os detalhes e aceitar/rejeitar esta troca na página de matches.</p>
-            </div>
-            <div class="footer">
-              <p>© 2025 Unclassed - NEI-ISEP</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
   }
 
   async sendMatchNotification(
@@ -145,15 +63,11 @@ class EmailService {
         from: this.fromEmail,
         to: userEmail,
         subject: `🎯 Novo Match Encontrado - ${data.matchType}`,
-        html: this.getMatchNotificationTemplate(data),
+        html: getMatchNotificationTemplate(data),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log("✅ Match notification sent:", result.messageId);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔗 Preview URL:", nodemailer.getTestMessageUrl(result));
-      }
 
       return true;
     } catch (error) {
@@ -185,28 +99,18 @@ class EmailService {
 
     try {
       const baseUrl =
-        process.env.APP_BASE_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3000";
+        env.APP_BASE_URL || env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       const mailOptions = {
         from: this.fromEmail,
         to: userEmail,
         subject: `${emoji} Atualização do Match - Unclassed`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>${emoji} Atualização do teu Match</h2>
-            <p>Olá ${userName},</p>
-            <p>O estado do teu match foi atualizado:</p>
-            <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Estado:</strong> ${status}</p>
-              <p><strong>Detalhes:</strong> ${details}</p>
-            </div>
-            <p>
-              <a href="${baseUrl}/matches" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Ver Matches</a>
-            </p>
-          </div>
-        `,
+        html: getMatchStatusUpdateTemplate({
+          userName,
+          status,
+          details,
+          matchesUrl: `${baseUrl.replace(/\/$/, "")}/matches`,
+        }),
       };
 
       const result = await this.transporter.sendMail(mailOptions);

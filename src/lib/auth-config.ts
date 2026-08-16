@@ -10,9 +10,10 @@ function hasValue(value: string | undefined) {
 }
 
 export function getMissingAuthEnvVars() {
-  return REQUIRED_AUTH_ENV_VARS.filter((key) => !hasValue(process.env[key]));
+  return REQUIRED_AUTH_ENV_VARS.filter((key) => !hasValue(env[key]));
 }
 
 export function isAuthConfigured() {
   return getMissingAuthEnvVars().length === 0;
 }
+import { env } from "@/lib/env";

@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 const DEFAULT_APP_URL = "http://localhost:3000";
 
 type OidcMetadata = {
@@ -10,18 +12,16 @@ function trimTrailingSlash(value: string) {
 
 export function getAppBaseUrl() {
   return trimTrailingSlash(
-    process.env.APP_BASE_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      DEFAULT_APP_URL
+    env.APP_BASE_URL || env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL
   );
 }
 
 export function getPostLogoutRedirectUri() {
-  return process.env.AUTH_POST_LOGOUT_REDIRECT_URI || `${getAppBaseUrl()}/`;
+  return env.AUTH_POST_LOGOUT_REDIRECT_URI || `${getAppBaseUrl()}/`;
 }
 
 export function getIssuerUrl() {
-  const issuer = process.env.AUTH_ISSUER_URL;
+  const issuer = env.AUTH_ISSUER_URL;
 
   if (!issuer) {
     throw new Error("AUTH_ISSUER_URL is not configured.");
@@ -31,7 +31,7 @@ export function getIssuerUrl() {
 }
 
 export function getAuthClientId() {
-  return process.env.AUTH_CLIENT_ID?.trim() || null;
+  return env.AUTH_CLIENT_ID || null;
 }
 
 async function getOidcMetadata(): Promise<OidcMetadata> {
@@ -94,7 +94,7 @@ export function resolveSafeLogoutTarget(target?: string | null) {
 
   try {
     const resolvedTarget = new URL(target);
-    const issuerUrl = process.env.AUTH_ISSUER_URL;
+    const issuerUrl = env.AUTH_ISSUER_URL;
 
     if (!issuerUrl) {
       return getPostLogoutRedirectUri();

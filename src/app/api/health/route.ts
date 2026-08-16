@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import { getCronSchedulerStatus } from "@/lib/cronInit";
+import { env } from "@/lib/env";
 import prisma from "@/lib/prisma";
 import { isAppInitialized } from "@/lib/startup";
 
@@ -61,8 +62,8 @@ export async function GET(request: NextRequest) {
       ? {
           ...healthData,
           uptime: process.uptime(),
-          version: process.env.npm_package_version || "1.0.0",
-          environment: process.env.NODE_ENV || "development",
+          version: env.npm_package_version || "1.0.0",
+          environment: env.NODE_ENV,
           services: {
             ...healthData.services,
             database: {

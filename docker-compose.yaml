@@ -24,6 +24,5 @@ services:
       - EMAIL_SECURE=${EMAIL_SECURE}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
-      - ADMIN_CACHE_TTL=${ADMIN_CACHE_TTL}
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED}
     restart: unless-stopped

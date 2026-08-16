@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
+import { authorizeRequest, hasValidCronSecret } from "@/lib/apiAccess";
 import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 
 /**
@@ -9,6 +9,9 @@ import { AdvancedMatchingService } from "@/services/advancedMatchingService";
  * Called by internal cron scheduler, external cron services, or manual triggers
  */
 export async function GET(request: NextRequest) {
+  if (!hasValidCronSecret(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
   return handleBatchMatching(request);
 }
 
@@ -24,6 +27,7 @@ async function handleBatchMatching(
       requireAdmin: true,
       allowCronSecret: true,
       enforceSameOriginForSessionWrites: true,
+      rateLimit: "batch",
     });
 
     if (!authResult.ok) {
