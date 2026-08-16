@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/lib/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/lib/components/ui/card";
-import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowRightLeft, Phone, Mail, Info, RefreshCw, ClipboardList, Hourglass } from "lucide-react";
+import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowRightLeft, Info, RefreshCw, ClipboardList, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
+import { MatchContactInfo } from "@/components/MatchContactInfo";
 import { useRouter } from "next/navigation";
 import type { MatchDto } from "@/types/match";
 
@@ -143,21 +144,7 @@ export function MatchCard({ match, currentUserId, showActions = true }: MatchCar
             {/* Contact Information */}
             {!isCurrentUser && participant.user && match.status === 'ACCEPTED' && (
               <div className="mt-3 pt-3 border-t border-border">
-                <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Contacto:</p>
-                <div className="space-y-1 break-words">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Mail className="w-3 h-3 shrink-0" /> {participant.user.email}
-                  </p>
-                  {participant.user.phone ? (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="w-3 h-3 shrink-0" /> {participant.user.phone}
-                    </p>
-                  ) : participant.user.sharePhoneOnMatch === false ? (
-                    <p className="text-xs text-muted-foreground italic flex items-center gap-1">
-                      <Phone className="w-3 h-3 shrink-0 opacity-50" /> Telemóvel não partilhado
-                    </p>
-                  ) : null}
-                </div>
+                <MatchContactInfo user={participant.user} />
               </div>
             )}
           </div>
