@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { env } from "@/lib/env";
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
 import { buildPartitionKey } from "./partitionKey";
@@ -1180,9 +1181,7 @@ export class AdvancedMatchingService {
       );
 
       const baseUrl =
-        process.env.APP_BASE_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3000";
+        env.APP_BASE_URL || env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       // Send notification to each participant
       for (const participant of match.participants) {

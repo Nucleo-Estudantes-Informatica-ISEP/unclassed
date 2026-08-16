@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { env } from "@/lib/env";
 import {
   CronScheduler,
   getLeaseHeartbeatInterval,
@@ -26,8 +27,8 @@ test("computes custom cron schedules without an hourly fallback", () => {
 });
 
 test("recovers after an invalid schedule fails startup", () => {
-  const originalSchedule = process.env.CRON_BATCH_MATCHING;
-  process.env.CRON_BATCH_MATCHING = "invalid";
+  const originalSchedule = env.CRON_BATCH_MATCHING;
+  env.CRON_BATCH_MATCHING = "invalid";
   const scheduler = new CronScheduler();
 
   try {
@@ -52,10 +53,6 @@ test("recovers after an invalid schedule fails startup", () => {
     assert.equal(scheduler.getJobStatus().some((job) => job.id === "invalid"), false);
   } finally {
     scheduler.stop();
-    if (originalSchedule === undefined) {
-      delete process.env.CRON_BATCH_MATCHING;
-    } else {
-      process.env.CRON_BATCH_MATCHING = originalSchedule;
-    }
+    env.CRON_BATCH_MATCHING = originalSchedule;
   }
 });

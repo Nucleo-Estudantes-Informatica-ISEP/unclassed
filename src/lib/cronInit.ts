@@ -6,12 +6,13 @@
  */
 
 import { getCronScheduler } from '../services/cronScheduler';
+import { env } from './env';
 
 /**
  * Initialize all scheduled jobs for the application
  */
 export function initializeCronScheduler(): void {
-  const enableScheduler = process.env.ENABLE_CRON_SCHEDULER === 'true';
+  const enableScheduler = env.ENABLE_CRON_SCHEDULER;
   
   if (!enableScheduler) {
     console.log('⏰ Cron scheduler is disabled (ENABLE_CRON_SCHEDULER=false)');
@@ -54,7 +55,7 @@ export function initializeCronScheduler(): void {
  * Health check function to verify cron scheduler status
  */
 export function getCronSchedulerStatus() {
-  const enableScheduler = process.env.ENABLE_CRON_SCHEDULER === 'true';
+  const enableScheduler = env.ENABLE_CRON_SCHEDULER;
   
   try {
     const cronScheduler = getCronScheduler();

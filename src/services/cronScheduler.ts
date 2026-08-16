@@ -1,6 +1,7 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
 import { CronExecution, Prisma } from "@prisma/client";
 import { CronExpressionParser } from "cron-parser";
+import { env } from "@/lib/env";
 import prisma from "@/lib/prisma";
 
 export function getNextCronRun(cronExpression: string, currentDate = new Date()): Date {
@@ -131,9 +132,9 @@ export class CronScheduler {
    */
   private registerDefaultJobs() {
     // Get schedules from environment variables with fallbacks
-    const batchSchedule = process.env.CRON_BATCH_MATCHING || '*/5 * * * *';
-    const cleanupSchedule = process.env.CRON_PROVISIONAL_CLEANUP || '*/30 * * * *';
-    const healthCheckSchedule = process.env.CRON_HEALTH_CHECK || '0 * * * *';
+    const batchSchedule = env.CRON_BATCH_MATCHING;
+    const cleanupSchedule = env.CRON_PROVISIONAL_CLEANUP;
+    const healthCheckSchedule = env.CRON_HEALTH_CHECK;
 
     // Batch processing
     this.addJob({
@@ -687,8 +688,7 @@ export function initializeCronScheduler() {
   const scheduler = getCronScheduler();
 
   // Only start in production or when explicitly enabled
-  const shouldStart = process.env.NODE_ENV === 'production' ||
-                     process.env.ENABLE_CRON_SCHEDULER === 'true';
+  const shouldStart = env.NODE_ENV === 'production' || env.ENABLE_CRON_SCHEDULER;
 
   if (shouldStart) {
     scheduler.start();

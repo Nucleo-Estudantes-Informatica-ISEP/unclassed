@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { validateOrigin } from "@/lib/originValidation";
+import { env } from "@/lib/env";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
@@ -84,7 +85,7 @@ async function enforceRateLimit(
 }
 
 export function hasValidCronSecret(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
   return Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);

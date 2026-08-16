@@ -1,5 +1,7 @@
 import nodemailer from "nodemailer";
 
+import { env } from "@/lib/env";
+
 export interface EmailConfig {
   host: string;
   port: number;
@@ -26,7 +28,7 @@ class EmailService {
   private fromEmail: string;
 
   constructor() {
-    this.fromEmail = process.env.EMAIL_FROM || "noreply@unclassed.isep.ipp.pt";
+    this.fromEmail = env.EMAIL_FROM;
     this.initializeTransporter();
   }
 
@@ -34,24 +36,24 @@ class EmailService {
     try {
       // Check if we have email credentials configured
       if (
-        process.env.EMAIL_HOST &&
-        process.env.EMAIL_USER &&
-        process.env.EMAIL_PASS
+        env.EMAIL_HOST &&
+        env.EMAIL_USER &&
+        env.EMAIL_PASS
       ) {
         // Use configured email service
         this.transporter = nodemailer.createTransport({
-          host: process.env.EMAIL_HOST,
-          port: parseInt(process.env.EMAIL_PORT || "587"),
-          secure: process.env.EMAIL_SECURE === "true",
+          host: env.EMAIL_HOST,
+          port: env.EMAIL_PORT,
+          secure: env.EMAIL_SECURE,
           auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
+            user: env.EMAIL_USER,
+            pass: env.EMAIL_PASS,
           },
         });
         console.log(
-          `📧 Email service initialized with ${process.env.EMAIL_HOST}`
+          `📧 Email service initialized with ${env.EMAIL_HOST}`
         );
-      } else if (process.env.NODE_ENV === "development") {
+      } else if (env.NODE_ENV === "development") {
         // For development without credentials, use Ethereal Email (test account)
         this.transporter = nodemailer.createTransport({
           host: "smtp.ethereal.email",
@@ -151,7 +153,7 @@ class EmailService {
       const result = await this.transporter.sendMail(mailOptions);
       console.log("✅ Match notification sent:", result.messageId);
 
-      if (process.env.NODE_ENV === "development") {
+      if (env.NODE_ENV === "development") {
         console.log("🔗 Preview URL:", nodemailer.getTestMessageUrl(result));
       }
 
@@ -185,9 +187,7 @@ class EmailService {
 
     try {
       const baseUrl =
-        process.env.APP_BASE_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3000";
+        env.APP_BASE_URL || env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       const mailOptions = {
         from: this.fromEmail,

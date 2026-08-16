@@ -185,6 +185,10 @@ Generate secrets with:
 openssl rand -hex 32
 ```
 
+Runtime configuration is parsed once through `src/lib/env.ts`. Production
+startup fails immediately when required values are missing or malformed;
+partial SMTP configuration is rejected instead of failing on first send.
+
 ### 3. Generate the Prisma Client
 
 `postinstall` already runs Prisma generation, but you can run it explicitly:
