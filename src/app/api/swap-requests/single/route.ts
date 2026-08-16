@@ -9,6 +9,7 @@ import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { buildPartitionKey } from "@/services/partitionKey";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
+import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
           where: { id: { in: request.preferredClassIds } },
           select: { id: true, name: true, year: true },
         });
-        return { ...request, preferredClasses };
+        return toSingleSwapRequestDto(request, preferredClasses);
       })
     );
 
@@ -195,8 +196,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        ...swapRequest,
-        preferredClasses: preferredClassesInfo,
+        ...toSingleSwapRequestDto(swapRequest, preferredClassesInfo),
         message: "Pedido criado com sucesso! A procurar matches imediatos...",
       },
       { status: 201 }
