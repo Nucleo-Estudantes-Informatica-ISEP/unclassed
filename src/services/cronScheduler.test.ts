@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { CronScheduler, getNextCronRun } from "./cronScheduler";
+import {
+  CronScheduler,
+  getLeaseHeartbeatInterval,
+  getNextCronRun,
+} from "./cronScheduler";
+
+test("renews cron leases well before their expiry", () => {
+  assert.equal(getLeaseHeartbeatInterval(8 * 60 * 1_000), 160_000);
+  assert.equal(getLeaseHeartbeatInterval(2_000), 1_000);
+});
 
 test("computes custom cron schedules without an hourly fallback", () => {
   const currentDate = new Date("2026-08-07T12:03:00.000Z");

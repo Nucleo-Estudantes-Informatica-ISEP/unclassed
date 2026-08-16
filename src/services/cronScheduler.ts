@@ -55,6 +55,16 @@ interface ScheduledJob {
   lockTimeout?: number; // Lock timeout in milliseconds
 }
 
+interface LockLease {
+  jobId: string;
+  acquiredAt: Date;
+  timeoutMs: number;
+}
+
+export function getLeaseHeartbeatInterval(timeoutMs: number): number {
+  return Math.max(1_000, Math.floor(timeoutMs / 3));
+}
+
 /**
  * Internal cron scheduler that works without external cron services
  * Supports self-hosting and Vercel deployments
@@ -247,10 +257,13 @@ export class CronScheduler {
 
       if (job.nextRun && now >= job.nextRun && !job.isRunning) {
         // Try to acquire lock before running
-        const lockAcquired = await this.acquireLock(job.id, job.lockTimeout || this.LOCK_TIMEOUT);
+        const lease = await this.acquireLock(
+          job.id,
+          job.lockTimeout || this.LOCK_TIMEOUT
+        );
 
-        if (lockAcquired) {
-          this.runJob(job);
+        if (lease) {
+          void this.runJob(job, lease);
           job.nextRun = getNextCronRun(job.schedule);
         } else {
           console.log(`🔒 Job '${job.name}' skipped - another instance is running`);
@@ -267,7 +280,10 @@ export class CronScheduler {
   /**
    * Acquire distributed lock using database
    */
-  private async acquireLock(jobId: string, timeoutMs: number): Promise<boolean> {
+  private async acquireLock(
+    jobId: string,
+    timeoutMs: number
+  ): Promise<LockLease | null> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + timeoutMs);
 
@@ -285,7 +301,7 @@ export class CronScheduler {
       });
 
       if (reclaimed.count > 0) {
-        return true;
+        return { jobId, acquiredAt: now, timeoutMs };
       }
 
       // No stale lock was reclaimable; try to create a fresh one.
@@ -297,7 +313,7 @@ export class CronScheduler {
         }
       });
 
-      return true;
+      return { jobId, acquiredAt: now, timeoutMs };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -318,7 +334,7 @@ export class CronScheduler {
           });
 
           if (reclaimedOnRetry.count > 0) {
-            return true;
+            return { jobId, acquiredAt: now, timeoutMs };
           }
 
           // Defensive visibility: with a valid unique index this should never be > 1.
@@ -332,32 +348,56 @@ export class CronScheduler {
           console.warn(`Failed to retry lock reclaim for job ${jobId}:`, retryError);
         }
 
-        return false;
+        return null;
       }
 
       console.warn(`Failed to acquire lock for job ${jobId}:`, error);
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Extend a lease only while this process still owns its acquisition token.
+   */
+  private async renewLock(lease: LockLease): Promise<boolean> {
+    const now = new Date();
+    const renewed = await this.prisma.cronLock.updateMany({
+      where: {
+        jobId: lease.jobId,
+        createdAt: lease.acquiredAt,
+        expiresAt: { gt: now },
+      },
+      data: {
+        expiresAt: new Date(now.getTime() + lease.timeoutMs),
+      },
+    });
+
+    return renewed.count === 1;
   }
 
   /**
    * Release distributed lock
    */
-  private async releaseLock(jobId: string): Promise<void> {
+  private async releaseLock(lease: LockLease): Promise<void> {
     try {
-      await this.prisma.cronLock.delete({
-        where: { jobId }
+      await this.prisma.cronLock.deleteMany({
+        where: {
+          jobId: lease.jobId,
+          createdAt: lease.acquiredAt,
+        },
       });
     } catch {
       // Ignore errors - lock might have expired or been deleted already
-      console.debug(`Lock release for job ${jobId} had no effect (likely already expired)`);
+      console.debug(
+        `Lock release for job ${lease.jobId} had no effect (likely already expired)`
+      );
     }
   }
 
   /**
    * Run a specific job with proper lock management
    */
-  private async runJob(job: ScheduledJob) {
+  private async runJob(job: ScheduledJob, lease: LockLease) {
     if (job.isRunning) return;
 
     job.isRunning = true;
@@ -365,6 +405,20 @@ export class CronScheduler {
 
     console.log(`🔄 Running job: ${job.name}`);
     const startTime = Date.now();
+    const heartbeat = setInterval(() => {
+      void this.renewLock(lease)
+        .then((renewed) => {
+          if (!renewed) {
+            console.error(
+              `Cron lock lease lost while '${job.name}' is still running`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(`Failed to renew cron lock for '${job.name}':`, error);
+        });
+    }, getLeaseHeartbeatInterval(lease.timeoutMs));
+    heartbeat.unref?.();
 
     // Create execution record
     let executionRecord;
@@ -415,9 +469,10 @@ export class CronScheduler {
       // Invalidate admin cache after job failure too
       this.invalidateAdminCache();
     } finally {
+      clearInterval(heartbeat);
       job.isRunning = false;
       // Release the lock
-      await this.releaseLock(job.id);
+      await this.releaseLock(lease);
     }
   }
 
@@ -629,7 +684,15 @@ export class CronScheduler {
       throw new Error(`Job ${jobId} not found`);
     }
 
-    await this.runJob(job);
+    const lease = await this.acquireLock(
+      job.id,
+      job.lockTimeout || this.LOCK_TIMEOUT
+    );
+    if (!lease) {
+      throw new Error(`Job ${jobId} is already running`);
+    }
+
+    await this.runJob(job, lease);
   }
 }
 
