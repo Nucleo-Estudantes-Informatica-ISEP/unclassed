@@ -21,6 +21,14 @@ For each task:
    - Split unrelated changes into separate commits.
 3. Push branch and open pull request into `dev`, never `main`.
 
+### CI/CD and test-first workflow
+
+- Prefer TDD for bug fixes, matching rules, state transitions, locks, and authorization: first add a focused failing regression, implement the smallest correction, then refactor while the suite stays green. If a failure cannot be reproduced without a hosted dependency, document the limitation and add the nearest deterministic test plus a staging procedure.
+- Every non-trivial behavior change needs a regression test. A green build without tests is not completion.
+- PRs target `dev`; reviewed release promotion controls production. Dependabot targets `dev`, groups patch/minor maintenance, and leaves major framework/toolchain migrations for explicit planned work.
+- Required CI uses a frozen install and runs lint, typecheck, all tests, schema validation, production build, a non-root Docker image build, and Gitleaks. Never disable or bypass a gate to make a PR green.
+- Production schema changes require `schema:audit`, a backup, `schema:deploy`, and post-deploy verification. Only the selected scheduler owner may run internal jobs.
+
 ---
 
 ## Stack
@@ -50,13 +58,15 @@ pnpm typecheck  # tsc --noEmit
 pnpm test       # node:test over every src/**/*.test.ts, via run-tests.mjs
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
-pnpm sync       # validate version manifest, then prisma db push to MongoDB
+pnpm sync       # compatibility alias for schema:deploy
 pnpm schema:validate # validate schema without touching MongoDB
+pnpm schema:audit # report index/data conflicts without mutation
+pnpm schema:deploy # validate, db push, and apply versioned MongoDB indexes
 pnpm seed       # seed subjects and classes
 pnpm start      # serve production build
 ```
 
-`populate`, `test-cron`, and `test-cron-system` currently point to missing `scripts/` files. Do not use them as verification until restored.
+Removed legacy `populate`, `test-cron`, and `test-cron-system` commands must not be reintroduced unless their implementation and tests are committed in the same change.
 
 ## Architecture
 
@@ -142,9 +152,9 @@ Documentation should answer a future contributor's first question without duplic
 
 ## Database and environment
 
-The datasource is MongoDB, which Prisma Migrate does not support. Schema changes use `prisma db push` through `pnpm sync`, with ordered records in `prisma/schema-changes/` and a hash in `prisma/schema-manifest.json`. Update the schema, add the next record/hash, regenerate Prisma Client, and keep seed data compatible.
+The datasource is MongoDB, which Prisma Migrate does not support. Schema changes use `prisma db push` through `pnpm schema:deploy` (`pnpm sync` is only a compatibility alias), with ordered records in `prisma/schema-changes/`, a hash in `prisma/schema-manifest.json`, and explicit index application. Update the schema, add the next record/hash, regenerate Prisma Client, and keep seed data compatible.
 
-Schema and production-data changes are consequential. Do not run `pnpm sync`, `pnpm seed`, or `prisma/reset.ts` against a shared/production database without explicit authorization and a confirmed `DATABASE_URL`. Preserve MongoDB `@db.ObjectId` compatibility with existing data.
+Schema and production-data changes are consequential. Do not run `pnpm schema:deploy`, `pnpm sync`, `pnpm seed`, or `prisma/reset.ts` against a shared/production database without explicit authorization, a backup, a clean `pnpm schema:audit`, and a confirmed `DATABASE_URL`. Preserve MongoDB `@db.ObjectId` compatibility with existing data.
 
 Read environment variables server-side only. `.env.example` is source of truth for documented configuration; update it when adding/removing/renaming a variable.
 
@@ -154,8 +164,8 @@ Before finishing a change:
 
 1. Run `pnpm lint`.
 2. Run `pnpm typecheck`.
-3. Run `pnpm test` if you touched or added `*.test.ts` files, or pure logic that should have one.
-4. Run `pnpm build` for configuration, route, or rendering changes. It can pass with type errors because `next.config.mjs` sets `typescript.ignoreBuildErrors: true`; typecheck is mandatory.
+3. Run `pnpm test` for every change. Prefer writing the focused regression first when practical.
+4. Run `pnpm schema:validate` and `pnpm build` for configuration, route, schema, or rendering changes. Typecheck remains a separate required gate.
 5. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
 6. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
@@ -165,7 +175,7 @@ Before finishing a change:
 
 - `CronScheduler` uses the shared Prisma client and database locks. Its start/stop lifecycle only manages scheduled jobs.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
-- A green `pnpm build` is not proof of type safety: Next ignores build-time TypeScript errors.
+- A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
 - `src/app/api/test-matches/route.ts` and `prisma/reset.ts` are development/destructive surfaces. Treat them as unsafe outside an explicit, confirmed local task.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task — this is why `run-tests.mjs` lives at the repo root instead.
