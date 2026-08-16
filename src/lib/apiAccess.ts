@@ -6,6 +6,7 @@ import getServerSession, {
 } from "@/services/getServerSession";
 import {
   checkRateLimit,
+  resolveRateLimitIdentifier,
   type RateLimitPolicy,
 } from "@/services/rateLimit";
 
@@ -49,6 +50,39 @@ function isSafeMethod(method: string) {
   return method === "GET" || method === "HEAD" || method === "OPTIONS";
 }
 
+async function enforceRateLimit(
+  request: NextRequest,
+  policy: RateLimitPolicy,
+  identity: { sessionId?: string; authenticatedBy?: "cron" }
+): Promise<AuthorizationFailure | null> {
+  const result = await checkRateLimit(
+    policy,
+    resolveRateLimitIdentifier({ ...identity, headers: request.headers })
+  );
+
+  if (result.allowed) {
+    return null;
+  }
+
+  return {
+    ok: false,
+    response: NextResponse.json(
+      {
+        error: "Limite de pedidos excedido",
+        retryAfter: result.retryAfter,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(result.retryAfter),
+          "X-RateLimit-Limit": String(result.limit),
+          "X-RateLimit-Remaining": String(result.remaining),
+        },
+      }
+    ),
+  };
+}
+
 export function hasValidCronSecret(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
@@ -74,36 +108,14 @@ export async function authorizeRequest(
     rateLimit,
   }: AuthorizationOptions = {}
 ): Promise<AuthorizationSuccess | AuthorizationFailure> {
-  if (rateLimit) {
-    const identifier =
-      request.headers.get("cf-connecting-ip") ||
-      request.headers.get("x-real-ip") ||
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      "unknown";
-    const rateLimitResult = await checkRateLimit(rateLimit, identifier);
-
-    if (!rateLimitResult.allowed) {
-      return {
-        ok: false,
-        response: NextResponse.json(
-          {
-            error: "Limite de pedidos excedido",
-            retryAfter: rateLimitResult.retryAfter,
-          },
-          {
-            status: 429,
-            headers: {
-              "Retry-After": String(rateLimitResult.retryAfter),
-              "X-RateLimit-Limit": String(rateLimitResult.limit),
-              "X-RateLimit-Remaining": String(rateLimitResult.remaining),
-            },
-          }
-        ),
-      };
-    }
-  }
-
   if (allowCronSecret && hasValidCronSecret(request)) {
+    if (rateLimit) {
+      const limited = await enforceRateLimit(request, rateLimit, {
+        authenticatedBy: "cron",
+      });
+      if (limited) return limited;
+    }
+
     return {
       ok: true,
       authenticatedBy: "cron",
@@ -114,6 +126,11 @@ export async function authorizeRequest(
   const session = await getServerSession().catch(() => null);
 
   if (!session) {
+    if (rateLimit) {
+      const limited = await enforceRateLimit(request, rateLimit, {});
+      if (limited) return limited;
+    }
+
     if (!requireAuth && !requireAdmin) {
       return {
         ok: true,
@@ -150,6 +167,13 @@ export async function authorizeRequest(
         { status: 403 }
       ),
     };
+  }
+
+  if (rateLimit) {
+    const limited = await enforceRateLimit(request, rateLimit, {
+      sessionId: session.id,
+    });
+    if (limited) return limited;
   }
 
   return {

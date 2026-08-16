@@ -43,6 +43,31 @@ export interface RateLimitResult {
   retryAfter: number;
 }
 
+export function resolveRateLimitIdentifier({
+  sessionId,
+  authenticatedBy,
+  headers,
+}: {
+  sessionId?: string;
+  authenticatedBy?: "cron";
+  headers: Headers;
+}): string {
+  if (sessionId) {
+    return `user:${sessionId}`;
+  }
+
+  if (authenticatedBy === "cron") {
+    return "machine:cron";
+  }
+
+  const clientAddress =
+    headers.get("cf-connecting-ip") ||
+    headers.get("x-real-ip") ||
+    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+  return `ip:${clientAddress}`;
+}
+
 export function buildRateLimitBucketKey(
   policy: RateLimitPolicy,
   identifier: string,

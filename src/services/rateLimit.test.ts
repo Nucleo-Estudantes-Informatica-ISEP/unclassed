@@ -5,6 +5,7 @@ import {
   MemoryRateLimitStore,
   buildRateLimitBucketKey,
   createRateLimiter,
+  resolveRateLimitIdentifier,
 } from "./rateLimit";
 
 test("enforces each fixed-window policy", async () => {
@@ -33,4 +34,37 @@ test("isolates identifiers and fixed windows without storing raw identities", as
   assert.notEqual(firstKey, otherUserKey);
   assert.notEqual(firstKey, secondKey);
   assert.equal(firstKey.includes("user-1"), false);
+});
+
+test("keys authenticated limits by user instead of shared client IP", () => {
+  const sharedCampusNetwork = new Headers({ "x-real-ip": "192.0.2.10" });
+  const otherNetwork = new Headers({ "x-real-ip": "192.0.2.11" });
+
+  assert.notEqual(
+    resolveRateLimitIdentifier({
+      sessionId: "student-1",
+      headers: sharedCampusNetwork,
+    }),
+    resolveRateLimitIdentifier({
+      sessionId: "student-2",
+      headers: sharedCampusNetwork,
+    })
+  );
+  assert.equal(
+    resolveRateLimitIdentifier({
+      sessionId: "student-1",
+      headers: sharedCampusNetwork,
+    }),
+    resolveRateLimitIdentifier({
+      sessionId: "student-1",
+      headers: otherNetwork,
+    })
+  );
+  assert.equal(
+    resolveRateLimitIdentifier({
+      authenticatedBy: "cron",
+      headers: sharedCampusNetwork,
+    }),
+    "machine:cron"
+  );
 });
