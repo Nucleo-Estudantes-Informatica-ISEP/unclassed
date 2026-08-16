@@ -74,7 +74,7 @@
     "eslint-plugin-import-helpers": "^2.0.1",
     "eslint-plugin-prettier": "^5.5.5",
     "jsonwebtoken": "^9.0.3",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.23",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "^6.19.0",
