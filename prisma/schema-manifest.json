@@ -1,5 +1,5 @@
 {
-  "currentVersion": 2,
+  "currentVersion": 3,
   "currentSchemaSha256": "8799c82d666ebdfb1b3313ed961d22b10b4a271aae5bc10efc293aea754b5241",
   "changes": [
     {
@@ -10,6 +10,11 @@
     {
       "version": 2,
       "file": "schema-changes/0002-shared-rate-limits.md",
+      "schemaSha256": "8799c82d666ebdfb1b3313ed961d22b10b4a271aae5bc10efc293aea754b5241"
+    },
+    {
+      "version": 3,
+      "file": "schema-changes/0003-active-request-uniqueness.md",
       "schemaSha256": "8799c82d666ebdfb1b3313ed961d22b10b4a271aae5bc10efc293aea754b5241"
     }
   ]

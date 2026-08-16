@@ -8,6 +8,7 @@ import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { buildPartitionKey } from "@/services/partitionKey";
+import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -202,6 +203,13 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating single swap request:", error);
+
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        { error: "Já tens um pedido ativo para esta disciplina" },
+        { status: 409 }
+      );
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

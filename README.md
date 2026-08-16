@@ -206,7 +206,7 @@ pnpm sync
 
 `pnpm schema:validate` checks the Prisma schema and rejects an unversioned
 schema edit without touching a database. Before production `pnpm sync`, take a
-MongoDB backup and run the same command against staging.
+MongoDB backup, run `pnpm schema:audit`, and run the deployment against staging.
 
 ### 5. Seed Subjects and Classes
 
