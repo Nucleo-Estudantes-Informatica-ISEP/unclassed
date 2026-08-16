@@ -3,31 +3,18 @@ import type { Prisma } from "@prisma/client";
 import { env } from "@/lib/env";
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
+import {
+  buildRequestGraph,
+  calculateEdgeWeight,
+  decideMatchOverlap,
+  findCyclesFromNode,
+  getIndividualSatisfaction,
+  type GraphEdge,
+  type GraphNode,
+} from "./matchingCore";
 import { buildPartitionKey } from "./partitionKey";
 
 // ===== INTERFACES =====
-
-interface GraphNode {
-  requestId: string;
-  userId: string;
-  currentClassId: string;
-  preferredClassIds: string[];
-  preferenceOrderMatters?: boolean; // Whether preference order affects satisfaction
-  requestType: "single" | "bundle";
-  priority: number;
-  createdAt: Date;
-  subjectId?: string; // For single swap requests
-}
-
-interface GraphEdge {
-  from: string;
-  to: string;
-  weight: number; // preference order + time decay
-  compatibility: number; // 0-1 compatibility score
-  fromClassId: string;
-  toClassId: string;
-  satisfactionScore: number;
-}
 
 interface MatchResult {
   pattern: "DIRECT" | "THREE_WAY" | "MULTI_WAY";
@@ -255,11 +242,11 @@ export class AdvancedMatchingService {
 
         // Check if this is everyone's first choice (perfect match)
         const isFirstChoiceForAll =
-          this.getIndividualSatisfaction(
+          getIndividualSatisfaction(
             request,
             compatibleRequest.currentClassId
           ) === 1.0 &&
-          this.getIndividualSatisfaction(
+          getIndividualSatisfaction(
             compatibleRequest,
             request.currentClassId
           ) === 1.0;
@@ -273,7 +260,7 @@ export class AdvancedMatchingService {
               toClass: compatibleRequest.currentClassId,
               requestId: request.requestId,
               requestType: request.requestType,
-              satisfactionScore: this.getIndividualSatisfaction(
+              satisfactionScore: getIndividualSatisfaction(
                 request,
                 compatibleRequest.currentClassId
               ),
@@ -284,7 +271,7 @@ export class AdvancedMatchingService {
               toClass: request.currentClassId,
               requestId: compatibleRequest.requestId,
               requestType: compatibleRequest.requestType,
-              satisfactionScore: this.getIndividualSatisfaction(
+              satisfactionScore: getIndividualSatisfaction(
                 compatibleRequest,
                 request.currentClassId
               ),
@@ -489,7 +476,7 @@ export class AdvancedMatchingService {
           break;
         }
 
-        const cycles = this.findCyclesFromNode(nodeId, graph, cycleLength);
+        const cycles = findCyclesFromNode(nodeId, graph, cycleLength);
 
         for (const cycle of cycles) {
           if (cycle.some((id: string) => processed.has(id))) {
@@ -773,41 +760,6 @@ export class AdvancedMatchingService {
     return totalSatisfaction / nodes.length;
   }
 
-  private getIndividualSatisfaction(
-    node: GraphNode,
-    targetClassId: string
-  ): number {
-    const preferenceIndex = node.preferredClassIds.indexOf(targetClassId);
-    if (preferenceIndex === -1) return 0;
-
-    // If order doesn't matter, all preferred classes have equal satisfaction
-    if (!node.preferenceOrderMatters) {
-      return 1.0; // 100% satisfaction for any preferred class
-    }
-
-    // Enhanced satisfaction scoring with exponential decay
-    // 1st choice: 100%, 2nd: 85%, 3rd: 70%, 4th: 55%, etc.
-    // This creates bigger differences between preferences
-    const totalChoices = node.preferredClassIds.length;
-    if (totalChoices === 1) return 1.0; // Only one choice = 100%
-
-    // Exponential decay: each subsequent choice loses 15% more value
-    const satisfactionLevels = [1.0, 0.85, 0.7, 0.55, 0.4, 0.25];
-    return satisfactionLevels[preferenceIndex] || 0.1; // Minimum 10% for any valid choice
-  }
-
-  private calculateEdgeWeight(fromNode: GraphNode, toNode: GraphNode): number {
-    // Calculate weight based on preference order and priority
-    const satisfactionScore = this.getIndividualSatisfaction(
-      fromNode,
-      toNode.currentClassId
-    );
-    const priorityWeight = (4 - fromNode.priority) / 3; // Higher priority = lower number, higher weight
-    const timeWeight = 1.0; // Could factor in request age if needed
-
-    return satisfactionScore * priorityWeight * timeWeight;
-  }
-
   private async findCompatibleRequests(
     request: GraphNode,
     context: ProcessingContext
@@ -1027,8 +979,8 @@ export class AdvancedMatchingService {
       for (const other of requests) {
         if (request.requestId === other.requestId) continue;
         if (request.preferredClassIds.includes(other.currentClassId)) {
-          const weight = this.calculateEdgeWeight(request, other);
-          const satisfactionScore = this.getIndividualSatisfaction(
+          const weight = calculateEdgeWeight(request, other);
+          const satisfactionScore = getIndividualSatisfaction(
             request,
             other.currentClassId
           );
@@ -1427,7 +1379,7 @@ export class AdvancedMatchingService {
     for (const match of matches) {
       try {
         // Use individual match isProvisional value, or fallback to global parameter
-        let isProvisional =
+        const isProvisional =
           globalIsProvisional !== undefined
             ? globalIsProvisional
             : match.isProvisional;
@@ -1437,73 +1389,38 @@ export class AdvancedMatchingService {
         const existingForUsers = await this.findProvisionalMatchesForUsers(
           userIds
         );
-        const committedOverlaps = existingForUsers.filter(
-          (existing) =>
-            !existing.isProvisional &&
-            (existing.status === "PROPOSED" || existing.status === "ACCEPTED")
-        );
-        const provisionalOverlaps = existingForUsers.filter(
-          (existing) =>
-            existing.isProvisional &&
-            (existing.status === "PROPOSED" ||
-              existing.status === "PROVISIONAL")
+        const overlapDecision = decideMatchOverlap(
+          isProvisional,
+          match.satisfactionScore,
+          existingForUsers
         );
 
-        if (committedOverlaps.length > 0) {
+        if (overlapDecision.action === "skip-committed") {
           console.log(
             `⏭️ Skipping match creation: committed overlap exists for users ${userIds.join(",")}`
           );
           continue;
         }
 
-        if (provisionalOverlaps.length > 0) {
-          if (!isProvisional) {
-            // Permanent matches may supersede older provisional overlaps, but
-            // never committed ones.
-            for (const existing of provisionalOverlaps) {
-              try {
-                await prisma.match.update({
-                  where: { id: existing.id },
-                  data: { status: "UPGRADED" },
-                });
-                await this.reactivateRequestsFromMatch(existing);
-              } catch (e) {
-                console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
-              }
-            }
-          } else {
-            // New provisional: only create if it is strictly better than ALL existing overlapping ones
-            const improvementThreshold = 0.05;
-            const upgradableMatches = provisionalOverlaps.filter((existing) => {
-              const satisfactionDiff =
-                match.satisfactionScore - (existing.satisfactionScore || 0);
-              return satisfactionDiff > improvementThreshold;
+        if (overlapDecision.action === "skip-not-improved") {
+          console.log(
+            `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
+          );
+          continue;
+        }
+
+        for (const existing of overlapDecision.supersede) {
+          try {
+            await prisma.match.update({
+              where: { id: existing.id },
+              data: { status: "UPGRADED" },
             });
-
-            if (upgradableMatches.length !== provisionalOverlaps.length) {
-              // Skip creating this provisional match unless it improves over all
-              // active overlaps for the participating users.
-              console.log(
-                `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
-              );
-              continue;
-            }
-
-            // Upgrade all overlapping provisional matches now that improvement is guaranteed
-            for (const existing of upgradableMatches) {
-              try {
-                await prisma.match.update({
-                  where: { id: existing.id },
-                  data: { status: "UPGRADED" },
-                });
-                await this.reactivateRequestsFromMatch(existing);
-              } catch (e) {
-                console.warn(`Failed to upgrade prior provisional match ${existing.id}:`, e);
-              }
-            }
-
-            // Ensure created match remains provisional
-            isProvisional = true;
+            await this.reactivateRequestsFromMatch(existing);
+          } catch (error) {
+            console.warn(
+              `Failed to upgrade prior provisional match ${existing.id}:`,
+              error
+            );
           }
         }
 
@@ -1678,8 +1595,6 @@ export class AdvancedMatchingService {
   private async buildPartitionGraph(
     partition: GraphPartition
   ): Promise<Map<string, GraphEdge[]>> {
-    const graph = new Map<string, GraphEdge[]>();
-
     try {
       console.log(`🔗 Building graph for partition ${partition.partitionKey}`);
 
@@ -1740,41 +1655,13 @@ export class AdvancedMatchingService {
 
       console.log(`📊 Found ${requests.length} active requests in partition`);
 
-      // Build adjacency list representation
-      for (const request of requests) {
-        const edges: GraphEdge[] = [];
-
-        // Find all requests that this request can potentially swap with
-        for (const otherRequest of requests) {
-          if (request.requestId === otherRequest.requestId) continue;
-
-          // Check if current request wants other request's class
-          if (request.preferredClassIds.includes(otherRequest.currentClassId)) {
-            const weight = this.calculateEdgeWeight(request, otherRequest);
-
-            edges.push({
-              from: request.requestId,
-              to: otherRequest.requestId,
-              weight,
-              compatibility: 1.0, // Default compatibility score
-              fromClassId: request.currentClassId,
-              toClassId: otherRequest.currentClassId,
-              satisfactionScore: this.getIndividualSatisfaction(
-                request,
-                otherRequest.currentClassId
-              ),
-            });
-          }
-        }
-
-        graph.set(request.requestId, edges);
-      }
+      const builtGraph = buildRequestGraph(requests);
 
       console.log(
-        `🔗 Built graph with ${graph.size} nodes and ${Array.from(graph.values()).reduce((sum: number, edges: GraphEdge[]) => sum + edges.length, 0)} edges`
+        `🔗 Built graph with ${builtGraph.size} nodes and ${Array.from(builtGraph.values()).reduce((sum: number, edges: GraphEdge[]) => sum + edges.length, 0)} edges`
       );
 
-      return graph;
+      return builtGraph;
     } catch (error) {
       console.error(
         `❌ Error building graph for partition ${partition.partitionKey}:`,
@@ -1782,43 +1669,6 @@ export class AdvancedMatchingService {
       );
       return new Map();
     }
-  }
-
-  private findCyclesFromNode(
-    nodeId: string,
-    graph: Map<string, GraphEdge[]>,
-    maxLength: number
-  ): string[][] {
-    const cycles: string[][] = [];
-    const visited = new Set<string>();
-    const path: string[] = [];
-
-    const dfs = (currentNode: string, startNode: string, depth: number) => {
-      if (depth > maxLength) return;
-
-      path.push(currentNode);
-      visited.add(currentNode);
-
-      const edges = graph.get(currentNode) || [];
-
-      for (const edge of edges) {
-        if (depth === maxLength && edge.to === startNode) {
-          // Found a cycle of exact length
-          cycles.push([...path]);
-        } else if (depth < maxLength && !visited.has(edge.to)) {
-          // Continue DFS
-          dfs(edge.to, startNode, depth + 1);
-        }
-      }
-
-      // Backtrack
-      path.pop();
-      visited.delete(currentNode);
-    };
-
-    dfs(nodeId, nodeId, 1);
-
-    return cycles;
   }
 
   private async convertCycleToMatch(
