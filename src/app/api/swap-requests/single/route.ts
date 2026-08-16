@@ -4,15 +4,9 @@ import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
+import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
-
-const createSingleSwapRequestSchema = z.object({
-  subjectId: z.string(),
-  currentClassId: z.string(),
-  preferredClassIds: z.array(z.string()).min(1),
-  preferenceOrderMatters: z.boolean().default(true),
-});
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
@@ -94,7 +88,10 @@ export async function POST(request: NextRequest) {
     const { session } = authResult;
 
     const body = await request.json();
-    const validatedData = createSingleSwapRequestSchema.parse(body);
+    const validatedData = singleSwapRequestSchema.parse({
+      preferenceOrderMatters: true,
+      ...body,
+    });
 
     // Verify the subject and classes exist
     const [subject, currentClass, preferredClasses] = await Promise.all([
