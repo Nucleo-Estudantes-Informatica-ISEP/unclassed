@@ -42,14 +42,3 @@ export function initializeApplication(): void {
 export function isAppInitialized(): boolean {
   return isInitialized;
 }
-
-// Auto-initialize on import in production or when explicitly enabled
-if (env.NODE_ENV === 'production' || env.ENABLE_CRON_SCHEDULER) {
-  // Use setTimeout to ensure this runs after all modules are loaded
-  setTimeout(() => {
-    if (!isInitialized) {
-      console.log('🔄 Auto-initializing application...');
-      initializeApplication();
-    }
-  }, 1000);
-}
