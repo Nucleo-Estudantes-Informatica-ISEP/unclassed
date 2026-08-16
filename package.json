@@ -16,9 +16,6 @@
     "sync": "prisma db push",
     "generate": "prisma generate",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} --transpile-only prisma/seed.ts",
-    "populate": "ts-node --transpile-only scripts/populate-test-data.ts",
-    "test-cron": "ts-node --transpile-only scripts/test-cron.ts",
-    "test-cron-system": "ts-node --transpile-only scripts/test-cron-system.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
