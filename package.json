@@ -13,7 +13,9 @@
     "test": "node run-tests.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "sync": "prisma db push",
+    "sync": "pnpm schema:deploy",
+    "schema:validate": "node prisma/validate-schema.mjs && node prisma/check-schema-manifest.mjs",
+    "schema:deploy": "pnpm schema:validate && prisma db push --skip-generate",
     "generate": "prisma generate",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} --transpile-only prisma/seed.ts",
     "postinstall": "prisma generate"

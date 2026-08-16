@@ -50,7 +50,8 @@ pnpm typecheck  # tsc --noEmit
 pnpm test       # node:test over every src/**/*.test.ts, via run-tests.mjs
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
-pnpm sync       # prisma db push to MongoDB
+pnpm sync       # validate version manifest, then prisma db push to MongoDB
+pnpm schema:validate # validate schema without touching MongoDB
 pnpm seed       # seed subjects and classes
 pnpm start      # serve production build
 ```
@@ -141,7 +142,7 @@ Documentation should answer a future contributor's first question without duplic
 
 ## Database and environment
 
-The datasource is MongoDB. Prisma migrations are not used; schema changes use `prisma db push` through `pnpm sync`. Update `prisma/schema.prisma`, regenerate Prisma Client, and keep seed data compatible.
+The datasource is MongoDB, which Prisma Migrate does not support. Schema changes use `prisma db push` through `pnpm sync`, with ordered records in `prisma/schema-changes/` and a hash in `prisma/schema-manifest.json`. Update the schema, add the next record/hash, regenerate Prisma Client, and keep seed data compatible.
 
 Schema and production-data changes are consequential. Do not run `pnpm sync`, `pnpm seed`, or `prisma/reset.ts` against a shared/production database without explicit authorization and a confirmed `DATABASE_URL`. Preserve MongoDB `@db.ObjectId` compatibility with existing data.
 

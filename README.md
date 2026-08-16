@@ -195,11 +195,18 @@ pnpm generate
 
 ### 4. Push the Schema to MongoDB
 
-This project uses Prisma with MongoDB and relies on `db push`.
+Prisma Migrate does not support MongoDB. This project uses the supported
+`db push` path, guarded by a versioned manifest under `prisma/schema-changes/`.
+Every schema edit must add the next change record and update
+`prisma/schema-manifest.json`.
 
 ```bash
 pnpm sync
 ```
+
+`pnpm schema:validate` checks the Prisma schema and rejects an unversioned
+schema edit without touching a database. Before production `pnpm sync`, take a
+MongoDB backup and run the same command against staging.
 
 ### 5. Seed Subjects and Classes
 
@@ -238,14 +245,14 @@ Prisma-related commands:
 
 ```bash
 pnpm generate
+pnpm schema:validate
 pnpm sync
 pnpm seed
 ```
 
 Important note about scripts:
 
-- `lint`, `typecheck`, `build`, `generate`, `sync`, and `seed` are present and wired up
-- `populate`, `test-cron`, and `test-cron-system` are listed in `package.json`, but the referenced `scripts/` files are not present in this repository snapshot
+- `lint`, `typecheck`, `build`, `generate`, `schema:validate`, `sync`, and `seed` are present and wired up
 
 ## Main Application Routes
 
@@ -554,7 +561,7 @@ Check:
 
 1. Install dependencies with `pnpm install`.
 2. Configure `.env`.
-3. Push the Prisma schema with `pnpm sync`.
+3. Validate and push the versioned Prisma schema with `pnpm sync`.
 4. Seed the subject and class catalog with `pnpm seed`.
 5. Start the app with `pnpm dev`.
 6. Verify `/api/health`.
@@ -563,6 +570,7 @@ Check:
 ## Production Checklist
 
 - MongoDB is reachable from the runtime environment
+- a current MongoDB backup exists before `pnpm sync`
 - All auth variables are set
 - `AUTH_SECRET` and `CRON_SECRET` are strong random values
 - SMTP is configured if email notifications are required
