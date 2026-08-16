@@ -23,7 +23,7 @@ env:
   AUTH_CLIENT_ID: ci-client
   AUTH_CLIENT_SECRET: ci-client-secret
   ENABLE_CRON_SCHEDULER: "false"
-  CRON_SECRET: ci-only-cron-secret
+  CRON_SECRET: ci-only-cron-secret-at-least-32-characters
 
 jobs:
   quality:
