@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { NextRequest } from "next/server";
-
-import { validateOrigin } from "./apiAccess";
+import { validateOrigin } from "./originValidation";
 
 function requestWith(headers: Record<string, string>) {
-  return new NextRequest("http://localhost:3000/api/swap-requests/single", {
-    method: "POST",
-    headers,
-  });
+  return {
+    headers: new Headers(headers),
+    nextUrl: new URL("http://localhost:3000/api/swap-requests/single"),
+  };
 }
 
 test("validateOrigin accepts a matching Origin header", () => {
