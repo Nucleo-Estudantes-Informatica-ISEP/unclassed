@@ -100,8 +100,6 @@ export class CronScheduler {
         }
       }
 
-      // Schedule cleanup task
-      this.scheduleCleanup();
     } catch (error) {
       this.stop();
       throw error;
@@ -562,16 +560,6 @@ export class CronScheduler {
       console.error("❌ Health check failed:", error);
       throw error;
     }
-  }
-
-  private scheduleCleanup() {
-    // Clean up completed jobs and rate limit entries every hour
-    const cleanupInterval = setInterval(() => {
-      console.log("🧹 Running periodic cleanup...");
-      // Add any additional cleanup logic here
-    }, 3600000); // 1 hour
-
-    this.intervals.set('cleanup', cleanupInterval);
   }
 
   /**
