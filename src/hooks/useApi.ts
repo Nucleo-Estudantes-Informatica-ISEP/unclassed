@@ -33,7 +33,7 @@ export type BundleSwapRequest = {
   preferredClasses?: ClassLite[];
 };
 
-export function useApi<T>(url: string): ApiState<T> {
+export function useApi<T>(url: string, pollIntervalMs?: number): ApiState<T> {
   const [state, setState] = useState<ApiState<T>>({
     data: null,
     loading: true,
@@ -43,9 +43,11 @@ export function useApi<T>(url: string): ApiState<T> {
   useEffect(() => {
     let isCancelled = false;
 
-    const fetchData = async () => {
+    const fetchData = async (isPoll: boolean) => {
       try {
-        setState((prev) => ({ ...prev, loading: true, error: null }));
+        if (!isPoll) {
+          setState((prev) => ({ ...prev, loading: true, error: null }));
+        }
 
         const response = await fetch(url, {
           credentials: "include", // Include cookies for authentication
@@ -75,12 +77,17 @@ export function useApi<T>(url: string): ApiState<T> {
       }
     };
 
-    fetchData();
+    fetchData(false);
+
+    const intervalId = pollIntervalMs
+      ? setInterval(() => fetchData(true), pollIntervalMs)
+      : undefined;
 
     return () => {
       isCancelled = true;
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [url]);
+  }, [url, pollIntervalMs]);
 
   return state;
 }
@@ -105,17 +112,25 @@ export function useClasses(year?: number) {
   return useApi<ClassLite[]>(url);
 }
 
-export function useSingleSwapRequests(userId?: string, status?: string) {
+export function useSingleSwapRequests(
+  userId?: string,
+  status?: string,
+  pollIntervalMs?: number
+) {
   const params = new URLSearchParams();
   if (userId) params.append("userId", userId);
   if (status) params.append("status", status);
   const url = `/api/swap-requests/single${
     params.toString() ? `?${params.toString()}` : ""
   }`;
-  return useApi<SingleSwapRequest[]>(url);
+  return useApi<SingleSwapRequest[]>(url, pollIntervalMs);
 }
 
-export function useBundleSwapRequests(userId?: string, status?: string) {
+export function useBundleSwapRequests(
+  userId?: string,
+  status?: string,
+  pollIntervalMs?: number
+) {
   const params = new URLSearchParams();
   if (userId) params.append("userId", userId);
   if (status) params.append("status", status);
@@ -123,18 +138,19 @@ export function useBundleSwapRequests(userId?: string, status?: string) {
   const url = `/api/swap-requests/bundle${
     params.toString() ? `?${params.toString()}` : ""
   }`;
-  return useApi<BundleSwapRequest[]>(url);
+  return useApi<BundleSwapRequest[]>(url, pollIntervalMs);
 }
 
 export function useMatches(
   status?: string,
   matchType?: string,
-  userId?: string
+  userId?: string,
+  pollIntervalMs?: number
 ) {
   const params = new URLSearchParams();
   if (status) params.append("status", status);
   if (matchType) params.append("matchType", matchType);
   if (userId) params.append("userId", userId);
   const url = `/api/matches${params.toString() ? `?${params.toString()}` : ""}`;
-  return useApi<MatchDto[]>(url);
+  return useApi<MatchDto[]>(url, pollIntervalMs);
 }

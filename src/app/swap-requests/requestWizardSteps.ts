@@ -18,6 +18,22 @@ const preferenceStep: WizardStep = {
     "Seleciona uma ou mais turmas. A ordem indica ao sistema quais deve priorizar.",
 };
 
+const matchStep: WizardStep = {
+  id: "match",
+  label: "Match",
+  title: "Revê o teu match",
+  description:
+    "Confirma os detalhes da permuta encontrada, incluindo todos os participantes da cadeia.",
+};
+
+const contactStep: WizardStep = {
+  id: "contact",
+  label: "Contacto",
+  title: "Contacto e próximos passos",
+  description:
+    "Consulta os contactos dos outros participantes e fala com o teu departamento para finalizar a troca.",
+};
+
 const detailSteps: Record<RequestType, WizardStep> = {
   single: {
     id: "single-details",
@@ -49,5 +65,7 @@ export function getRequestWizardSteps(
     typeStep,
     requestType ? detailSteps[requestType] : pendingDetailStep,
     preferenceStep,
+    matchStep,
+    contactStep,
   ];
 }

@@ -186,6 +186,17 @@ export async function POST(request: NextRequest) {
       console.warn("Failed to trigger immediate matching:", error);
     });
 
+    if (session.onboardingCompletedAt === null) {
+      await prisma.user
+        .updateMany({
+          where: { id: session.id, onboardingCompletedAt: null },
+          data: { onboardingCompletedAt: new Date() },
+        })
+        .catch((error) => {
+          console.warn("Failed to record onboarding completion:", error);
+        });
+    }
+
     return NextResponse.json(
       {
         ...swapRequest,

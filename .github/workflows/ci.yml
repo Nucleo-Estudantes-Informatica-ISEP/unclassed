@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: mongodb://127.0.0.1:27017/unclassed_ci
+  APP_BASE_URL: http://localhost:3000
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+  AUTH_ISSUER_URL: https://auth.example.test
+  AUTH_CLIENT_ID: ci-client
+  AUTH_CLIENT_SECRET: ci-client-secret
+  ENABLE_CRON_SCHEDULER: "false"
+  CRON_SECRET: ci-only-cron-secret
+
+jobs:
+  quality:
+    name: Lint, typecheck, test & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Validate Prisma schema
+        run: pnpm exec prisma validate
+
+      - name: Production build
+        run: pnpm build
+
+  docker:
+    name: Production Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build -t unclassed-check .
+
+      - name: Verify non-root runtime
+        run: test "$(docker inspect --format '{{.Config.User}}' unclassed-check)" = "nextjs"
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install verified Gitleaks binary
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          asset="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl --fail --silent --show-error --location --output "$asset" "$base/$asset"
+          curl --fail --silent --show-error --location --output checksums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " $asset$" checksums.txt | sha256sum --check --strict
+          tar -xzf "$asset" gitleaks
+
+      - name: Scan pull-request commits
+        if: github.event_name == 'pull_request'
+        run: ./gitleaks git --redact --no-banner --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.sha }}" .
+
+      - name: Scan pushed commit
+        if: github.event_name != 'pull_request'
+        run: ./gitleaks git --redact --no-banner --log-opts=-1 .

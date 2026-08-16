@@ -9,12 +9,14 @@ test("resolves branch-specific request wizard steps", () => {
 
   assert.deepEqual(
     singleSteps.map((step) => step.id),
-    ["type", "single-details", "preferences"]
+    ["type", "single-details", "preferences", "match", "contact"]
   );
   assert.deepEqual(
     bundleSteps.map((step) => step.id),
-    ["type", "bundle-details", "preferences"]
+    ["type", "bundle-details", "preferences", "match", "contact"]
   );
   assert.equal(singleSteps[0], bundleSteps[0]);
   assert.equal(singleSteps[2], bundleSteps[2]);
+  assert.equal(singleSteps[3], bundleSteps[3]);
+  assert.equal(singleSteps[4], bundleSteps[4]);
 });
