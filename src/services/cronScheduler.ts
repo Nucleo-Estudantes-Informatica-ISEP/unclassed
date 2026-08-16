@@ -2,7 +2,6 @@ import { AdvancedMatchingService } from "./advancedMatchingService";
 import { CronExecution, Prisma } from "@prisma/client";
 import { CronExpressionParser } from "cron-parser";
 import prisma from "@/lib/prisma";
-import { getCache } from "./cache";
 
 export function getNextCronRun(cronExpression: string, currentDate = new Date()): Date {
   try {
@@ -76,19 +75,6 @@ export class CronScheduler {
   private matchingService = new AdvancedMatchingService();
   private prisma = prisma;
   private readonly LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes default lock timeout
-
-  /**
-   * Invalidate admin cron cache when job states change
-   */
-  private invalidateAdminCache() {
-    try {
-      const cache = getCache();
-      cache.deletePattern('admin:cron:.*');
-      console.log('🗑️ Invalidated admin cron cache after job execution');
-    } catch (error) {
-      console.warn('Failed to invalidate admin cache:', error);
-    }
-  }
 
   constructor() {
     this.registerDefaultJobs();
@@ -450,8 +436,6 @@ export class CronScheduler {
         });
       }
 
-      // Invalidate admin cache after successful job completion
-      this.invalidateAdminCache();
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ Job '${job.name}' failed:`, error);
@@ -466,8 +450,6 @@ export class CronScheduler {
         });
       }
 
-      // Invalidate admin cache after job failure too
-      this.invalidateAdminCache();
     } finally {
       clearInterval(heartbeat);
       job.isRunning = false;

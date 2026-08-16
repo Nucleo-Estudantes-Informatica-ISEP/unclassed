@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
+
+import prisma from "@/lib/prisma";
 
 export const RATE_LIMIT_POLICIES = {
   matching: { maxRequests: 10, windowMs: 60_000 },
@@ -78,4 +81,48 @@ export function createRateLimiter(store: RateLimitStore) {
   };
 }
 
-export const checkRateLimit = createRateLimiter(new MemoryRateLimitStore());
+export class PrismaRateLimitStore implements RateLimitStore {
+  private nextCleanupAt = 0;
+
+  async increment(key: string, expiresAt: Date): Promise<number> {
+    await this.cleanupExpiredBuckets();
+
+    try {
+      const bucket = await prisma.rateLimitBucket.upsert({
+        where: { key },
+        create: { key, count: 1, expiresAt },
+        update: { count: { increment: 1 } },
+        select: { count: true },
+      });
+      return bucket.count;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const bucket = await prisma.rateLimitBucket.update({
+          where: { key },
+          data: { count: { increment: 1 } },
+          select: { count: true },
+        });
+        return bucket.count;
+      }
+
+      throw error;
+    }
+  }
+
+  private async cleanupExpiredBuckets(): Promise<void> {
+    const now = Date.now();
+    if (now < this.nextCleanupAt) {
+      return;
+    }
+
+    this.nextCleanupAt = now + 60 * 60 * 1_000;
+    await prisma.rateLimitBucket.deleteMany({
+      where: { expiresAt: { lte: new Date(now) } },
+    });
+  }
+}
+
+export const checkRateLimit = createRateLimiter(new PrismaRateLimitStore());
