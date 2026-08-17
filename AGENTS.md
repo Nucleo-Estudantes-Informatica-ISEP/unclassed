@@ -8,7 +8,7 @@ Reference for AI agents and humans working in this repository. `README.md` cover
 
 For each task:
 
-1. Create a branch from `dev` named `<type>/<short-kebab-case-description>`, following [Conventional Branch](https://conventionalbranch.org/):
+1. Always create a branch from `dev` named `<type>/<short-kebab-case-description>`, following [Conventional Branch](https://conventionalbranch.org/). Never use an untyped branch name:
    - `feature/` or `feat/` — new functionality
    - `bugfix/` or `fix/` — bug fixes
    - `hotfix/` — urgent production fixes
