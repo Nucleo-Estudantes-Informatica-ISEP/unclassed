@@ -50,8 +50,6 @@ const environmentSchema = z
     AUTH_POST_LOGOUT_REDIRECT_URI: optionalUrl,
     AUTH_TRUST_HOST: optionalBoolean(false),
     AUTH_DEBUG: optionalBoolean(false),
-    AUTHNEI_PROVISIONER_URL: optionalUrl,
-    AUTHNEI_PROVISIONER_TOKEN: optionalSecret,
     CRON_SECRET: optionalSecret,
     ENABLE_CRON_SCHEDULER: optionalBoolean(false),
     CRON_BATCH_MATCHING: z.preprocess(
@@ -93,8 +91,6 @@ const environmentSchema = z
         "AUTH_CLIENT_SECRET",
         "AUTH_SECRET",
         "AUTH_POST_LOGOUT_REDIRECT_URI",
-        "AUTHNEI_PROVISIONER_URL",
-        "AUTHNEI_PROVISIONER_TOKEN",
         "CRON_SECRET",
       ] as const;
 

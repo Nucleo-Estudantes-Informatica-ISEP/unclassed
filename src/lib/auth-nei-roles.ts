@@ -1,16 +1,9 @@
-export const AUTH_NEI_ROLES = [
-  "student",
-  "nei_member",
-  "admin",
-  "employee",
-] as const;
+export const AUTH_NEI_ROLES = ["admin"] as const;
 
 export type AuthNeiRole = (typeof AUTH_NEI_ROLES)[number];
 
 const ROLE_SET = new Set<string>(AUTH_NEI_ROLES);
 const DEFAULT_ROLE_CLAIM = "urn:zitadel:iam:org:project:roles";
-const ZITADEL_PROJECT_ROLE_CLAIM =
-  /^urn:zitadel:iam:org:project(?::id:[^:]+)?:roles$/;
 
 function rolesFromValue(value: unknown): string[] {
   if (Array.isArray(value))
@@ -26,13 +19,9 @@ export function getAuthNeiRoles(
 ): AuthNeiRole[] {
   if (!claims) return [];
 
-  const keys = new Set([
-    configuredClaim,
-    DEFAULT_ROLE_CLAIM,
-    ...Object.keys(claims).filter((key) =>
-      ZITADEL_PROJECT_ROLE_CLAIM.test(key)
-    ),
-  ]);
+  // Unclassed has its own ZITADEL Project. Never aggregate role claims from
+  // other NEI applications, even when their project-ID claims are present.
+  const keys = new Set([configuredClaim, DEFAULT_ROLE_CLAIM]);
   const roles = new Set<AuthNeiRole>();
 
   for (const key of keys) {
@@ -56,10 +45,6 @@ export function hasAuthNeiRole(
   if (!source) return false;
   const roles = source.roles ?? source.authNeiRoles;
   return roles?.includes(role) ?? false;
-}
-
-export function isStudent(source: RolesSource | null | undefined) {
-  return hasAuthNeiRole(source, "student");
 }
 
 export function isAdmin(source: RolesSource | null | undefined) {

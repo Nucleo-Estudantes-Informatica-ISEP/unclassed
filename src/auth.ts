@@ -2,8 +2,7 @@ import NextAuth from "next-auth";
 import Zitadel from "next-auth/providers/zitadel";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
-import { getAuthNeiRoles, isAdmin, isStudent } from "@/lib/auth-nei-roles";
-import { provisionStudentForNormalOnboarding } from "@/lib/authnei-provisioner";
+import { getAuthNeiRoles, isAdmin } from "@/lib/auth-nei-roles";
 import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 
@@ -77,27 +76,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const sub = getClaim(claims, "sub") || account.providerAccountId || null;
-      if (!sub) return false;
-
-      try {
-        const result = await provisionStudentForNormalOnboarding(
-          sub,
-          getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM)
-        );
-        return result === "provisioned"
-          ? "/login?studentProvisioned=true"
-          : true;
-      } catch (error) {
-        if (authDebugEnabled) {
-          console.warn("[auth][provisioning]", {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Unknown provisioning failure",
-          });
-        }
-        return false;
-      }
+      return Boolean(sub);
     },
     async jwt({ token, account, profile, trigger }) {
       if (typeof account?.id_token === "string" && account.id_token.length > 0) {
@@ -135,10 +114,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const authNeiRoles = getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM);
-      if (!isStudent({ authNeiRoles })) {
-        throw new Error("OIDC login did not include the required student role.");
-      }
-
       const localUser = await syncLocalUserFromOidc({
         sub,
         email: getClaim(claims, "email") || token.email,

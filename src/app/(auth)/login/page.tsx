@@ -17,7 +17,6 @@ const Login: React.FC = () => {
     searchParams.get("callbackUrl") ||
     searchParams.get("redirectTo") ||
     "/dashboard";
-  const studentProvisioned = searchParams.get("studentProvisioned") === "true";
 
   useEffect(() => {
     let mounted = true;
@@ -92,12 +91,6 @@ const Login: React.FC = () => {
         ) : null}
 
         <div className="space-y-3">
-          {studentProvisioned ? (
-            <p className="border-primary/30 bg-primary/10 rounded-md border px-4 py-3 text-sm">
-              Conta classificada como estudante. Continua novamente para obter
-              uma sessão com os novos acessos.
-            </p>
-          ) : null}
           <Button
             onClick={handleSignIn}
             size="lg"

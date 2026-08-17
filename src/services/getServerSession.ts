@@ -1,4 +1,4 @@
-import { isAdmin, isStudent } from "@/lib/auth-nei-roles";
+import { isAdmin } from "@/lib/auth-nei-roles";
 import { exclude } from "@/lib/exclude";
 import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 const getServerSession = async () => {
   const session = await auth();
 
-  if (!session?.user?.id || !isStudent(session.user)) {
+  if (!session?.user?.id) {
     return null;
   }
 
@@ -27,7 +27,7 @@ const getServerSession = async () => {
   return {
     ...safeUser,
     roles: session.user.roles,
-    // Compatibility projection only. AuthNEI remains the source of truth.
+    // Compatibility projection only. AuthNEI remains the source of truth for admin.
     role: isAdmin(session.user) ? ("ADMIN" as const) : ("USER" as const),
   };
 };
