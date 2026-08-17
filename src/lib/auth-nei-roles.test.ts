@@ -26,10 +26,10 @@ test("supports an explicitly configured Unclassed role claim", () => {
   assert.deepEqual(roles, ["admin"]);
 });
 
-test("does not aggregate roles from another ZITADEL project", () => {
+test("does not aggregate the documented role claim from another ZITADEL project", () => {
   const roles = getAuthNeiRoles({
     "urn:zitadel:iam:org:project:roles": {},
-    "urn:zitadel:iam:org:project:id:orbit-project:roles": {
+    "urn:zitadel:iam:org:project:orbit-project:roles": {
       admin: { org: "org" },
       nei_member: { org: "org" },
     },

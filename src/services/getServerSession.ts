@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 const getServerSession = async () => {
   const session = await auth();
 
-  if (!session?.user?.id) {
+  if (!session?.user?.id || session.error) {
     return null;
   }
 

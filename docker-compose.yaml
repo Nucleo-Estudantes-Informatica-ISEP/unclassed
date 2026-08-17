@@ -9,7 +9,7 @@ services:
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
       - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET:?AUTH_CLIENT_SECRET is required}
-      - AUTH_SCOPES=${AUTH_SCOPES:-openid email profile}
+      - AUTH_SCOPES=${AUTH_SCOPES:-openid email profile offline_access}
       - AUTH_ROLE_CLAIM=${AUTH_ROLE_CLAIM:-urn:zitadel:iam:org:project:roles}
       - AUTH_POST_LOGOUT_REDIRECT_URI=${AUTH_POST_LOGOUT_REDIRECT_URI:?AUTH_POST_LOGOUT_REDIRECT_URI is required}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-false}
