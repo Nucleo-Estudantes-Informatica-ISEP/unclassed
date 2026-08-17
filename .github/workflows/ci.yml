@@ -55,7 +55,7 @@ jobs:
         run: pnpm test
 
       - name: Validate Prisma schema
-        run: pnpm exec prisma validate
+        run: pnpm schema:validate
 
       - name: Production build
         run: pnpm build
