@@ -26,7 +26,7 @@ For each task:
 - Prefer TDD for bug fixes, matching rules, state transitions, locks, and authorization: first add a focused failing regression, implement the smallest correction, then refactor while the suite stays green. If a failure cannot be reproduced without a hosted dependency, document the limitation and add the nearest deterministic test plus a staging procedure.
 - Every non-trivial behavior change needs a regression test. A green build without tests is not completion.
 - PRs target `dev`; reviewed release promotion controls production. Dependabot targets `dev`, groups patch/minor maintenance, and leaves major framework/toolchain migrations for explicit planned work.
-- Required CI uses a frozen install and runs lint, typecheck, all tests, schema validation, production build, a non-root Docker image build, and Gitleaks. Never disable or bypass a gate to make a PR green.
+- Required CI uses a frozen install and runs lint, typecheck, all tests, schema validation, production build, a non-root Docker image build, Gitleaks, and CodeQL on every PR. Never disable or bypass a gate to make a PR green.
 - Production schema changes require `schema:audit`, a backup, `schema:deploy`, and post-deploy verification. Only the selected scheduler owner may run internal jobs.
 
 ---
@@ -166,8 +166,9 @@ Before finishing a change:
 2. Run `pnpm typecheck`.
 3. Run `pnpm test` for every change. Prefer writing the focused regression first when practical.
 4. Run `pnpm schema:validate` and `pnpm build` for configuration, route, schema, or rendering changes. Typecheck remains a separate required gate.
-5. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
-6. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
+5. Run `actionlint .github/workflows/*.yml` for GitHub Actions changes.
+6. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
+7. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
 `pnpm test` runs Node's built-in `node:test` runner (via `ts-node/register/transpile-only`) over every `*.test.ts` file under `src/`, discovered recursively by `run-tests.mjs` at the repo root (kept out of `scripts/`, which is gitignored — see Gotchas). Colocate a test next to the file it covers; follow the `node:test`/`node:assert` style already used in `cronScheduler.test.ts`, not a bare top-level `assert()` script. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
 
