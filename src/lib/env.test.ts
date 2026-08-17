@@ -22,19 +22,8 @@ test("fails fast when production runtime configuration is missing", () => {
   );
 });
 
-test("requires AuthNEI provisioner configuration in production", () => {
-  assert.throws(
-    () => parseEnvironment(productionBase),
-    /AUTHNEI_PROVISIONER_URL is required in production/
-  );
-
-  assert.doesNotThrow(() =>
-    parseEnvironment({
-      ...productionBase,
-      AUTHNEI_PROVISIONER_URL: "https://provisioner.example.com",
-      AUTHNEI_PROVISIONER_TOKEN: "c".repeat(32),
-    })
-  );
+test("accepts complete production configuration without a role provisioner", () => {
+  assert.doesNotThrow(() => parseEnvironment(productionBase));
 });
 
 test("allows secretless production builds but not malformed SMTP config", () => {
