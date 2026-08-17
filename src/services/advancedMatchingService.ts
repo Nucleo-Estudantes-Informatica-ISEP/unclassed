@@ -4,8 +4,9 @@ import { env } from "@/lib/env";
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
 import {
-  buildRequestGraph,
+  buildPartitionGraph,
   calculateEdgeWeight,
+  convertCycleToMatch as convertGraphCycleToMatch,
   decideMatchOverlap,
   findCyclesFromNode,
   getIndividualSatisfaction,
@@ -1655,7 +1656,7 @@ export class AdvancedMatchingService {
 
       console.log(`📊 Found ${requests.length} active requests in partition`);
 
-      const builtGraph = buildRequestGraph(requests);
+      const builtGraph = buildPartitionGraph(requests);
 
       console.log(
         `🔗 Built graph with ${builtGraph.size} nodes and ${Array.from(builtGraph.values()).reduce((sum: number, edges: GraphEdge[]) => sum + edges.length, 0)} edges`
@@ -1678,70 +1679,19 @@ export class AdvancedMatchingService {
   ): Promise<MatchResult | null> {
     try {
       console.log(`🔄 Converting cycle to match: ${cycle.join(" → ")}`);
-
-      const participants: MatchParticipant[] = [];
-      let totalSatisfactionScore = 0;
-
-      // Get detailed information for each participant in the cycle
-      for (let i = 0; i < cycle.length; i++) {
-        const currentRequestId = cycle[i];
-        const nextRequestId = cycle[(i + 1) % cycle.length];
-
-        // Get the edge from current to next
-        const edges = graph.get(currentRequestId) || [];
-        const edge = edges.find((e: GraphEdge) => e.to === nextRequestId);
-
-        if (!edge) {
-          console.warn(
-            `⚠️ Missing edge from ${currentRequestId} to ${nextRequestId}`
-          );
-          return null;
-        }
-
-        // Get request details
-        const requestDetails = await this.getRequestDetails(currentRequestId);
-        if (!requestDetails) {
-          console.warn(`⚠️ Request details not found for ${currentRequestId}`);
-          return null;
-        }
-
-        participants.push({
-          userId: requestDetails.userId,
-          fromClass: requestDetails.currentClassId,
-          toClass: edge.toClassId,
-          requestId: currentRequestId,
-          requestType: requestDetails.requestType,
-          satisfactionScore: edge.satisfactionScore,
-        });
-
-        totalSatisfactionScore += edge.satisfactionScore;
-      }
-
-      const averageSatisfactionScore = totalSatisfactionScore / cycle.length;
-
-      // Determine match type based on participant requests
-      const matchType = participants[0].requestType;
-      const swapPattern =
-        cycle.length === 2
-          ? "DIRECT"
-          : cycle.length === 3
-            ? "THREE_WAY"
-            : "MULTI_WAY";
-
-      const matchResult: MatchResult = {
-        pattern: swapPattern as "DIRECT" | "THREE_WAY" | "MULTI_WAY",
-        participants,
-        satisfactionScore: averageSatisfactionScore,
-        processingTime: Date.now() - context.startTime,
-        isProvisional: false,
-        graphPartition: context.partition.partitionKey,
-        singleSwapRequestIds: matchType === "single" ? cycle : [],
-        bundleSwapRequestIds: matchType === "bundle" ? cycle : [],
-      };
-
-      console.log(
-        `✅ Created ${swapPattern} match with satisfaction score ${averageSatisfactionScore.toFixed(3)}`
+      const matchResult = await convertGraphCycleToMatch(
+        cycle,
+        graph,
+        (requestId) => this.getRequestDetails(requestId),
+        context.partition.partitionKey,
+        context.startTime
       );
+
+      if (matchResult) {
+        console.log(
+          `✅ Created ${matchResult.pattern} match with satisfaction score ${matchResult.satisfactionScore.toFixed(3)}`
+        );
+      }
 
       return matchResult;
     } catch (error) {
