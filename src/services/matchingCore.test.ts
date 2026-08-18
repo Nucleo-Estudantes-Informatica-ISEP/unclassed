@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { afterEach, test, vi } from "vitest";
 
 import {
-  buildRequestGraph,
+  buildPartitionGraph,
+  convertCycleToMatch,
   decideMatchOverlap,
   findCyclesFromNode,
   type GraphNode,
@@ -27,29 +28,96 @@ function request(
   };
 }
 
-test("characterizes direct two-way matching", () => {
-  const graph = buildRequestGraph([
+function lookup(requests: GraphNode[]) {
+  return async (id: string) =>
+    requests.find((candidate) => candidate.requestId === id) ?? null;
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+test("characterizes a direct-swap pair", async () => {
+  vi.spyOn(Date, "now").mockReturnValue(1_500);
+  const requests = [
     request("a", "user-a", "class-a", ["class-b"]),
     request("b", "user-b", "class-b", ["class-a"]),
-  ]);
+  ];
+  const graph = buildPartitionGraph(requests);
+  const cycle = findCyclesFromNode("a", graph, 2)[0];
 
-  assert.deepEqual(findCyclesFromNode("a", graph, 2), [["a", "b"]]);
-  assert.equal(graph.get("a")?.[0]?.satisfactionScore, 1);
+  assert.deepEqual(cycle, ["a", "b"]);
+  assert.deepEqual(
+    await convertCycleToMatch(
+      cycle,
+      graph,
+      lookup(requests),
+      "subject-1",
+      1_000
+    ),
+    {
+      pattern: "DIRECT",
+      participants: [
+        {
+          userId: "user-a",
+          fromClass: "class-a",
+          toClass: "class-b",
+          requestId: "a",
+          requestType: "single",
+          satisfactionScore: 1,
+        },
+        {
+          userId: "user-b",
+          fromClass: "class-b",
+          toClass: "class-a",
+          requestId: "b",
+          requestType: "single",
+          satisfactionScore: 1,
+        },
+      ],
+      satisfactionScore: 1,
+      processingTime: 500,
+      isProvisional: false,
+      graphPartition: "subject-1",
+      singleSwapRequestIds: ["a", "b"],
+      bundleSwapRequestIds: [],
+    }
+  );
 });
 
-test("characterizes three-way matching", () => {
-  const graph = buildRequestGraph([
+test("characterizes a three-way cycle", async () => {
+  const requests = [
     request("a", "user-a", "class-a", ["class-b"]),
     request("b", "user-b", "class-b", ["class-c"]),
     request("c", "user-c", "class-c", ["class-a"]),
-  ]);
+  ];
+  const graph = buildPartitionGraph(requests);
+  const cycle = findCyclesFromNode("a", graph, 3)[0];
+  const match = await convertCycleToMatch(
+    cycle,
+    graph,
+    lookup(requests),
+    "subject-1",
+    Date.now()
+  );
 
-  assert.deepEqual(findCyclesFromNode("a", graph, 3), [["a", "b", "c"]]);
+  assert.deepEqual(cycle, ["a", "b", "c"]);
   assert.deepEqual(findCyclesFromNode("a", graph, 2), []);
+  assert.equal(match?.pattern, "THREE_WAY");
+  assert.deepEqual(match?.singleSwapRequestIds, ["a", "b", "c"]);
+  assert.deepEqual(
+    match?.participants.map(({ fromClass, toClass }) => ({
+      fromClass,
+      toClass,
+    })),
+    [
+      { fromClass: "class-a", toClass: "class-b" },
+      { fromClass: "class-b", toClass: "class-c" },
+      { fromClass: "class-c", toClass: "class-a" },
+    ]
+  );
 });
 
 test("does not match unsatisfiable preferences", () => {
-  const graph = buildRequestGraph([
+  const graph = buildPartitionGraph([
     request("a", "user-a", "class-a", ["class-c"]),
     request("b", "user-b", "class-b", ["class-a"]),
   ]);
@@ -58,7 +126,7 @@ test("does not match unsatisfiable preferences", () => {
   assert.equal(graph.get("a")?.length, 0);
 });
 
-test("never replaces committed overlaps and upgrades only better provisionals", () => {
+test("keeps committed overlaps and upgrades only better provisionals", () => {
   assert.equal(
     decideMatchOverlap(false, 1, [
       {

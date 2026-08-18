@@ -55,7 +55,7 @@ Node.js `>=20.9.0` required. Prefer `pnpm`; `package-lock.json` is legacy and `p
 pnpm dev        # Next.js development server
 pnpm lint       # ESLint
 pnpm typecheck  # tsc --noEmit
-pnpm test       # node:test over every src/**/*.test.ts, via run-tests.mjs
+pnpm test       # Vitest over every **/*.{test,spec}.ts file
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
 pnpm sync       # compatibility alias for schema:deploy
@@ -170,7 +170,7 @@ Before finishing a change:
 6. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
 7. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
-`pnpm test` runs Node's built-in `node:test` runner (via `ts-node/register/transpile-only`) over every `*.test.ts` file under `src/`, discovered recursively by `run-tests.mjs` at the repo root (kept out of `scripts/`, which is gitignored — see Gotchas). Colocate a test next to the file it covers; follow the `node:test`/`node:assert` style already used in `cronScheduler.test.ts`, not a bare top-level `assert()` script. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
+`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. Colocate a test next to the file it covers; import `test` from `vitest`, and use either Vitest expectations or `node:assert`. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
 
 ## Gotchas
 
@@ -179,5 +179,5 @@ Before finishing a change:
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
 - `src/app/api/test-matches/route.ts` and `prisma/reset.ts` are development/destructive surfaces. Treat them as unsafe outside an explicit, confirmed local task.
-- `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task — this is why `run-tests.mjs` lives at the repo root instead.
+- `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.

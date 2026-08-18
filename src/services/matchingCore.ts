@@ -20,6 +20,24 @@ export interface GraphEdge {
   satisfactionScore: number;
 }
 
+export interface ConvertedMatch {
+  pattern: "DIRECT" | "THREE_WAY" | "MULTI_WAY";
+  participants: Array<{
+    userId: string;
+    fromClass: string;
+    toClass: string;
+    requestId: string;
+    requestType: "single" | "bundle";
+    satisfactionScore: number;
+  }>;
+  satisfactionScore: number;
+  processingTime: number;
+  isProvisional: false;
+  graphPartition: string;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+}
+
 export function getIndividualSatisfaction(
   node: GraphNode,
   targetClassId: string
@@ -44,7 +62,7 @@ export function calculateEdgeWeight(
   return satisfaction * priorityWeight;
 }
 
-export function buildRequestGraph(
+export function buildPartitionGraph(
   requests: GraphNode[]
 ): Map<string, GraphEdge[]> {
   const graph = new Map<string, GraphEdge[]>();
@@ -72,6 +90,66 @@ export function buildRequestGraph(
   }
 
   return graph;
+}
+
+export async function convertCycleToMatch(
+  cycle: string[],
+  graph: Map<string, GraphEdge[]>,
+  getRequestDetails: (requestId: string) => Promise<GraphNode | null>,
+  graphPartition: string,
+  startTime: number
+): Promise<ConvertedMatch | null> {
+  const participants: ConvertedMatch["participants"] = [];
+  let totalSatisfactionScore = 0;
+
+  for (let i = 0; i < cycle.length; i++) {
+    const currentRequestId = cycle[i];
+    const nextRequestId = cycle[(i + 1) % cycle.length];
+    const edge = (graph.get(currentRequestId) ?? []).find(
+      (candidate) => candidate.to === nextRequestId
+    );
+
+    if (!edge) {
+      console.warn(
+        `⚠️ Missing edge from ${currentRequestId} to ${nextRequestId}`
+      );
+      return null;
+    }
+
+    const requestDetails = await getRequestDetails(currentRequestId);
+    if (!requestDetails) {
+      console.warn(`⚠️ Request details not found for ${currentRequestId}`);
+      return null;
+    }
+
+    participants.push({
+      userId: requestDetails.userId,
+      fromClass: requestDetails.currentClassId,
+      toClass: edge.toClassId,
+      requestId: currentRequestId,
+      requestType: requestDetails.requestType,
+      satisfactionScore: edge.satisfactionScore,
+    });
+    totalSatisfactionScore += edge.satisfactionScore;
+  }
+
+  const requestType = participants[0].requestType;
+
+  return {
+    pattern:
+      cycle.length === 2
+        ? "DIRECT"
+        : cycle.length === 3
+          ? "THREE_WAY"
+          : "MULTI_WAY",
+    participants,
+    satisfactionScore: totalSatisfactionScore / cycle.length,
+    processingTime: Date.now() - startTime,
+    isProvisional: false,
+    graphPartition,
+    singleSwapRequestIds: requestType === "single" ? cycle : [],
+    bundleSwapRequestIds: requestType === "bundle" ? cycle : [],
+  };
 }
 
 export function findCyclesFromNode(

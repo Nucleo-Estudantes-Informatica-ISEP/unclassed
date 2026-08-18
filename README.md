@@ -523,7 +523,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm test` runs Node's built-in test runner over every `*.test.ts` file under `src/`. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
+`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
 
 GitHub CI uses a frozen install and requires lint, typecheck, all tests, Prisma/schema validation, the production build, a non-root Docker image build, and Gitleaks before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
 
