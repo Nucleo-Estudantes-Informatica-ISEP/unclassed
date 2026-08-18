@@ -15,8 +15,9 @@ services:
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
       - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET:?AUTH_CLIENT_SECRET is required}
-      - AUTH_SCOPES=${AUTH_SCOPES:-openid email profile offline_access}
-      - AUTH_ROLE_CLAIM=${AUTH_ROLE_CLAIM:-urn:zitadel:iam:org:project:roles}
+      - AUTH_GLOBAL_ADMIN_PROJECT_ID=${AUTH_GLOBAL_ADMIN_PROJECT_ID:?AUTH_GLOBAL_ADMIN_PROJECT_ID is required}
+      - AUTH_SCOPES=openid email profile offline_access urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:aud
+      - AUTH_ROLE_CLAIM=urn:zitadel:iam:org:project:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:roles
       - AUTH_POST_LOGOUT_REDIRECT_URI=${AUTH_POST_LOGOUT_REDIRECT_URI:?AUTH_POST_LOGOUT_REDIRECT_URI is required}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-false}
       - CRON_SECRET=${CRON_SECRET:?CRON_SECRET is required}
@@ -42,8 +43,9 @@ services:
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
       - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET:?AUTH_CLIENT_SECRET is required}
-      - AUTH_SCOPES=${AUTH_SCOPES:-openid email profile offline_access}
-      - AUTH_ROLE_CLAIM=${AUTH_ROLE_CLAIM:-urn:zitadel:iam:org:project:roles}
+      - AUTH_GLOBAL_ADMIN_PROJECT_ID=${AUTH_GLOBAL_ADMIN_PROJECT_ID:?AUTH_GLOBAL_ADMIN_PROJECT_ID is required}
+      - AUTH_SCOPES=openid email profile offline_access urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:aud
+      - AUTH_ROLE_CLAIM=urn:zitadel:iam:org:project:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:roles
       - AUTH_POST_LOGOUT_REDIRECT_URI=${AUTH_POST_LOGOUT_REDIRECT_URI:?AUTH_POST_LOGOUT_REDIRECT_URI is required}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-false}
       - CRON_SECRET=${CRON_SECRET:?CRON_SECRET is required}
@@ -69,8 +71,9 @@ services:
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
       - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET:?AUTH_CLIENT_SECRET is required}
-      - AUTH_SCOPES=${AUTH_SCOPES:-openid email profile offline_access}
-      - AUTH_ROLE_CLAIM=${AUTH_ROLE_CLAIM:-urn:zitadel:iam:org:project:roles}
+      - AUTH_GLOBAL_ADMIN_PROJECT_ID=${AUTH_GLOBAL_ADMIN_PROJECT_ID:?AUTH_GLOBAL_ADMIN_PROJECT_ID is required}
+      - AUTH_SCOPES=openid email profile offline_access urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:aud
+      - AUTH_ROLE_CLAIM=urn:zitadel:iam:org:project:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:roles
       - AUTH_POST_LOGOUT_REDIRECT_URI=${AUTH_POST_LOGOUT_REDIRECT_URI:?AUTH_POST_LOGOUT_REDIRECT_URI is required}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-false}
       - CRON_SECRET=${CRON_SECRET:?CRON_SECRET is required}
