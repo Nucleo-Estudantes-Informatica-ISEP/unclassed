@@ -46,7 +46,7 @@ test("fails closed when no shared role claim is configured", () => {
         admin: { org: "org" },
       },
     },
-    undefined
+    ""
   );
 
   assert.deepEqual(roles, []);
