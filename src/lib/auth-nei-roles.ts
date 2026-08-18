@@ -3,7 +3,6 @@ export const AUTH_NEI_ROLES = ["admin"] as const;
 export type AuthNeiRole = (typeof AUTH_NEI_ROLES)[number];
 
 const ROLE_SET = new Set<string>(AUTH_NEI_ROLES);
-const DEFAULT_ROLE_CLAIM = "urn:zitadel:iam:org:project:roles";
 
 function rolesFromValue(value: unknown): string[] {
   if (Array.isArray(value))
@@ -15,19 +14,16 @@ function rolesFromValue(value: unknown): string[] {
 
 export function getAuthNeiRoles(
   claims: Record<string, unknown> | undefined,
-  configuredClaim = process.env.AUTH_ROLE_CLAIM ?? DEFAULT_ROLE_CLAIM
+  configuredClaim = process.env.AUTH_ROLE_CLAIM
 ): AuthNeiRole[] {
-  if (!claims) return [];
+  if (!claims || !configuredClaim) return [];
 
-  // Unclassed has its own ZITADEL Project. Never aggregate role claims from
-  // other NEI applications, even when their project-ID claims are present.
-  const keys = new Set([configuredClaim, DEFAULT_ROLE_CLAIM]);
+  // The shared NEI admin role is authoritative. Never fall back to the
+  // generic/current-project claim or aggregate roles from other projects.
   const roles = new Set<AuthNeiRole>();
 
-  for (const key of keys) {
-    for (const role of rolesFromValue(claims[key])) {
-      if (ROLE_SET.has(role)) roles.add(role as AuthNeiRole);
-    }
+  for (const role of rolesFromValue(claims[configuredClaim])) {
+    if (ROLE_SET.has(role)) roles.add(role as AuthNeiRole);
   }
 
   return AUTH_NEI_ROLES.filter((role) => roles.has(role));
