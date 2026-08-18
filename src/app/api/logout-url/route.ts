@@ -47,7 +47,7 @@ async function getJwtTokenFromRequest(request: NextRequest) {
   for (const variant of sessionCookieVariants) {
     const token = (await getToken({
       req,
-      secret: env.AUTH_SECRET || env.NEXTAUTH_SECRET,
+      secret: env.AUTH_SECRET,
       cookieName: variant.cookieName,
       secureCookie: variant.secureCookie,
     })) as JWT | null;
@@ -59,7 +59,7 @@ async function getJwtTokenFromRequest(request: NextRequest) {
 
   return (await getToken({
     req,
-    secret: env.AUTH_SECRET || env.NEXTAUTH_SECRET,
+    secret: env.AUTH_SECRET,
   })) as JWT | null;
 }
 
