@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { validateOrigin } from "@/lib/originValidation";
+import { isAdmin } from "@/lib/auth-nei-roles";
 import { env } from "@/lib/env";
+import { validateOrigin } from "@/lib/originValidation";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
@@ -61,9 +62,7 @@ async function enforceRateLimit(
     resolveRateLimitIdentifier({ ...identity, headers: request.headers })
   );
 
-  if (result.allowed) {
-    return null;
-  }
+  if (result.allowed) return null;
 
   return {
     ok: false,
@@ -117,11 +116,7 @@ export async function authorizeRequest(
       if (limited) return limited;
     }
 
-    return {
-      ok: true,
-      authenticatedBy: "cron",
-      session: null,
-    };
+    return { ok: true, authenticatedBy: "cron", session: null };
   }
 
   const session = await getServerSession().catch(() => null);
@@ -133,11 +128,7 @@ export async function authorizeRequest(
     }
 
     if (!requireAuth && !requireAdmin) {
-      return {
-        ok: true,
-        authenticatedBy: "public",
-        session: null,
-      };
+      return { ok: true, authenticatedBy: "public", session: null };
     }
 
     return {
@@ -146,7 +137,7 @@ export async function authorizeRequest(
     };
   }
 
-  if (requireAdmin && session.role !== "ADMIN") {
+  if (requireAdmin && !isAdmin(session)) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -177,9 +168,5 @@ export async function authorizeRequest(
     if (limited) return limited;
   }
 
-  return {
-    ok: true,
-    authenticatedBy: "session",
-    session,
-  };
+  return { ok: true, authenticatedBy: "session", session };
 }

@@ -43,10 +43,10 @@ const environmentSchema = z
     AUTH_CLIENT_SECRET: optionalString,
     AUTH_SCOPES: z.preprocess(
       emptyToUndefined,
-      z.string().trim().min(1).default("openid email profile")
+      z.string().trim().min(1).default("openid email profile offline_access")
     ),
+    AUTH_ROLE_CLAIM: optionalString,
     AUTH_SECRET: optionalSecret,
-    NEXTAUTH_SECRET: optionalSecret,
     AUTH_POST_LOGOUT_REDIRECT_URI: optionalUrl,
     AUTH_TRUST_HOST: optionalBoolean(false),
     AUTH_DEBUG: optionalBoolean(false),

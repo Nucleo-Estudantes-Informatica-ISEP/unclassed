@@ -1,14 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { User, LogOut, LogIn, UserPlus } from "lucide-react";
-import { Button } from "@/lib/components/ui/button";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogIn, LogOut, RefreshCw, User, UserPlus } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
+import {
+  signOutFromApp,
+  switchAuthNeiAccount,
+} from "@/lib/client-auth-actions";
+import { Button } from "@/lib/components/ui/button";
 import type { SessionUser } from "@/services/getServerSession";
 
 import DarkModeToggle from "../DarkModeToggle";
@@ -49,6 +53,14 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
     }
   };
 
+  const handleAppLogout = async () => {
+    await signOutFromApp("/");
+  };
+
+  const handleSwitchAccount = async () => {
+    await switchAuthNeiAccount("/dashboard");
+  };
+
   // Get initials for avatar
   const initials = user?.name
     .split(" ")
@@ -58,8 +70,8 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
     .slice(0, 2);
 
   return (
-    <header className="sticky top-0 left-0 z-30 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
-      <nav className="container flex h-16 md:h-[4.5rem] items-center justify-between gap-4">
+    <header className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/70 sticky top-0 left-0 z-30 w-full border-b backdrop-blur-xl">
+      <nav className="container flex h-16 items-center justify-between gap-4 md:h-[4.5rem]">
         {/* Left: Logo */}
         <Link
           href={user ? "/dashboard" : "/"}
@@ -70,7 +82,7 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
             alt="Unclassed Logo"
             width={100}
             height={28}
-            className="block h-7 w-auto dark:hidden sm:h-8"
+            className="block h-7 w-auto sm:h-8 dark:hidden"
             priority
           />
           <Image
@@ -78,42 +90,42 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
             alt="Unclassed Logo"
             width={100}
             height={28}
-            className="hidden h-7 w-auto dark:block sm:h-8"
+            className="hidden h-7 w-auto sm:h-8 dark:block"
             priority
           />
         </Link>
 
         {/* Center: Navigation Links */}
-        <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
           {user && (
             <>
               <Link
                 href="/dashboard"
-                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
               >
                 Visão Geral
               </Link>
               <Link
                 href="/swap-requests"
-                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
               >
                 Criar Pedido
               </Link>
               <Link
                 href="/requests"
-                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
               >
                 Pedidos
               </Link>
               <Link
                 href="/matches"
-                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
               >
                 Matches
               </Link>
               <Link
                 href="/statistics"
-                className="rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors"
               >
                 Estatísticas
               </Link>
@@ -130,18 +142,20 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
               {/* User Menu */}
               <div className="relative">
                 <button
-                  className="flex h-10 items-center gap-2 rounded-md px-2 py-1 hover:bg-accent/60"
+                  className="hover:bg-accent/60 flex h-10 items-center gap-2 rounded-md px-2 py-1"
                   onClick={() => setShowUserMenu(!showUserMenu)}
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
+                  <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white">
                     {initials}
                   </div>
                   <div className="hidden flex-col items-start lg:flex">
                     <span className="text-sm font-medium">{user.name}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {user.email}
+                    </span>
                   </div>
                   {user.role === "ADMIN" && (
-                    <span className="hidden rounded-full bg-primary/10 px-2 py-1 text-xs text-primary lg:block">
+                    <span className="bg-primary/10 text-primary hidden rounded-full px-2 py-1 text-xs lg:block">
                       Admin
                     </span>
                   )}
@@ -149,17 +163,17 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
 
                 {/* User Dropdown Menu */}
                 {showUserMenu && (
-                  <div className="absolute right-0 top-12 z-50 w-64 rounded-lg border border-border bg-background shadow-lg">
-                    <div className="border-b border-border p-3">
+                  <div className="border-border bg-background absolute top-12 right-0 z-50 w-64 rounded-lg border shadow-lg">
+                    <div className="border-border border-b p-3">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none text-foreground">
+                        <p className="text-foreground text-sm leading-none font-medium">
                           {user.name}
                         </p>
-                        <p className="text-xs leading-none text-muted-foreground">
+                        <p className="text-muted-foreground text-xs leading-none">
                           {user.email}
                         </p>
                         {user.role === "ADMIN" && (
-                          <span className="w-fit rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+                          <span className="bg-primary/10 text-primary w-fit rounded-full px-2 py-1 text-xs">
                             Admin
                           </span>
                         )}
@@ -171,35 +185,35 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                       <div className="block md:hidden">
                         <Link
                           href="/dashboard"
-                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                           onClick={() => setShowUserMenu(false)}
                         >
                           Visão Geral
                         </Link>
                         <Link
                           href="/swap-requests"
-                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                           onClick={() => setShowUserMenu(false)}
                         >
                           Criar Pedido
                         </Link>
                         <Link
                           href="/requests"
-                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                           onClick={() => setShowUserMenu(false)}
                         >
                           Pedidos
                         </Link>
                         <Link
                           href="/matches"
-                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                           onClick={() => setShowUserMenu(false)}
                         >
                           Matches
                         </Link>
                         <Link
                           href="/statistics"
-                          className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                          className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                           onClick={() => setShowUserMenu(false)}
                         >
                           Estatísticas
@@ -208,7 +222,7 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
 
                       <Link
                         href="/profile"
-                        className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-foreground hover:bg-muted"
+                        className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
                         onClick={() => setShowUserMenu(false)}
                       >
                         <User className="mr-2 h-4 w-4" />
@@ -216,12 +230,30 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                       </Link>
 
                       <button
+                        onClick={handleAppLogout}
+                        className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sair apenas do Unclassed</span>
+                      </button>
+
+                      <button
+                        onClick={handleSwitchAccount}
+                        className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        <span>Trocar de conta</span>
+                      </button>
+
+                      <button
                         onClick={handleLogout}
                         disabled={isLoggingOut}
                         className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                       >
                         <LogOut className="mr-2 h-4 w-4" />
-                        <span>{isLoggingOut ? "A sair..." : "Sair"}</span>
+                        <span>
+                          {isLoggingOut ? "A sair..." : "Sair do AuthNEI"}
+                        </span>
                       </button>
                     </div>
                   </div>
