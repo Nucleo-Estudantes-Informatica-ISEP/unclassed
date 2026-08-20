@@ -1,6 +1,35 @@
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+
 import { PrismaClient } from "@prisma/client";
 
 import { mongoIndexSpecifications } from "./mongodb-indexes.mjs";
+
+const envReloadMarker = "UNCLASSED_SCHEMA_ENV_RELOADED";
+
+if (
+  !process.env.DATABASE_URL &&
+  !process.env[envReloadMarker] &&
+  existsSync(".env")
+) {
+  const result = spawnSync(
+    process.execPath,
+    ["--env-file=.env", ...process.argv.slice(1)],
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        [envReloadMarker]: "1",
+      },
+    }
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  process.exit(result.status ?? 1);
+}
 
 const prisma = new PrismaClient();
 const auditOnly = process.argv.includes("--audit-only");
