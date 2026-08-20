@@ -21,6 +21,9 @@ RUN \
     echo "Lockfile not found." && exit 1; \
   fi
 
+# One-shot schema deployment image used by Docker Compose before app startup
+FROM deps AS schema
+CMD ["pnpm", "schema:deploy"]
 
 # Rebuild the source code only when needed
 FROM base AS builder

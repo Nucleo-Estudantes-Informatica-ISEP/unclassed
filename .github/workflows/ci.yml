@@ -20,6 +20,7 @@ env:
   AUTH_ISSUER_URL: https://auth.example.test
   AUTH_CLIENT_ID: ci-client
   AUTH_CLIENT_SECRET: ci-client-secret
+  AUTH_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/
   ENABLE_CRON_SCHEDULER: "false"
   CRON_SECRET: ci-only-cron-secret-at-least-32-characters
 
@@ -65,8 +66,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build image
+      - name: Build runtime image
         run: docker build -t unclassed-check .
+
+      - name: Build schema deployment image
+        run: docker build --target schema -t unclassed-schema-check .
 
       - name: Verify non-root runtime
         run: test "$(docker inspect --format '{{.Config.User}}' unclassed-check)" = "nextjs"
+
+      - name: Verify runtime container starts
+        run: |
+          docker run --detach --name unclassed-runtime-check \
+            --env NODE_ENV=production \
+            --env DATABASE_URL=mongodb://127.0.0.1:27017/unclassed_ci \
+            --env APP_BASE_URL=http://localhost:3000 \
+            --env NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+            --env AUTH_SECRET=ci-only-auth-secret-with-at-least-32-characters \
+            --env AUTH_ISSUER_URL=https://auth.example.test \
+            --env AUTH_CLIENT_ID=ci-client \
+            --env AUTH_CLIENT_SECRET=ci-client-secret \
+            --env AUTH_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/ \
+            --env ENABLE_CRON_SCHEDULER=false \
+            --env CRON_SECRET=ci-only-cron-secret-at-least-32-characters \
+            unclassed-check
+
+          sleep 5
+
+          if [ "$(docker inspect --format '{{.State.Running}}' unclassed-runtime-check)" != "true" ]; then
+            docker logs unclassed-runtime-check
+            exit 1
+          fi
+
+      - name: Show runtime logs on failure
+        if: failure()
+        run: docker logs unclassed-runtime-check || true
+
+      - name: Cleanup runtime container
+        if: always()
+        run: docker rm -f unclassed-runtime-check || true

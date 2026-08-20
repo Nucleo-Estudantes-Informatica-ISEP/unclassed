@@ -2,6 +2,12 @@
 const nextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
+  outputFileTracingIncludes: {
+    '/*': [
+      './node_modules/@swc/helpers/**/*',
+      './node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*',
+    ],
+  },
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
