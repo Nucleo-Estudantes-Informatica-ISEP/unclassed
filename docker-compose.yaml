@@ -19,6 +19,7 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:-${SERVICE_URL_APP:-http://localhost:3000}}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-${SERVICE_URL_APP:-http://localhost:3000}}
       - AUTH_SECRET=${AUTH_SECRET:-${SERVICE_REALBASE64_64_AUTH}}
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:-https://auth.nei-isep.org}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
