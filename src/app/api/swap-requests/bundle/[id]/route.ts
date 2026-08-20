@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import getServerSession from "@/services/getServerSession";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
+import { toBundleSwapRequestDto } from "@/services/swapRequestDto";
 
 const updateBundleSwapRequestSchema = z.object({
   preferredClassIds: z.array(z.string()).min(1).optional(),
@@ -22,10 +24,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const swapRequest = await prisma.bundleSwapRequest.findUnique({
       where: { id },
@@ -57,7 +60,9 @@ export async function GET(
       select: { id: true, name: true, year: true }
     });
 
-    return NextResponse.json({ ...swapRequest, preferredClasses });
+    return NextResponse.json(
+      toBundleSwapRequestDto(swapRequest, preferredClasses)
+    );
   } catch (error) {
     console.error("Error fetching bundle swap request:", error);
     return NextResponse.json(
@@ -73,10 +78,13 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const body = await request.json();
     const validatedData = updateBundleSwapRequestSchema.parse(body);
@@ -146,7 +154,9 @@ export async function PUT(
       select: { id: true, name: true, year: true }
     });
 
-    return NextResponse.json({ ...updatedRequest, preferredClasses });
+    return NextResponse.json(
+      toBundleSwapRequestDto(updatedRequest, preferredClasses)
+    );
 
   } catch (error) {
     console.error("Error updating bundle swap request:", error);
@@ -171,10 +181,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const existingRequest = await prisma.bundleSwapRequest.findUnique({
       where: { id }

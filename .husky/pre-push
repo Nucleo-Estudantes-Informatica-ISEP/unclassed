@@ -1,0 +1,5 @@
+pnpm test
+pnpm typecheck
+pnpm exec eslint . --max-warnings=0
+pnpm schema:validate
+pnpm build

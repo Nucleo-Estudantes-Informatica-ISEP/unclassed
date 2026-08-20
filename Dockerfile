@@ -1,5 +1,6 @@
 # Multi-stage build for Next.js application
-FROM node:20-alpine AS base
+FROM node:26-alpine AS base
+RUN npm install --global pnpm@9.15.9
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -13,7 +14,7 @@ COPY prisma ./prisma
 # Install dependencies based on the preferred package manager
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm install --frozen-lockfile; \
+    pnpm install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then \
     npm ci; \
   else \
@@ -34,7 +35,7 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm run build; \
+    pnpm run build; \
   else \
     npm run build; \
   fi

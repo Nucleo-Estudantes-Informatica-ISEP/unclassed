@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
 import { Button } from "@/lib/components/ui/button";
 import { Badge } from "@/lib/components/ui/badge";
@@ -19,8 +19,6 @@ import {
   Play,
   Pause,
   Settings,
-  ArrowLeftRight,
-  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -92,25 +90,8 @@ export default function AdvancedMatchingDashboard() {
   const [runningBatch, setRunningBatch] = useState(false);
   const [lastBatchResult, setLastBatchResult] = useState<BatchResult | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout>();
 
-  // Load initial data
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Setup auto-refresh
-  useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(loadStats, 30000); // 30 seconds
-      setRefreshInterval(interval);
-      return () => clearInterval(interval);
-    } else if (refreshInterval) {
-      clearInterval(refreshInterval);
-    }
-  }, [autoRefresh]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const [matchingResponse, cronResponse] = await Promise.all([
         fetch('/api/matching'),
@@ -138,7 +119,20 @@ export default function AdvancedMatchingDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load initial data
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // Setup auto-refresh
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(loadStats, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadStats]);
 
   const runBatchProcessing = async () => {
     setRunningBatch(true);

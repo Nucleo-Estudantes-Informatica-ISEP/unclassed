@@ -25,6 +25,7 @@ model User {
   emailNotifications      Boolean             @default(true) // Match notifications
   sharePhoneOnMatch       Boolean             @default(false) // Share phone number with match partners
   createdAt               DateTime            @default(now())
+  onboardingCompletedAt   DateTime?
   role                    Role                @default(USER)
   identities              UserIdentity[]
   singleSwapRequests      SingleSwapRequest[]
@@ -258,6 +259,16 @@ model CronLock {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   jobId     String   @unique // Job identifier (batch-matching, cleanup, etc.)
   expiresAt DateTime // When the lock expires
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model RateLimitBucket {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  count     Int      @default(1)
+  expiresAt DateTime
   createdAt DateTime @default(now())
 
   @@index([expiresAt])

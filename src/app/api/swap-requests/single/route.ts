@@ -2,26 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
-import getServerSession from "@/services/getServerSession";
+import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
-
-const createSingleSwapRequestSchema = z.object({
-  subjectId: z.string(),
-  currentClassId: z.string(),
-  preferredClassIds: z.array(z.string()).min(1),
-  preferenceOrderMatters: z.boolean().default(true),
-});
+import { buildPartitionKey } from "@/services/partitionKey";
+import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
+import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
 const requestStatuses = ["ACTIVE", "CANCELLED"] as const;
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
           where: { id: { in: request.preferredClassIds } },
           select: { id: true, name: true, year: true },
         });
-        return { ...request, preferredClasses };
+        return toSingleSwapRequestDto(request, preferredClasses);
       })
     );
 
@@ -84,13 +82,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+      rateLimit: "create",
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const body = await request.json();
-    const validatedData = createSingleSwapRequestSchema.parse(body);
+    const validatedData = singleSwapRequestSchema.parse({
+      preferenceOrderMatters: true,
+      ...body,
+    });
 
     // Verify the subject and classes exist
     const [subject, currentClass, preferredClasses] = await Promise.all([
@@ -160,7 +165,10 @@ export async function POST(request: NextRequest) {
         ticketType: "SPECIFIC_CLASS",
         priority: 1, // Default priority
         status: "ACTIVE",
-        graphPartition: `subject-${validatedData.subjectId}`,
+        graphPartition: buildPartitionKey({
+          ticketType: "SPECIFIC_CLASS",
+          subjectId: validatedData.subjectId,
+        }),
       },
       include: {
         user: {
@@ -186,16 +194,33 @@ export async function POST(request: NextRequest) {
       console.warn("Failed to trigger immediate matching:", error);
     });
 
+    if (session.onboardingCompletedAt === null) {
+      await prisma.user
+        .updateMany({
+          where: { id: session.id, onboardingCompletedAt: null },
+          data: { onboardingCompletedAt: new Date() },
+        })
+        .catch((error) => {
+          console.warn("Failed to record onboarding completion:", error);
+        });
+    }
+
     return NextResponse.json(
       {
-        ...swapRequest,
-        preferredClasses: preferredClassesInfo,
+        ...toSingleSwapRequestDto(swapRequest, preferredClassesInfo),
         message: "Pedido criado com sucesso! A procurar matches imediatos...",
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Error creating single swap request:", error);
+
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        { error: "Já tens um pedido ativo para esta disciplina" },
+        { status: 409 }
+      );
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

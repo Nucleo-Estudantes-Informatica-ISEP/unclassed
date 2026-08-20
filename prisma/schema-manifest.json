@@ -1,0 +1,26 @@
+{
+  "currentVersion": 4,
+  "currentSchemaSha256": "6f77d3ca2b7534ef5edcec36461656ca27ba752f2de30e52c4acadacc79c60a5",
+  "changes": [
+    {
+      "version": 1,
+      "file": "schema-changes/0001-baseline.md",
+      "schemaSha256": "4d357a91a55dd81f92f8537498f500529383967ede147daab7213476635a1d5f"
+    },
+    {
+      "version": 2,
+      "file": "schema-changes/0002-shared-rate-limits.md",
+      "schemaSha256": "8799c82d666ebdfb1b3313ed961d22b10b4a271aae5bc10efc293aea754b5241"
+    },
+    {
+      "version": 3,
+      "file": "schema-changes/0003-active-request-uniqueness.md",
+      "schemaSha256": "8799c82d666ebdfb1b3313ed961d22b10b4a271aae5bc10efc293aea754b5241"
+    },
+    {
+      "version": 4,
+      "file": "schema-changes/0004-onboarding-completion.md",
+      "schemaSha256": "6f77d3ca2b7534ef5edcec36461656ca27ba752f2de30e52c4acadacc79c60a5"
+    }
+  ]
+}

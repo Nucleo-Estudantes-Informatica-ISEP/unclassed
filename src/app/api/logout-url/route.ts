@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
+import { env } from "@/lib/env";
 import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
 
-const authDebugEnabled = process.env.AUTH_DEBUG === "true";
+const authDebugEnabled = env.AUTH_DEBUG;
 
 async function getJwtTokenFromRequest(request: NextRequest) {
   const allCookies = request.cookies.getAll();
@@ -46,7 +47,7 @@ async function getJwtTokenFromRequest(request: NextRequest) {
   for (const variant of sessionCookieVariants) {
     const token = (await getToken({
       req,
-      secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+      secret: env.AUTH_SECRET,
       cookieName: variant.cookieName,
       secureCookie: variant.secureCookie,
     })) as JWT | null;
@@ -58,7 +59,7 @@ async function getJwtTokenFromRequest(request: NextRequest) {
 
   return (await getToken({
     req,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    secret: env.AUTH_SECRET,
   })) as JWT | null;
 }
 

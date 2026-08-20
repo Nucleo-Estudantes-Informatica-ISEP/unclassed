@@ -12,9 +12,6 @@ import Topbar from "@/components/Topbar";
 import { ThemeProvider } from "@/context/ThemeContext";
 import CookieConsent from "@/components/CookieConsent";
 
-// Auto-initialize application services (cron scheduler, etc.)
-import "@/lib/startup";
-
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
@@ -32,16 +29,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getServerSession();
-
-  // Convert the Prisma user object to the Session type expected by Topbar
-  const userSession = session
+  const topbarUser = session
     ? {
-        id: session.id,
         name: session.name,
         email: session.email,
         role: session.role,
       }
-    : undefined;
+    : null;
 
   return (
     <html lang="pt" suppressHydrationWarning>
@@ -50,7 +44,7 @@ export default async function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="relative flex min-h-screen flex-col">
-            <Topbar user={userSession} />
+            <Topbar user={topbarUser} />
             <main className="flex-1 flex"><div className="flex items-stretch w-full">{children}</div></main>
             <Footer />
           </div>

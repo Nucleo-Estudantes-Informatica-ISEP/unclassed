@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import getServerSession from "@/services/getServerSession";
+
+import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(req);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const user = await prisma.user.findUnique({
       where: { id: session.id },
@@ -43,11 +44,13 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await getServerSession();
-    
-    if (!session) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    const authResult = await authorizeRequest(req, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const { emailNotifications, sharePhoneOnMatch, phone } = await req.json();
 

@@ -1,7 +1,7 @@
 import getServerSession from "@/services/getServerSession";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { ArrowLeftRight, CheckCircle2, History, Zap, Search } from "lucide-react";
+import { CheckCircle2, History, Zap, Search } from "lucide-react";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
 import {

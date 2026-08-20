@@ -7,11 +7,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { hasValidCronSecret } from "@/lib/apiAccess";
+import { authorizeRequest } from "@/lib/apiAccess";
 import { getCronSchedulerStatus } from "@/lib/cronInit";
+import { env } from "@/lib/env";
 import prisma from "@/lib/prisma";
 import { isAppInitialized } from "@/lib/startup";
-import getServerSession from "@/services/getServerSession";
 
 /**
  * Health check endpoint
@@ -20,11 +20,14 @@ import getServerSession from "@/services/getServerSession";
 export async function GET(request: NextRequest) {
   try {
     const startTime = Date.now();
-    const hasCronSecret = hasValidCronSecret(request);
-    const session = hasCronSecret
-      ? null
-      : await getServerSession().catch(() => null);
-    const includeDetailedStatus = hasCronSecret || session?.role === "ADMIN";
+    const authResult = await authorizeRequest(request, {
+      requireAuth: false,
+      allowCronSecret: true,
+    });
+    const includeDetailedStatus =
+      authResult.ok &&
+      (authResult.authenticatedBy === "cron" ||
+        authResult.session?.role === "ADMIN");
 
     // Test database connectivity
     let dbHealth = "healthy";
@@ -59,8 +62,8 @@ export async function GET(request: NextRequest) {
       ? {
           ...healthData,
           uptime: process.uptime(),
-          version: process.env.npm_package_version || "1.0.0",
-          environment: process.env.NODE_ENV || "development",
+          version: env.npm_package_version || "1.0.0",
+          environment: env.NODE_ENV,
           services: {
             ...healthData.services,
             database: {

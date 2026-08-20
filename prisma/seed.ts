@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -136,87 +135,9 @@ async function main() {
     classes.push(classEntity);
   }
 
-/*  // Create sample users
-  console.log("Creating sample users...");
-  const hashedPassword = await bcrypt.hash("password123", 10);
-
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@isep.ipp.pt" },
-    update: {},
-    create: {
-      name: "Admin User",
-      email: "admin@isep.ipp.pt",
-      password: hashedPassword,
-      phone: "912345678",
-      role: "ADMIN",
-    },
-  });
-
-  const users = [];
-  for (let i = 1; i <= 10; i++) {
-    const user = await prisma.user.upsert({
-      where: { email: `student${i}@isep.ipp.pt` },
-      update: {},
-      create: {
-        name: `Student ${i}`,
-        email: `student${i}@isep.ipp.pt`,
-        password: hashedPassword,
-        phone: `91234567${i % 10}`,
-        role: "USER",
-      },
-    });
-    users.push(user);
-  }
-
-  // Create sample single swap requests
-  console.log("Creating sample single swap requests...");
-  const firstYearClasses = classes.filter(c => c.year === 1);
-  const firstYearSubjects = subjects.filter(s => s.year === 1);
-
-  for (let i = 0; i < 5; i++) {
-    const user = users[i];
-    const subject = firstYearSubjects[i % firstYearSubjects.length];
-    const currentClass = firstYearClasses[0]; // 1DA
-    const preferredClass = firstYearClasses[1]; // 1DB
-
-    await prisma.singleSwapRequest.create({
-      data: {
-        userId: user.id,
-        subjectId: subject.id,
-        currentClassId: currentClass.id,
-        preferredClassIds: [preferredClass.id],
-        status: "ACTIVE",
-        ticketType: "SPECIFIC_CLASS",
-        priority: 1,
-        graphPartition: `subject-${subject.id}`,
-      },
-    });
-  }
-
-  // Create sample bundle swap requests
-  console.log("Creating sample bundle swap requests...");
-  for (let i = 5; i < 8; i++) {
-    const user = users[i];
-    const currentClass = firstYearClasses[0]; // 1DA
-    const preferredClass = firstYearClasses[2]; // 1DC
-
-    await prisma.bundleSwapRequest.create({
-      data: {
-        userId: user.id,
-        currentClassId: currentClass.id,
-        preferredClassIds: [preferredClass.id],
-        status: "ACTIVE",
-        ticketType: "ALL_CLASSES",
-        priority: 1,
-        graphPartition: `year-${currentClass.year}`,
-      },
-    });
-  }*/
-
   console.log("Seed data created successfully!");
   console.log(`Created ${subjects.length} subjects`);
   console.log(`Created ${classes.length} classes`);
-  // console.log(`Created ${users.length + 1} users (including admin)`);
 }
 
 main()

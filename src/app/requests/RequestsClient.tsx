@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, ArrowLeftRight, CheckCircle, Clock, Package2, Trash2, XCircle } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, ArrowLeftRight, CheckCircle, Clock, Eye, Package2, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/lib/components/ui/badge";
 import { Button } from "@/lib/components/ui/button";
@@ -174,6 +175,21 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                           </p>
                         </div>
                         <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
+                          {(request.status === "ACTIVE" ||
+                            request.status === "MATCHED") && (
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto"
+                            >
+                              <Link
+                                href={`/swap-requests?type=single&requestId=${request.id}`}
+                              >
+                                <Eye className="mr-2 h-4 w-4" /> Ver estado
+                              </Link>
+                            </Button>
+                          )}
                           {request.status === "ACTIVE" && (
                             <Button
                               variant="outline"
@@ -242,6 +258,21 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                           </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+                          {(request.status === "ACTIVE" ||
+                            request.status === "MATCHED") && (
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto"
+                            >
+                              <Link
+                                href={`/swap-requests?type=bundle&requestId=${request.id}`}
+                              >
+                                <Eye className="mr-2 h-4 w-4" /> Ver estado
+                              </Link>
+                            </Button>
+                          )}
                           {request.status === "ACTIVE" && (
                             <Button
                               variant="outline"

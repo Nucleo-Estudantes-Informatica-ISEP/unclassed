@@ -3,41 +3,20 @@
 import { useState } from "react";
 import { Button } from "@/lib/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/lib/components/ui/card";
-import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowRightLeft, Phone, Mail, Info, RefreshCw, ClipboardList, Hourglass } from "lucide-react";
+import { Clock, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Users, ArrowRightLeft, Info, RefreshCw, ClipboardList, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import { ClientDate } from "@/components/ClientDate";
+import { MatchContactInfo } from "@/components/MatchContactInfo";
 import { useRouter } from "next/navigation";
-
-interface MatchParticipant {
-  userId: string;
-  fromClass: string | { id: string; name: string; year: number };
-  toClass: string | { id: string; name: string; year: number };
-  requestId: string;
-  requestType: 'single' | 'bundle';
-  satisfactionScore: number;
-  status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  user?: { id: string; name: string; email: string; phone?: string | null; sharePhoneOnMatch?: boolean };
-}
-
-interface Match {
-  id: string;
-  matchType: 'SINGLE' | 'BUNDLE';
-  swapPattern: 'DIRECT' | 'THREE_WAY' | 'MULTI_WAY';
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'PROVISIONAL' | 'UPGRADED';
-  isProvisional: boolean;
-  provisionalUntil?: string | null;
-  satisfactionScore: number;
-  participants: MatchParticipant[];
-  createdAt: string;
-  subject?: { id: string; code: string; name: string; year: number; semester: number };
-}
+import type { MatchDto } from "@/types/match";
 
 interface MatchCardProps {
-  match: Match;
+  match: MatchDto;
   currentUserId: string;
+  showActions?: boolean;
 }
 
-export function MatchCard({ match, currentUserId }: MatchCardProps) {
+export function MatchCard({ match, currentUserId, showActions = true }: MatchCardProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -165,21 +144,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
             {/* Contact Information */}
             {!isCurrentUser && participant.user && match.status === 'ACCEPTED' && (
               <div className="mt-3 pt-3 border-t border-border">
-                <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Contacto:</p>
-                <div className="space-y-1 break-words">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Mail className="w-3 h-3 shrink-0" /> {participant.user.email}
-                  </p>
-                  {participant.user.phone ? (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="w-3 h-3 shrink-0" /> {participant.user.phone}
-                    </p>
-                  ) : participant.user.sharePhoneOnMatch === false ? (
-                    <p className="text-xs text-muted-foreground italic flex items-center gap-1">
-                      <Phone className="w-3 h-3 shrink-0 opacity-50" /> Telemóvel não partilhado
-                    </p>
-                  ) : null}
-                </div>
+                <MatchContactInfo user={participant.user} />
               </div>
             )}
           </div>
@@ -309,7 +274,7 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mt-2">
           <span className="text-sm text-muted-foreground">
             {match.participants.length} participantes •
-            {Math.round(match.satisfactionScore * 100)}% satisfação
+            {Math.round((match.satisfactionScore ?? 0) * 100)}% satisfação
           </span>
           <ClientDate
             date={match.createdAt}
@@ -349,9 +314,11 @@ export function MatchCard({ match, currentUserId }: MatchCardProps) {
         )}
       </CardContent>
 
-      <CardFooter className="w-full">
-        {renderActionButtons()}
-      </CardFooter>
+      {showActions && (
+        <CardFooter className="w-full">
+          {renderActionButtons()}
+        </CardFooter>
+      )}
     </Card>
   );
 }

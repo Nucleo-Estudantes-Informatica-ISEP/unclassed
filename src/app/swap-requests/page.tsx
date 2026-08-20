@@ -9,5 +9,12 @@ export default async function SwapRequestsPage() {
     redirect("/login");
   }
 
-  return <SwapRequestsClient />;
+  return (
+    <SwapRequestsClient
+      currentUserId={session.id}
+      initialGuidanceMode={
+        session.onboardingCompletedAt === null ? "guided" : "basic"
+      }
+    />
+  );
 }

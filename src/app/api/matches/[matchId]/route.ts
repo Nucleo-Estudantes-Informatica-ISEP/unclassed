@@ -7,10 +7,16 @@
 
 import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from 'next/server';
-import getServerSession from '@/services/getServerSession';
-import { AdvancedMatchingService } from '@/services/advancedMatchingService';
+
+import { authorizeRequest } from '@/lib/apiAccess';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/emailService';
+import {
+  assertMatchActionAllowed,
+  matchActions,
+  MatchActionError,
+} from '@/services/matchActionRules';
+import { z } from 'zod';
 
 interface MatchParticipant {
   userId: string;
@@ -35,7 +41,10 @@ interface MatchRecord {
   participants: unknown;
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
+  updatedAt: Date | string;
 }
+
+const matchActionSchema = z.object({ action: z.enum(matchActions) });
 
 type MatchRouteContext = {
   params: Promise<{ matchId: string }>;
@@ -62,10 +71,11 @@ export async function GET(
 ) {
   try {
     const { matchId } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const authResult = await authorizeRequest(request);
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
     const match = (await prisma.match.findUnique({
       where: { id: matchId }
@@ -104,16 +114,15 @@ export async function PATCH(
 ) {
   try {
     const { matchId } = await params;
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const authResult = await authorizeRequest(request, {
+      enforceSameOriginForSessionWrites: true,
+    });
+    if (!authResult.ok) {
+      return authResult.response;
     }
+    const { session } = authResult;
 
-    const { action } = await request.json();
-    
-    if (!['accept', 'reject', 'complete', 'revoke'].includes(action)) {
-      return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
-    }
+    const { action } = matchActionSchema.parse(await request.json());
 
     const match = (await prisma.match.findUnique({
       where: { id: matchId }
@@ -127,28 +136,32 @@ export async function PATCH(
     const participants = coerceParticipants(match.participants);
     const userParticipation = participants.find((p) => p.userId === session.id);
 
-    if (!userParticipation && session.role !== 'ADMIN') {
+    if (!userParticipation) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
-    let updatedMatch;
-    const matchingService = new AdvancedMatchingService();
+    assertMatchActionAllowed(
+      { ...match, participants },
+      session.id,
+      action
+    );
 
+    let updatedMatch;
     switch (action) {
       case 'accept':
         updatedMatch = await handleMatchAccept(match, session.id);
         break;
         
       case 'reject':
-        updatedMatch = await handleMatchReject(match, session.id, matchingService);
+        updatedMatch = await handleMatchReject(match, session.id);
         break;
         
       case 'complete':
-        updatedMatch = await handleMatchComplete(match, session.id, matchingService);
+        updatedMatch = await handleMatchComplete(match, session.id);
         break;
         
       case 'revoke':
-        updatedMatch = await handleMatchRevoke(match, session.id, matchingService);
+        updatedMatch = await handleMatchRevoke(match, session.id);
         break;
         
       default:
@@ -163,6 +176,12 @@ export async function PATCH(
 
   } catch (error) {
     console.error('Error updating match:', error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
+    }
+    if (error instanceof MatchActionError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
@@ -191,13 +210,10 @@ async function handleMatchAccept(match: MatchRecord, userId: string) {
     (p) => p.status === 'accepted'
   );
 
-  const updatedMatch = await prisma.match.update({
-    where: { id: match.id },
-    data: {
+  const updatedMatch = await updateMatchAtomically(match, {
       participants: toParticipantsJson(updatedParticipants),
       status: allAccepted ? 'ACCEPTED' : 'PROPOSED',
       isProvisional: false, // Remove provisional status when accepted
-    }
   });
 
   console.log(`✅ User ${userId} accepted match ${match.id}`);
@@ -215,13 +231,11 @@ async function handleMatchAccept(match: MatchRecord, userId: string) {
 /**
  * Handle match rejection - clean up graph and reactivate requests
  */
-async function handleMatchReject(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchReject(match: MatchRecord, userId: string) {
   console.log(`❌ User ${userId} rejected match ${match.id} - cleaning up graph`);
 
   // Mark match as rejected
-  const updatedMatch = await prisma.match.update({
-    where: { id: match.id },
-    data: {
+  const updatedMatch = await updateMatchAtomically(match, {
       status: 'REJECTED',
       isProvisional: false,
       participants: toParticipantsJson(
@@ -231,7 +245,6 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
           rejectedAt: p.userId === userId ? new Date() : p.rejectedAt
         }))
       )
-    }
   });
 
   // Send notification to other participants
@@ -241,7 +254,7 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
   await reactivateRequestsFromMatch(match);
   
   // Update graph partitions
-  await updateGraphPartitionsFromMatch(match, matchingService);
+  await updateGraphPartitionsFromMatch(match);
 
   return updatedMatch;
 }
@@ -249,7 +262,7 @@ async function handleMatchReject(match: MatchRecord, userId: string, matchingSer
 /**
  * Handle match completion - finalize the swap
  */
-async function handleMatchComplete(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchComplete(match: MatchRecord, userId: string) {
   console.log(`🏁 User ${userId} completed match ${match.id} - finalizing swap`);
 
   // Update participant status
@@ -265,12 +278,9 @@ async function handleMatchComplete(match: MatchRecord, userId: string, matchingS
     (p) => p.status === 'completed'
   );
 
-  const updatedMatch = await prisma.match.update({
-    where: { id: match.id },
-    data: {
+  const updatedMatch = await updateMatchAtomically(match, {
       participants: toParticipantsJson(updatedParticipants),
       status: allCompleted ? 'COMPLETED' : 'ACCEPTED'
-    }
   });
 
   // Send notification to other participants
@@ -304,7 +314,7 @@ async function handleMatchComplete(match: MatchRecord, userId: string, matchingS
 /**
  * Handle match revocation - user changes mind within 6-hour window
  */
-async function handleMatchRevoke(match: MatchRecord, userId: string, matchingService: AdvancedMatchingService) {
+async function handleMatchRevoke(match: MatchRecord, userId: string) {
   // Check if revocation is still allowed (within 6 hours)
   const provisionalUntil = match.provisionalUntil ? new Date(match.provisionalUntil) : null;
   const now = new Date();
@@ -316,9 +326,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
   console.log(`🔄 User ${userId} revoked match ${match.id} - reactivating requests`);
 
   // Mark match as revoked
-  const updatedMatch = await prisma.match.update({
-    where: { id: match.id },
-    data: {
+  const updatedMatch = await updateMatchAtomically(match, {
       status: 'REJECTED',
       participants: toParticipantsJson(
         coerceParticipants(match.participants).map((p) => ({
@@ -327,7 +335,6 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
           revokedAt: p.userId === userId ? new Date() : p.revokedAt
         }))
       )
-    }
   });
 
   // Send notification to other participants
@@ -337,9 +344,27 @@ async function handleMatchRevoke(match: MatchRecord, userId: string, matchingSer
   await reactivateRequestsFromMatch(match);
   
   // Update graph partitions
-  await updateGraphPartitionsFromMatch(match, matchingService);
+  await updateGraphPartitionsFromMatch(match);
 
   return updatedMatch;
+}
+
+async function updateMatchAtomically(
+  match: MatchRecord,
+  data: Prisma.MatchUpdateManyMutationInput
+) {
+  const result = await prisma.match.updateMany({
+    where: { id: match.id, updatedAt: new Date(match.updatedAt) },
+    data,
+  });
+
+  if (result.count !== 1) {
+    throw new MatchActionError(
+      "O match foi atualizado por outro participante. Atualiza a página e tenta novamente."
+    );
+  }
+
+  return prisma.match.findUniqueOrThrow({ where: { id: match.id } });
 }
 
 // =============================================================================
@@ -411,7 +436,7 @@ async function removeRequestsFromGraph(match: MatchRecord) {
 /**
  * Update graph partition counts after match changes
  */
-async function updateGraphPartitionsFromMatch(match: MatchRecord, matchingService: AdvancedMatchingService) {
+async function updateGraphPartitionsFromMatch(match: MatchRecord) {
   console.log(`📊 Updating graph partitions affected by match ${match.id}`);
 
   // Get unique graph partitions affected

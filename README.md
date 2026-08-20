@@ -6,8 +6,8 @@ The application is built as a Next.js App Router project with Prisma, MongoDB, N
 
 ## Key Features
 
-- Single-subject swap requests with ordered class preferences
-- Full bundle swaps that move a student to a different class across all subjects in the same year
+- Guided request wizard with branch-specific single-subject and full-bundle flows
+- Ordered class preferences for both request types
 - Automated graph-based matching with direct, three-way, and multi-way swap patterns
 - Provisional matches that can later be upgraded into better outcomes
 - Admin dashboard for monitoring matching, cron runs, and partition health
@@ -185,6 +185,10 @@ Generate secrets with:
 openssl rand -hex 32
 ```
 
+Runtime configuration is parsed once through `src/lib/env.ts`. Production
+startup fails immediately when required values are missing or malformed;
+partial SMTP configuration is rejected instead of failing on first send.
+
 ### 3. Generate the Prisma Client
 
 `postinstall` already runs Prisma generation, but you can run it explicitly:
@@ -193,13 +197,21 @@ openssl rand -hex 32
 pnpm generate
 ```
 
-### 4. Push the Schema to MongoDB
+### 4. Validate and Deploy the Schema to MongoDB
 
-This project uses Prisma with MongoDB and relies on `db push`.
+Prisma Migrate does not support MongoDB. This project uses the supported
+`db push` path, guarded by a versioned manifest under `prisma/schema-changes/`.
+Every schema edit must add the next change record and update
+`prisma/schema-manifest.json`.
 
 ```bash
-pnpm sync
+pnpm schema:deploy
 ```
+
+`pnpm schema:validate` checks the Prisma schema and rejects an unversioned
+schema edit without touching a database. `pnpm sync` remains only as a compatibility
+alias. Before production `pnpm schema:deploy`, take a
+MongoDB backup, run `pnpm schema:audit`, and run the deployment against staging.
 
 ### 5. Seed Subjects and Classes
 
@@ -238,14 +250,15 @@ Prisma-related commands:
 
 ```bash
 pnpm generate
-pnpm sync
+pnpm schema:validate
+pnpm schema:audit
+pnpm schema:deploy
 pnpm seed
 ```
 
 Important note about scripts:
 
-- `lint`, `typecheck`, `build`, `generate`, `sync`, and `seed` are present and wired up
-- `populate`, `test-cron`, and `test-cron-system` are listed in `package.json`, but the referenced `scripts/` files are not present in this repository snapshot
+- `lint`, `typecheck`, `test`, `build`, `generate`, `schema:validate`, `schema:audit`, `schema:deploy`, and `seed` are present and wired up
 
 ## Main Application Routes
 
@@ -317,7 +330,8 @@ Behavior:
 
 - the app auto-initializes background services when running in production
 - it also auto-initializes when `ENABLE_CRON_SCHEDULER=true`
-- the scheduler uses database-backed lock records to reduce concurrent execution issues
+- the scheduler uses database-backed lock records with lease renewal to prevent overlapping long-running jobs
+- scaled Docker deployment assigns internal scheduling only to `app1`; `app2` and `app3` explicitly disable it
 
 ### When to Use the Internal Scheduler
 
@@ -337,7 +351,7 @@ ENABLE_CRON_SCHEDULER=false
 
 In that mode, trigger:
 
-- `GET /api/cron/batch-matching`
+  - `POST /api/cron/batch-matching`
 
 with:
 
@@ -432,7 +446,7 @@ The repository also contains `deploy.sh`, which:
 
 - generates a multi-instance `docker-compose.override.yml`
 - configures Nginx as a reverse proxy
-- scales multiple `app` instances
+- scales multiple `app` instances while assigning internal scheduler ownership only to `app1`
 - wires health checks and proxy headers
 
 If you want to use that flow:
@@ -505,10 +519,13 @@ Before merging changes, run:
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-This repository does not currently expose a formal automated test suite in the checked-in package scripts.
+`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
+
+GitHub CI uses a frozen install and requires lint, typecheck, all tests, Prisma/schema validation, the production build, a non-root Docker image build, and Gitleaks before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
 
 ## Troubleshooting
 
@@ -531,7 +548,7 @@ Check:
 Symptoms:
 
 - health checks return database failure
-- `pnpm sync` or `pnpm seed` fails
+- `pnpm schema:audit`, `pnpm schema:deploy`, or `pnpm seed` fails
 
 Check:
 
@@ -553,7 +570,7 @@ Check:
 
 1. Install dependencies with `pnpm install`.
 2. Configure `.env`.
-3. Push the Prisma schema with `pnpm sync`.
+3. Validate the versioned Prisma schema with `pnpm schema:validate`; deploy it only to an authorized local database with `pnpm schema:deploy`.
 4. Seed the subject and class catalog with `pnpm seed`.
 5. Start the app with `pnpm dev`.
 6. Verify `/api/health`.
@@ -562,6 +579,7 @@ Check:
 ## Production Checklist
 
 - MongoDB is reachable from the runtime environment
+- a current MongoDB backup and clean `pnpm schema:audit` exist before `pnpm schema:deploy`
 - All auth variables are set
 - `AUTH_SECRET` and `CRON_SECRET` are strong random values
 - SMTP is configured if email notifications are required

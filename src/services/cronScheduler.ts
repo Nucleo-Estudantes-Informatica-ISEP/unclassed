@@ -1,6 +1,17 @@
 import { AdvancedMatchingService } from "./advancedMatchingService";
-import { CronExecution, Prisma, PrismaClient } from "@prisma/client";
-import { getCache } from "./cache";
+import { CronExecution, Prisma } from "@prisma/client";
+import { CronExpressionParser } from "cron-parser";
+import { env } from "@/lib/env";
+import prisma from "@/lib/prisma";
+
+export function getNextCronRun(cronExpression: string, currentDate = new Date()): Date {
+  try {
+    return CronExpressionParser.parse(cronExpression, { currentDate }).next().toDate();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid cron expression "${cronExpression}": ${message}`);
+  }
+}
 
 interface JobExecutionResult {
   processedPartitions: number;
@@ -44,6 +55,16 @@ interface ScheduledJob {
   lockTimeout?: number; // Lock timeout in milliseconds
 }
 
+interface LockLease {
+  jobId: string;
+  acquiredAt: Date;
+  timeoutMs: number;
+}
+
+export function getLeaseHeartbeatInterval(timeoutMs: number): number {
+  return Math.max(1_000, Math.floor(timeoutMs / 3));
+}
+
 /**
  * Internal cron scheduler that works without external cron services
  * Supports self-hosting and Vercel deployments
@@ -53,21 +74,8 @@ export class CronScheduler {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private isStarted = false;
   private matchingService = new AdvancedMatchingService();
-  private prisma = new PrismaClient();
+  private prisma = prisma;
   private readonly LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes default lock timeout
-
-  /**
-   * Invalidate admin cron cache when job states change
-   */
-  private invalidateAdminCache() {
-    try {
-      const cache = getCache();
-      cache.deletePattern('admin:cron:.*');
-      console.log('🗑️ Invalidated admin cron cache after job execution');
-    } catch (error) {
-      console.warn('Failed to invalidate admin cache:', error);
-    }
-  }
 
   constructor() {
     this.registerDefaultJobs();
@@ -85,15 +93,18 @@ export class CronScheduler {
     console.log("🚀 Starting internal cron scheduler...");
     this.isStarted = true;
 
-    // Schedule all enabled jobs
-    for (const job of this.jobs.values()) {
-      if (job.enabled) {
-        this.scheduleJob(job);
+    try {
+      // Schedule all enabled jobs
+      for (const job of this.jobs.values()) {
+        if (job.enabled) {
+          this.scheduleJob(job);
+        }
       }
-    }
 
-    // Schedule cleanup task
-    this.scheduleCleanup();
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
 
     console.log(`✅ Cron scheduler started with ${Array.from(this.jobs.values()).filter(j => j.enabled).length} active jobs`);
   }
@@ -121,9 +132,9 @@ export class CronScheduler {
    */
   private registerDefaultJobs() {
     // Get schedules from environment variables with fallbacks
-    const batchSchedule = process.env.CRON_BATCH_MATCHING || '*/5 * * * *';
-    const cleanupSchedule = process.env.CRON_PROVISIONAL_CLEANUP || '*/30 * * * *';
-    const healthCheckSchedule = process.env.CRON_HEALTH_CHECK || '0 * * * *';
+    const batchSchedule = env.CRON_BATCH_MATCHING;
+    const cleanupSchedule = env.CRON_PROVISIONAL_CLEANUP;
+    const healthCheckSchedule = env.CRON_HEALTH_CHECK;
 
     // Batch processing
     this.addJob({
@@ -168,11 +179,11 @@ export class CronScheduler {
    * Add a new cron job
    */
   addJob(job: ScheduledJob) {
-    this.jobs.set(job.id, job);
-
     if (this.isStarted && job.enabled) {
       this.scheduleJob(job);
     }
+
+    this.jobs.set(job.id, job);
   }
 
   /**
@@ -181,8 +192,6 @@ export class CronScheduler {
   setJobEnabled(jobId: string, enabled: boolean) {
     const job = this.jobs.get(jobId);
     if (!job) return;
-
-    job.enabled = enabled;
 
     if (this.isStarted) {
       if (enabled) {
@@ -195,6 +204,8 @@ export class CronScheduler {
         }
       }
     }
+
+    job.enabled = enabled;
   }
 
   /**
@@ -212,30 +223,37 @@ export class CronScheduler {
     }));
   }
 
+  isRunning() {
+    return this.isStarted;
+  }
+
   /**
    * Schedule a specific job with improved precision
    */
   private scheduleJob(job: ScheduledJob) {
     // Calculate next run time
-    job.nextRun = this.getNextRunTime(job.schedule);
+    job.nextRun = getNextCronRun(job.schedule);
 
-    // Use more precise interval based on job schedule
-    const checkIntervalMs = this.getCheckInterval(job.schedule);
+    // Cron expressions can include seconds, so poll at one-second precision.
+    const checkIntervalMs = 1000;
 
     const checkInterval = setInterval(async () => {
       const now = new Date();
 
       if (job.nextRun && now >= job.nextRun && !job.isRunning) {
         // Try to acquire lock before running
-        const lockAcquired = await this.acquireLock(job.id, job.lockTimeout || this.LOCK_TIMEOUT);
+        const lease = await this.acquireLock(
+          job.id,
+          job.lockTimeout || this.LOCK_TIMEOUT
+        );
 
-        if (lockAcquired) {
-          this.runJob(job);
-          job.nextRun = this.getNextRunTime(job.schedule);
+        if (lease) {
+          void this.runJob(job, lease);
+          job.nextRun = getNextCronRun(job.schedule);
         } else {
           console.log(`🔒 Job '${job.name}' skipped - another instance is running`);
           // Recalculate next run to avoid immediate retry
-          job.nextRun = this.getNextRunTime(job.schedule);
+          job.nextRun = getNextCronRun(job.schedule);
         }
       }
     }, checkIntervalMs);
@@ -245,25 +263,12 @@ export class CronScheduler {
   }
 
   /**
-   * Get appropriate check interval based on cron schedule
-   */
-  private getCheckInterval(cronExpression: string): number {
-    if (cronExpression.includes('*/5 * * * *')) {
-      return 30000; // Check every 30 seconds for 5-minute jobs
-    }
-    if (cronExpression.includes('*/30 * * * *')) {
-      return 60000; // Check every minute for 30-minute jobs
-    }
-    if (cronExpression.includes('0 * * * *')) {
-      return 60000; // Check every minute for hourly jobs
-    }
-    return 60000; // Default: check every minute
-  }
-
-  /**
    * Acquire distributed lock using database
    */
-  private async acquireLock(jobId: string, timeoutMs: number): Promise<boolean> {
+  private async acquireLock(
+    jobId: string,
+    timeoutMs: number
+  ): Promise<LockLease | null> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + timeoutMs);
 
@@ -281,7 +286,7 @@ export class CronScheduler {
       });
 
       if (reclaimed.count > 0) {
-        return true;
+        return { jobId, acquiredAt: now, timeoutMs };
       }
 
       // No stale lock was reclaimable; try to create a fresh one.
@@ -293,7 +298,7 @@ export class CronScheduler {
         }
       });
 
-      return true;
+      return { jobId, acquiredAt: now, timeoutMs };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -314,7 +319,7 @@ export class CronScheduler {
           });
 
           if (reclaimedOnRetry.count > 0) {
-            return true;
+            return { jobId, acquiredAt: now, timeoutMs };
           }
 
           // Defensive visibility: with a valid unique index this should never be > 1.
@@ -328,32 +333,56 @@ export class CronScheduler {
           console.warn(`Failed to retry lock reclaim for job ${jobId}:`, retryError);
         }
 
-        return false;
+        return null;
       }
 
       console.warn(`Failed to acquire lock for job ${jobId}:`, error);
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Extend a lease only while this process still owns its acquisition token.
+   */
+  private async renewLock(lease: LockLease): Promise<boolean> {
+    const now = new Date();
+    const renewed = await this.prisma.cronLock.updateMany({
+      where: {
+        jobId: lease.jobId,
+        createdAt: lease.acquiredAt,
+        expiresAt: { gt: now },
+      },
+      data: {
+        expiresAt: new Date(now.getTime() + lease.timeoutMs),
+      },
+    });
+
+    return renewed.count === 1;
   }
 
   /**
    * Release distributed lock
    */
-  private async releaseLock(jobId: string): Promise<void> {
+  private async releaseLock(lease: LockLease): Promise<void> {
     try {
-      await this.prisma.cronLock.delete({
-        where: { jobId }
+      await this.prisma.cronLock.deleteMany({
+        where: {
+          jobId: lease.jobId,
+          createdAt: lease.acquiredAt,
+        },
       });
-    } catch (error) {
+    } catch {
       // Ignore errors - lock might have expired or been deleted already
-      console.debug(`Lock release for job ${jobId} had no effect (likely already expired)`);
+      console.debug(
+        `Lock release for job ${lease.jobId} had no effect (likely already expired)`
+      );
     }
   }
 
   /**
    * Run a specific job with proper lock management
    */
-  private async runJob(job: ScheduledJob) {
+  private async runJob(job: ScheduledJob, lease: LockLease) {
     if (job.isRunning) return;
 
     job.isRunning = true;
@@ -361,6 +390,20 @@ export class CronScheduler {
 
     console.log(`🔄 Running job: ${job.name}`);
     const startTime = Date.now();
+    const heartbeat = setInterval(() => {
+      void this.renewLock(lease)
+        .then((renewed) => {
+          if (!renewed) {
+            console.error(
+              `Cron lock lease lost while '${job.name}' is still running`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(`Failed to renew cron lock for '${job.name}':`, error);
+        });
+    }, getLeaseHeartbeatInterval(lease.timeoutMs));
+    heartbeat.unref?.();
 
     // Create execution record
     let executionRecord;
@@ -392,8 +435,6 @@ export class CronScheduler {
         });
       }
 
-      // Invalidate admin cache after successful job completion
-      this.invalidateAdminCache();
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ Job '${job.name}' failed:`, error);
@@ -408,147 +449,12 @@ export class CronScheduler {
         });
       }
 
-      // Invalidate admin cache after job failure too
-      this.invalidateAdminCache();
     } finally {
+      clearInterval(heartbeat);
       job.isRunning = false;
       // Release the lock
-      await this.releaseLock(job.id);
+      await this.releaseLock(lease);
     }
-  }
-
-  /**
-   * Parse cron expression and get next run time with improved precision
-   */
-  private getNextRunTime(cronExpression: string): Date {
-    const now = new Date();
-
-    if (cronExpression === '*/5 * * * *') {
-      // Every 5 minutes - align to exact 5-minute boundaries
-      const next = new Date(now);
-      const currentMinutes = next.getMinutes();
-      const nextMinutes = Math.ceil(currentMinutes / 5) * 5;
-
-      if (nextMinutes >= 60) {
-        next.setHours(next.getHours() + 1);
-        next.setMinutes(0, 0, 0);
-      } else {
-        next.setMinutes(nextMinutes, 0, 0);
-      }
-
-      // Ensure we're at least 10 seconds in the future to avoid immediate execution
-      if (next.getTime() - now.getTime() < 10000) {
-        next.setMinutes(next.getMinutes() + 5);
-      }
-
-      return next;
-    }
-
-    if (cronExpression === '*/30 * * * *') {
-      // Every 30 minutes - align to 0 or 30 minutes
-      const next = new Date(now);
-      const currentMinutes = next.getMinutes();
-      const nextMinutes = currentMinutes < 30 ? 30 : 60;
-
-      if (nextMinutes >= 60) {
-        next.setHours(next.getHours() + 1);
-        next.setMinutes(0, 0, 0);
-      } else {
-        next.setMinutes(nextMinutes, 0, 0);
-      }
-
-      return next;
-    }
-
-    if (cronExpression === '0 * * * *') {
-      // Every hour
-      const next = new Date(now);
-      next.setMinutes(0, 0, 0);
-      next.setHours(next.getHours() + 1);
-      return next;
-    }
-
-    // Fallback: next hour
-    const next = new Date(now);
-    next.setHours(next.getHours() + 1, 0, 0, 0);
-    return next;
-  }
-
-  private getNextWeekdayRun(now: Date, hourRange: [number, number], intervalMinutes: number): Date {
-    const [startHour, endHour] = hourRange;
-    const next = new Date(now);
-
-    // Check if we're in a weekday
-    const dayOfWeek = next.getDay(); // 0 = Sunday, 6 = Saturday
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // It's weekend, go to next Monday
-      const daysUntilMonday = dayOfWeek === 0 ? 1 : 2;
-      next.setDate(next.getDate() + daysUntilMonday);
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    }
-
-    // We're on a weekday
-    const currentHour = next.getHours();
-
-    if (currentHour < startHour) {
-      // Before work hours
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    } else if (currentHour >= endHour) {
-      // After work hours, go to next day
-      next.setDate(next.getDate() + 1);
-      next.setHours(startHour, 0, 0, 0);
-      return next;
-    } else {
-      // During work hours, next interval
-      return this.getNextInterval(now, intervalMinutes);
-    }
-  }
-
-  private getNextWeekendRun(now: Date, hours: number[]): Date {
-    const next = new Date(now);
-    const dayOfWeek = next.getDay();
-    const currentHour = next.getHours();
-
-    // If it's weekend
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // Find next hour
-      for (const hour of hours) {
-        if (currentHour < hour || (currentHour === hour && next.getMinutes() === 0)) {
-          next.setHours(hour, 0, 0, 0);
-          return next;
-        }
-      }
-
-      // No more hours today, go to next weekend day or next weekend
-      if (dayOfWeek === 6) {
-        // Saturday -> Sunday
-        next.setDate(next.getDate() + 1);
-      } else {
-        // Sunday -> next Saturday
-        next.setDate(next.getDate() + 6);
-      }
-      next.setHours(hours[0], 0, 0, 0);
-      return next;
-    } else {
-      // It's weekday, go to next weekend
-      const daysUntilSaturday = 6 - dayOfWeek;
-      next.setDate(next.getDate() + daysUntilSaturday);
-      next.setHours(hours[0], 0, 0, 0);
-      return next;
-    }
-  }
-
-  private getNextInterval(now: Date, intervalMinutes: number): Date {
-    const next = new Date(now);
-    next.setMinutes(Math.ceil(next.getMinutes() / intervalMinutes) * intervalMinutes, 0, 0);
-
-    if (next <= now) {
-      next.setMinutes(next.getMinutes() + intervalMinutes);
-    }
-
-    return next;
   }
 
   /**
@@ -657,16 +563,6 @@ export class CronScheduler {
     }
   }
 
-  private scheduleCleanup() {
-    // Clean up completed jobs and rate limit entries every hour
-    const cleanupInterval = setInterval(() => {
-      console.log("🧹 Running periodic cleanup...");
-      // Add any additional cleanup logic here
-    }, 3600000); // 1 hour
-
-    this.intervals.set('cleanup', cleanupInterval);
-  }
-
   /**
    * Get cron execution history
    */
@@ -689,18 +585,13 @@ export class CronScheduler {
     try {
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      const [recentExecutions, last24hExecutions, lastWeekExecutions, lastExecution] = await Promise.all([
+      const [recentExecutions, last24hExecutions, lastExecution] = await Promise.all([
         this.prisma.cronExecution.findMany({
           where: { startedAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) } }, // Last hour
           orderBy: { startedAt: 'desc' }
         }),
         this.prisma.cronExecution.findMany({
           where: { startedAt: { gte: last24Hours } }
-        }),
-        this.prisma.cronExecution.findMany({
-          where: { startedAt: { gte: lastWeek } }
         }),
         this.prisma.cronExecution.findFirst({
           where: { status: 'COMPLETED' },
@@ -764,7 +655,15 @@ export class CronScheduler {
       throw new Error(`Job ${jobId} not found`);
     }
 
-    await this.runJob(job);
+    const lease = await this.acquireLock(
+      job.id,
+      job.lockTimeout || this.LOCK_TIMEOUT
+    );
+    if (!lease) {
+      throw new Error(`Job ${jobId} is already running`);
+    }
+
+    await this.runJob(job, lease);
   }
 }
 
@@ -789,8 +688,7 @@ export function initializeCronScheduler() {
   const scheduler = getCronScheduler();
 
   // Only start in production or when explicitly enabled
-  const shouldStart = process.env.NODE_ENV === 'production' ||
-                     process.env.ENABLE_CRON_SCHEDULER === 'true';
+  const shouldStart = env.NODE_ENV === 'production' || env.ENABLE_CRON_SCHEDULER;
 
   if (shouldStart) {
     scheduler.start();
