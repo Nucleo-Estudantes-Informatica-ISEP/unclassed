@@ -66,7 +66,7 @@ const environmentSchema = z
     ),
     EMAIL_FROM: z.preprocess(
       emptyToUndefined,
-      z.email().default("noreply@unclassed.isep.ipp.pt")
+      z.email().default("no-reply@nei-isep.org")
     ),
     EMAIL_HOST: optionalString,
     EMAIL_PORT: z.preprocess(
