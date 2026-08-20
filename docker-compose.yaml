@@ -5,13 +5,13 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:-${SERVICE_URL_APP_3000:-http://localhost:3000}}
-      - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required}
-      - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
+      - AUTH_SECRET=${AUTH_SECRET:-${SERVICE_REALBASE64_64_AUTH:-development-only-unclassed-auth-secret-change-me}}
+      - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:-https://auth.nei-isep.org}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
       - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET:?AUTH_CLIENT_SECRET is required}
-      - AUTH_GLOBAL_ADMIN_PROJECT_ID=${AUTH_GLOBAL_ADMIN_PROJECT_ID:?AUTH_GLOBAL_ADMIN_PROJECT_ID is required}
-      - AUTH_SCOPES=openid email profile offline_access urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:aud
-      - AUTH_ROLE_CLAIM=urn:zitadel:iam:org:project:${AUTH_GLOBAL_ADMIN_PROJECT_ID}:roles
+      - AUTH_GLOBAL_PROJECT_ID=${AUTH_GLOBAL_PROJECT_ID:?AUTH_GLOBAL_PROJECT_ID is required}
+      - AUTH_SCOPES=openid email profile offline_access urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${AUTH_GLOBAL_PROJECT_ID}:aud
+      - AUTH_ROLE_CLAIM=urn:zitadel:iam:org:project:${AUTH_GLOBAL_PROJECT_ID}:roles
       - AUTH_POST_LOGOUT_REDIRECT_URI=${AUTH_POST_LOGOUT_REDIRECT_URI:-${SERVICE_URL_APP_3000:-http://localhost:3000}/}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-false}
       - AUTH_DEBUG=${AUTH_DEBUG:-false}
@@ -20,7 +20,7 @@ services:
       - CRON_BATCH_MATCHING=${CRON_BATCH_MATCHING:-*/5 * * * *}
       - CRON_PROVISIONAL_CLEANUP=${CRON_PROVISIONAL_CLEANUP:-*/30 * * * *}
       - CRON_HEALTH_CHECK=${CRON_HEALTH_CHECK:-0 * * * *}
-      - CRON_SECRET=${CRON_SECRET:?CRON_SECRET is required}
+      - CRON_SECRET=${CRON_SECRET:-${SERVICE_REALBASE64_64_CRON:-development-only-unclassed-cron-secret-change-me}}
       - EMAIL_FROM=${EMAIL_FROM:-noreply@unclassed.isep.ipp.pt}
       - EMAIL_HOST=${EMAIL_HOST:-}
       - EMAIL_PORT=${EMAIL_PORT:-587}
