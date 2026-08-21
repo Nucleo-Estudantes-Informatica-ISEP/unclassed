@@ -2,18 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildRequestGraph,
+  buildCompatibilityGraph,
+  cycleToParticipants,
   decideMatchOverlap,
-  findCyclesFromNode,
-  type GraphNode,
-} from "./matchingCore";
+  findCycles,
+  type MatchingRequest,
+} from "./algorithms";
 
 function request(
   requestId: string,
   userId: string,
   currentClassId: string,
   preferredClassIds: string[]
-): GraphNode {
+): MatchingRequest {
   return {
     requestId,
     userId,
@@ -28,34 +29,52 @@ function request(
 }
 
 test("characterizes direct two-way matching", () => {
-  const graph = buildRequestGraph([
+  const graph = buildCompatibilityGraph([
     request("a", "user-a", "class-a", ["class-b"]),
     request("b", "user-b", "class-b", ["class-a"]),
   ]);
 
-  assert.deepEqual(findCyclesFromNode("a", graph, 2), [["a", "b"]]);
-  assert.equal(graph.get("a")?.[0]?.satisfactionScore, 1);
+  assert.deepEqual(findCycles(graph, "a", 2), [["a", "b"]]);
+  assert.equal(graph.outgoingEdges("a")[0]?.value.satisfactionScore, 1);
+  assert.deepEqual(cycleToParticipants(["a", "b"], graph), [
+    {
+      userId: "user-a",
+      fromClass: "class-a",
+      toClass: "class-b",
+      requestId: "a",
+      requestType: "single",
+      satisfactionScore: 1,
+    },
+    {
+      userId: "user-b",
+      fromClass: "class-b",
+      toClass: "class-a",
+      requestId: "b",
+      requestType: "single",
+      satisfactionScore: 1,
+    },
+  ]);
 });
 
 test("characterizes three-way matching", () => {
-  const graph = buildRequestGraph([
+  const graph = buildCompatibilityGraph([
     request("a", "user-a", "class-a", ["class-b"]),
     request("b", "user-b", "class-b", ["class-c"]),
     request("c", "user-c", "class-c", ["class-a"]),
   ]);
 
-  assert.deepEqual(findCyclesFromNode("a", graph, 3), [["a", "b", "c"]]);
-  assert.deepEqual(findCyclesFromNode("a", graph, 2), []);
+  assert.deepEqual(findCycles(graph, "a", 3), [["a", "b", "c"]]);
+  assert.deepEqual(findCycles(graph, "a", 2), []);
 });
 
 test("does not match unsatisfiable preferences", () => {
-  const graph = buildRequestGraph([
+  const graph = buildCompatibilityGraph([
     request("a", "user-a", "class-a", ["class-c"]),
     request("b", "user-b", "class-b", ["class-a"]),
   ]);
 
-  assert.deepEqual(findCyclesFromNode("a", graph, 2), []);
-  assert.equal(graph.get("a")?.length, 0);
+  assert.deepEqual(findCycles(graph, "a", 2), []);
+  assert.equal(graph.outgoingEdges("a").length, 0);
 });
 
 test("never replaces committed overlaps and upgrades only better provisionals", () => {

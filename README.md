@@ -55,14 +55,16 @@ The core product flow is:
 ├── public/                  # Static assets
 ├── src/
 │   ├── app/                 # Next.js App Router pages and API routes
+│   ├── application/         # Matching orchestration and persistence adapters
 │   ├── components/          # Shared UI and dashboard components
 │   ├── config/              # App-level configuration
 │   ├── context/             # Theme context
+│   ├── domain/              # Pure graph structure and matching algorithms
 │   ├── hooks/               # Client-side data hooks
 │   ├── lib/                 # Auth, Prisma, startup, helpers
 │   ├── middleware/          # Request validation helpers
 │   ├── schemas/             # Zod schemas
-│   ├── services/            # Matching, email, caching, cron logic
+│   ├── services/            # Email, caching, cron, and matching triggers
 │   └── types/               # Session and NextAuth types
 ├── data/
 │   └── subjects.json
@@ -293,7 +295,7 @@ Key API routes:
 
 ## Matching Engine Overview
 
-The matching engine lives primarily in [`src/services/advancedMatchingService.ts`](./src/services/advancedMatchingService.ts). At a high level, it:
+Pure graph storage and cycle logic live in [`src/domain`](./src/domain), while [`MatchingOrchestrator`](./src/application/matchingOrchestrator.ts) adapts Prisma and notifications to that core. At a high level, it:
 
 - reads active requests from Prisma
 - groups them into graph partitions

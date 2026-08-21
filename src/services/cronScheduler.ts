@@ -1,4 +1,4 @@
-import { AdvancedMatchingService } from "./advancedMatchingService";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 import { CronExecution, Prisma } from "@prisma/client";
 import { CronExpressionParser } from "cron-parser";
 import { env } from "@/lib/env";
@@ -73,7 +73,7 @@ export class CronScheduler {
   private jobs: Map<string, ScheduledJob> = new Map();
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private isStarted = false;
-  private matchingService = new AdvancedMatchingService();
+  private matchingService = new MatchingOrchestrator();
   private prisma = prisma;
   private readonly LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes default lock timeout
 
