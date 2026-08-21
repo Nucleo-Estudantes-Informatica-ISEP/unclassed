@@ -95,7 +95,7 @@ docs/domain-model/ # PlantUML domain diagram
 Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
-- `CronScheduler` uses the shared Prisma singleton. Scheduler start/stop manages job timers, not the application-owned database connection.
+- `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
 - Prisma and server services belong only in server-side code—never client components or browser hooks.
 - Put reusable non-HTTP logic in `src/services/`; do not duplicate it across API routes.
 - Put reusable Zod schemas in `src/schemas/`. Legacy inline schemas exist, but do not create a second copy of a rule already defined there.
@@ -108,7 +108,7 @@ Routes currently own request orchestration: authenticate, validate input, enforc
 - `AdvancedMatchingService` finds direct, three-way, and multi-way cycles; it records `Match` documents and manages provisional-match upgrades/expiry.
 - Users with blocking accepted matches cannot create new requests. Reuse `hasBlockingAcceptedMatch()`.
 - Creating a request calls `triggerImmediateMatching()` asynchronously. Keep matching non-blocking: request creation must not wait for background matching.
-- Batch matching, provisional cleanup, and health checks run via `CronScheduler`. Its `CronLock` documents prevent concurrent job execution; do not bypass them.
+- Batch matching, provisional cleanup, and health checks run through `CronJobHandlers`; `CronScheduler` schedules them and `JobLock` uses `CronLock` documents to prevent concurrent execution. Do not bypass the lock module.
 
 ## Authentication and authorization
 
@@ -174,7 +174,7 @@ Before finishing a change:
 
 ## Gotchas
 
-- `CronScheduler` uses the shared Prisma client and database locks. Its start/stop lifecycle only manages scheduled jobs.
+- `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
