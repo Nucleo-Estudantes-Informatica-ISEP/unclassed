@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { isDevOnlyRequestAllowed } from "./devOnly";
 import { validateOrigin } from "./originValidation";
 
 function requestWith(headers: Record<string, string>) {
@@ -47,4 +48,11 @@ test("validateOrigin allows requests with neither Origin nor Referer", () => {
   // send Origin/Referer; enforceSameOriginForSessionWrites relies on this
   // staying permissive rather than failing closed on missing headers.
   assert.equal(validateOrigin(requestWith({})), true);
+});
+
+test("dev-only authorization is allowed only in development", () => {
+  assert.equal(isDevOnlyRequestAllowed(true, "development"), true);
+  assert.equal(isDevOnlyRequestAllowed(true, "test"), false);
+  assert.equal(isDevOnlyRequestAllowed(true, "production"), false);
+  assert.equal(isDevOnlyRequestAllowed(false, "production"), true);
 });
