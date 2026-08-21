@@ -41,7 +41,7 @@ For each task:
 | Database | MongoDB via Prisma 6 (`prisma/schema.prisma`) |
 | Auth | NextAuth 5 beta + AuthNEI OIDC through ZITADEL |
 | Validation | Zod; React Hook Form in client forms |
-| Matching | Custom graph/cycle matcher in `src/services/advancedMatchingService.ts` |
+| Matching | Pure graph/algorithm domain core with a Prisma-backed application orchestrator |
 | Background work | In-process cron scheduler with MongoDB-backed locks |
 | Email | Nodemailer |
 | Package manager | pnpm 9 (`packageManager` in `package.json`) |
@@ -74,10 +74,12 @@ Removed legacy `populate`, `test-cron`, and `test-cron-system` commands must not
 
 ```text
 src/
+├── application/   # use-case orchestration and persistence/notification adapters
 ├── app/          # App Router pages, layouts, and API routes
 ├── components/   # shared/client UI
 ├── config/       # app configuration
 ├── context/      # React context providers
+├── domain/       # pure graph structures and matching algorithms (never Prisma)
 ├── hooks/        # client hooks
 ├── lib/          # Prisma singleton, OIDC helpers, startup, request-auth (apiAccess), generic utilities
 │   └── components/ui/ # reusable UI primitives
@@ -97,7 +99,7 @@ Routes currently own request orchestration: authenticate, validate input, enforc
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
 - `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
 - Prisma and server services belong only in server-side code—never client components or browser hooks.
-- Put reusable non-HTTP logic in `src/services/`; do not duplicate it across API routes.
+- Put pure domain logic in `src/domain/`, use-case orchestration in `src/application/`, and reusable infrastructure logic in `src/services/`; do not duplicate logic across API routes.
 - Put reusable Zod schemas in `src/schemas/`. Legacy inline schemas exist, but do not create a second copy of a rule already defined there.
 - Reuse `src/lib/components/ui/` primitives and existing Tailwind patterns before adding UI abstractions.
 
@@ -105,7 +107,8 @@ Routes currently own request orchestration: authenticate, validate input, enforc
 
 - A `SingleSwapRequest` is scoped to a subject/current class; its `graphPartition` is `subject-<subjectId>`.
 - A `BundleSwapRequest` moves a student across a year's classes; its partition is year-based.
-- `AdvancedMatchingService` finds direct, three-way, and multi-way cycles; it records `Match` documents and manages provisional-match upgrades/expiry.
+- `MatchingOrchestrator` loads requests, delegates compatibility/cycle work to `src/domain/matching/algorithms.ts`, records `Match` documents, and manages provisional-match upgrades/expiry.
+- `src/domain/graph/` and `src/domain/matching/` stay pure and synchronous; never import Prisma, email, or framework modules there.
 - Users with blocking accepted matches cannot create new requests. Reuse `hasBlockingAcceptedMatch()`.
 - Creating a request calls `triggerImmediateMatching()` asynchronously. Keep matching non-blocking: request creation must not wait for background matching.
 - Batch matching, provisional cleanup, and health checks run through `CronJobHandlers`; `CronScheduler` schedules them and `JobLock` uses `CronLock` documents to prevent concurrent execution. Do not bypass the lock module.
