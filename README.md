@@ -325,6 +325,10 @@ Relevant files:
 - `src/lib/startup.ts`
 - `src/lib/cronInit.ts`
 - `src/services/cronScheduler.ts`
+- `src/services/cron/jobRegistry.ts`
+- `src/services/cron/jobLock.ts`
+- `src/services/cron/jobHandlers.ts`
+- `src/services/cron/executionStore.ts`
 
 Behavior:
 
