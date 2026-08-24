@@ -41,6 +41,32 @@ test("job lock releases only the acquired lease token", async () => {
   });
 });
 
+test("job lock treats an explicit zero timeout as the default", async () => {
+  let createdData: { expiresAt: Date; createdAt: Date } | undefined;
+  const database = {
+    cronLock: {
+      updateMany: async () => ({ count: 0 }),
+      create: async ({ data }: { data: typeof createdData }) => {
+        createdData = data;
+        return {};
+      },
+      count: async () => 1,
+      deleteMany: async () => ({ count: 1 }),
+    },
+  } as unknown as ConstructorParameters<typeof JobLock>[0];
+  const defaultTimeout = 60_000;
+  const lock = new JobLock(database, defaultTimeout);
+
+  const lease = await lock.acquire("batch-matching", 0);
+
+  assert.equal(lease?.timeoutMs, defaultTimeout);
+  assert.ok(createdData);
+  assert.equal(
+    createdData.expiresAt.getTime(),
+    createdData.createdAt.getTime() + defaultTimeout
+  );
+});
+
 test("job registry owns add, enable, and status state", () => {
   const registry = new JobRegistry();
   registry.add({

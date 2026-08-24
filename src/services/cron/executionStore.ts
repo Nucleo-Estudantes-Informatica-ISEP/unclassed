@@ -47,17 +47,17 @@ export class CronExecutionStore {
     jobs: ScheduledJob[]
   ): Promise<CronStats> {
     const schedulerStatus = schedulerRunning ? "RUNNING" : "STOPPED";
-    const enabledJobs = jobs.filter((job) => job.enabled);
-    const nextScheduledRuns = enabledJobs
-      .filter((job): job is ScheduledJob & { nextRun: Date } =>
-        Boolean(job.nextRun)
-      )
-      .map((job) => ({ jobName: job.name, nextRun: job.nextRun }))
-      .sort(
-        (first, second) => first.nextRun.getTime() - second.nextRun.getTime()
-      );
 
     try {
+      const enabledJobs = jobs.filter((job) => job.enabled);
+      const nextScheduledRuns = enabledJobs
+        .filter((job): job is ScheduledJob & { nextRun: Date } =>
+          Boolean(job.nextRun)
+        )
+        .map((job) => ({ jobName: job.name, nextRun: job.nextRun }))
+        .sort(
+          (first, second) => first.nextRun.getTime() - second.nextRun.getTime()
+        );
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1_000);
       const [recent, last24h, last] = await Promise.all([

@@ -17,20 +17,23 @@ export class JobLock {
     jobId: string,
     timeoutMs = this.defaultTimeout
   ): Promise<LockLease | null> {
+    const effectiveTimeout = timeoutMs || this.defaultTimeout;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + timeoutMs);
+    const expiresAt = new Date(now.getTime() + effectiveTimeout);
 
     try {
       const reclaimed = await this.database.cronLock.updateMany({
         where: { jobId, expiresAt: { lte: now } },
         data: { expiresAt, createdAt: now },
       });
-      if (reclaimed.count > 0) return { jobId, acquiredAt: now, timeoutMs };
+      if (reclaimed.count > 0) {
+        return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
+      }
 
       await this.database.cronLock.create({
         data: { jobId, expiresAt, createdAt: now },
       });
-      return { jobId, acquiredAt: now, timeoutMs };
+      return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -41,7 +44,9 @@ export class JobLock {
             where: { jobId, expiresAt: { lte: new Date() } },
             data: { expiresAt, createdAt: now },
           });
-          if (reclaimed.count > 0) return { jobId, acquiredAt: now, timeoutMs };
+          if (reclaimed.count > 0) {
+            return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
+          }
 
           const lockCount = await this.database.cronLock.count({
             where: { jobId },
