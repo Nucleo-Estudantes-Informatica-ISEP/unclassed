@@ -25,7 +25,7 @@ export default function UserMenu({ user }: UserMenuProps) {
 
   const handleManageProfile = () => {
     setShowMenu(false);
-    window.location.href = "/api/auth/profile-url";
+    router.push("/api/auth/profile-url");
   };
 
   const handleSwitchAccount = async () => {
