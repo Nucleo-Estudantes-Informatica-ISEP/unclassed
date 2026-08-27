@@ -3,16 +3,14 @@ import type { Graph, GraphConnection } from "./graph";
 export class MapGraph<V, E> implements Graph<V, E> {
   private readonly vertexValues = new Map<string, V>();
   private readonly adjacency = new Map<string, GraphConnection<E>[]>();
+  private edges = 0;
 
   get size() {
     return this.vertexValues.size;
   }
 
   get edgeCount() {
-    return Array.from(this.adjacency.values()).reduce(
-      (count, edges) => count + edges.length,
-      0
-    );
+    return this.edges;
   }
 
   addVertex(id: string, value: V) {
@@ -28,6 +26,7 @@ export class MapGraph<V, E> implements Graph<V, E> {
     }
 
     this.adjacency.get(from)?.push({ from, to, value });
+    this.edges++;
   }
 
   vertex(id: string) {

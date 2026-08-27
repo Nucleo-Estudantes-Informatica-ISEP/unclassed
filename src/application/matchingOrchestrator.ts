@@ -13,7 +13,7 @@ import {
   buildCompatibilityGraph,
   calculateCycleSatisfaction,
   canSwapDirectly,
-  cycleToParticipants,
+  cycleToMatch,
   decideMatchOverlap,
   findCycles,
   getIndividualSatisfaction,
@@ -1671,33 +1671,12 @@ export class MatchingOrchestrator {
     try {
       console.log(`🔄 Converting cycle to match: ${cycle.join(" → ")}`);
 
-      const participants = cycleToParticipants(cycle, graph);
-      if (!participants) return null;
-      const averageSatisfactionScore =
-        participants.reduce(
-          (total, participant) => total + participant.satisfactionScore,
-          0
-        ) / participants.length;
-
-      // Determine match type based on participant requests
-      const matchType = participants[0].requestType;
-      const swapPattern =
-        cycle.length === 2
-          ? "DIRECT"
-          : cycle.length === 3
-            ? "THREE_WAY"
-            : "MULTI_WAY";
-
-      const matchResult: MatchResult = {
-        pattern: swapPattern as "DIRECT" | "THREE_WAY" | "MULTI_WAY",
-        participants,
-        satisfactionScore: averageSatisfactionScore,
-        processingTime: Date.now() - context.startTime,
-        isProvisional: false,
-        graphPartition: context.partition.partitionKey,
-        singleSwapRequestIds: matchType === "single" ? cycle : [],
-        bundleSwapRequestIds: matchType === "bundle" ? cycle : [],
-      };
+      const matchResult = cycleToMatch(
+        cycle,
+        graph,
+        context.partition.partitionKey,
+        Date.now() - context.startTime
+      );
 
       if (matchResult) {
         console.log(

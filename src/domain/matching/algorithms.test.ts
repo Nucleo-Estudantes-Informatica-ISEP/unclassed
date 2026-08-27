@@ -4,6 +4,7 @@ import { test } from "vitest";
 import {
   areAllRequestsAvailable,
   buildCompatibilityGraph,
+  cycleToMatch,
   cycleToParticipants,
   decideMatchOverlap,
   findCycles,
@@ -37,6 +38,10 @@ test("characterizes direct two-way matching", () => {
 
   assert.deepEqual(findCycles(graph, "a", 2), [["a", "b"]]);
   assert.equal(graph.outgoingEdges("a")[0]?.value.satisfactionScore, 1);
+  const match = cycleToMatch(["a", "b"], graph, "subject-1", 500);
+  assert.equal(match?.pattern, "DIRECT");
+  assert.equal(match?.satisfactionScore, 1);
+  assert.equal(match?.processingTime, 500);
   assert.deepEqual(cycleToParticipants(["a", "b"], graph), [
     {
       userId: "user-a",
@@ -66,6 +71,26 @@ test("characterizes three-way matching", () => {
 
   assert.deepEqual(findCycles(graph, "a", 3), [["a", "b", "c"]]);
   assert.deepEqual(findCycles(graph, "a", 2), []);
+  assert.equal(
+    cycleToMatch(["a", "b", "c"], graph, "subject-1", 0)?.pattern,
+    "THREE_WAY"
+  );
+});
+
+test("assembles multi-way matches and averages satisfaction", () => {
+  const graph = buildCompatibilityGraph([
+    request("a", "user-a", "class-a", ["unused-class", "class-b"]),
+    request("b", "user-b", "class-b", ["class-c"]),
+    request("c", "user-c", "class-c", ["class-d"]),
+    request("d", "user-d", "class-d", ["class-a"]),
+  ]);
+
+  const match = cycleToMatch(["a", "b", "c", "d"], graph, "subject-1", 250);
+
+  assert.equal(match?.pattern, "MULTI_WAY");
+  assert.equal(match?.satisfactionScore, (0.85 + 1 + 1 + 1) / 4);
+  assert.equal(match?.processingTime, 250);
+  assert.deepEqual(match?.singleSwapRequestIds, ["a", "b", "c", "d"]);
 });
 
 test("does not match unsatisfiable preferences", () => {

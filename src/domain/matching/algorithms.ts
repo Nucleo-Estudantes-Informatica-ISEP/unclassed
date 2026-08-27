@@ -30,6 +30,17 @@ export interface MatchParticipant {
   satisfactionScore: number;
 }
 
+export interface CycleMatch {
+  pattern: "DIRECT" | "THREE_WAY" | "MULTI_WAY";
+  participants: MatchParticipant[];
+  satisfactionScore: number;
+  processingTime: number;
+  isProvisional: false;
+  graphPartition: string;
+  singleSwapRequestIds: string[];
+  bundleSwapRequestIds: string[];
+}
+
 export interface RequestAvailability {
   id: string;
   status: string;
@@ -184,6 +195,37 @@ export function cycleToParticipants(
   }
 
   return participants;
+}
+
+export function cycleToMatch(
+  cycle: string[],
+  graph: Graph<MatchingRequest, CompatibilityEdge>,
+  graphPartition: string,
+  processingTime: number
+): CycleMatch | null {
+  const participants = cycleToParticipants(cycle, graph);
+  if (!participants?.length) return null;
+
+  const requestType = participants[0].requestType;
+  return {
+    pattern:
+      cycle.length === 2
+        ? "DIRECT"
+        : cycle.length === 3
+          ? "THREE_WAY"
+          : "MULTI_WAY",
+    participants,
+    satisfactionScore:
+      participants.reduce(
+        (total, participant) => total + participant.satisfactionScore,
+        0
+      ) / participants.length,
+    processingTime,
+    isProvisional: false,
+    graphPartition,
+    singleSwapRequestIds: requestType === "single" ? cycle : [],
+    bundleSwapRequestIds: requestType === "bundle" ? cycle : [],
+  };
 }
 
 export interface OverlappingMatch {
