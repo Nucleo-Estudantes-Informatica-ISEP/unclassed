@@ -76,14 +76,13 @@ export class CronScheduler {
   }
 
   setJobEnabled(jobId: string, enabled: boolean) {
-    const job = this.registry.get(jobId);
+    const job = this.registry.setEnabled(jobId, enabled);
     if (!job) return;
 
     if (this.started) {
       if (enabled) this.scheduleJob(job);
       else this.unscheduleJob(jobId);
     }
-    this.registry.setEnabled(jobId, enabled);
   }
 
   getJobStatus() {

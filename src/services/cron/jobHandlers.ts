@@ -1,14 +1,12 @@
 import type { JobExecutionResult } from "./types";
-import prisma from "@/lib/prisma";
 import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 
 export class CronJobHandlers {
   private readonly matchingOrchestrator = new AdvancedMatchingService();
 
-  constructor(private readonly database = prisma) {}
-
   async runBatchMatching(): Promise<JobExecutionResult> {
-    const totalActiveRequests = await this.countActiveRequests();
+    const totalActiveRequests =
+      await this.matchingOrchestrator.countActiveRequests();
     const results = await this.matchingOrchestrator.runBatchProcessing();
 
     console.log(
@@ -38,7 +36,8 @@ export class CronJobHandlers {
       processedPartitions: 0,
       matchesFound: 0,
       expiredMatches,
-      totalActiveRequests: await this.countActiveRequests(),
+      totalActiveRequests:
+        await this.matchingOrchestrator.countActiveRequests(),
       errors: [],
     };
   }
@@ -70,13 +69,5 @@ export class CronJobHandlers {
         totalPartitions: stats.partitions,
       },
     };
-  }
-
-  private async countActiveRequests() {
-    const [single, bundle] = await Promise.all([
-      this.database.singleSwapRequest.count({ where: { status: "ACTIVE" } }),
-      this.database.bundleSwapRequest.count({ where: { status: "ACTIVE" } }),
-    ]);
-    return single + bundle;
   }
 }
