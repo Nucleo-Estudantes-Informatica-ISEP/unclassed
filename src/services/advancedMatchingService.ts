@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { env } from "@/lib/env";
+
 import prisma from "../lib/prisma";
 import { emailService, MatchNotificationData } from "./emailService";
 import {
@@ -178,9 +179,14 @@ export class AdvancedMatchingService {
       console.log(`🚀 Starting immediate processing for request ${requestId}`);
 
       // Acquire partition lock for immediate processing to prevent race conditions
-      const lockAcquired = await this.lockPartition(context.partition.id, context.processId);
+      const lockAcquired = await this.lockPartition(
+        context.partition.id,
+        context.processId
+      );
       if (!lockAcquired) {
-        console.log(`🔒 Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`);
+        console.log(
+          `🔒 Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`
+        );
         return [];
       }
 
@@ -402,7 +408,10 @@ export class AdvancedMatchingService {
 
     try {
       // Lock partition for processing (distributed lock)
-      const acquired = await this.lockPartition(partition.id, context.processId);
+      const acquired = await this.lockPartition(
+        partition.id,
+        context.processId
+      );
       if (!acquired) {
         console.log(
           `🔒 Skipping partition ${partition.partitionKey}: lock already held by another worker`
@@ -513,7 +522,7 @@ export class AdvancedMatchingService {
       // Find existing provisional matches involving ANY of the same participants
       const existingProvisional = (
         await this.findProvisionalMatchesForUsers(
-        newMatch.participants.map((p: MatchParticipant) => p.userId)
+          newMatch.participants.map((p: MatchParticipant) => p.userId)
         )
       ).filter((m) => m.isProvisional);
 
@@ -573,7 +582,10 @@ export class AdvancedMatchingService {
       try {
         await this.reactivateRequestsFromMatch(m);
       } catch (e) {
-        console.warn(`Failed to reactivate requests for expired match ${m.id}:`, e);
+        console.warn(
+          `Failed to reactivate requests for expired match ${m.id}:`,
+          e
+        );
       }
     }
 
@@ -850,10 +862,15 @@ export class AdvancedMatchingService {
     return res.count === 1;
   }
 
-  private async unlockPartition(partitionId: string, processId?: string): Promise<void> {
+  private async unlockPartition(
+    partitionId: string,
+    processId?: string
+  ): Promise<void> {
     // Release lock only if held by this process (if provided)
     await prisma.graphPartition.updateMany({
-      where: processId ? { id: partitionId, lockedBy: processId } : { id: partitionId },
+      where: processId
+        ? { id: partitionId, lockedBy: processId }
+        : { id: partitionId },
       data: {
         isLocked: false,
         lockedAt: null,
@@ -931,7 +948,8 @@ export class AdvancedMatchingService {
         include: { subject: true },
       })) as unknown as SingleSwapRequestRecord[];
 
-      const filtered = await this.filterUsersWithAcceptedMatches(singleRequests);
+      const filtered =
+        await this.filterUsersWithAcceptedMatches(singleRequests);
 
       requests = filtered.map((r: SingleSwapRequestRecord): GraphNode => ({
         requestId: r.id,
@@ -951,7 +969,8 @@ export class AdvancedMatchingService {
         },
       })) as unknown as BundleSwapRequestRecord[];
 
-      const filtered = await this.filterUsersWithAcceptedMatches(bundleRequests);
+      const filtered =
+        await this.filterUsersWithAcceptedMatches(bundleRequests);
 
       requests = filtered.map((r: BundleSwapRequestRecord): GraphNode => ({
         requestId: r.id,
@@ -1001,18 +1020,32 @@ export class AdvancedMatchingService {
     const nodeUserIds = Array.from(new Set(requests.map((r) => r.userId)));
     const classIds = new Set<string>();
     requests.forEach((r) => classIds.add(r.currentClassId));
-    edges.forEach((e) => { classIds.add(e.fromClassId); classIds.add(e.toClassId); });
-    const subjectIds = Array.from(new Set(requests.map((r) => r.subjectId).filter(Boolean))) as string[];
+    edges.forEach((e) => {
+      classIds.add(e.fromClassId);
+      classIds.add(e.toClassId);
+    });
+    const subjectIds = Array.from(
+      new Set(requests.map((r) => r.subjectId).filter(Boolean))
+    ) as string[];
 
     const [users, classes, subjects] = await Promise.all([
       nodeUserIds.length > 0
-        ? prisma.user.findMany({ where: { id: { in: nodeUserIds } }, select: { id: true, name: true } })
+        ? prisma.user.findMany({
+            where: { id: { in: nodeUserIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([] as { id: string; name: string }[]),
       classIds.size > 0
-        ? prisma.class.findMany({ where: { id: { in: Array.from(classIds) } }, select: { id: true, name: true } })
+        ? prisma.class.findMany({
+            where: { id: { in: Array.from(classIds) } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([] as { id: string; name: string }[]),
       subjectIds.length > 0
-        ? prisma.subject.findMany({ where: { id: { in: subjectIds } }, select: { id: true, name: true } })
+        ? prisma.subject.findMany({
+            where: { id: { in: subjectIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([] as { id: string; name: string }[]),
     ]);
 
@@ -1040,9 +1073,10 @@ export class AdvancedMatchingService {
       toClassName: classMap.get(e.toClassId),
     }));
 
-    const partitionLabel = partition.ticketType === "SPECIFIC_CLASS"
-      ? `Subject ${partition.subjectId || ""}`
-      : `Year ${partition.year ?? ""}`;
+    const partitionLabel =
+      partition.ticketType === "SPECIFIC_CLASS"
+        ? `Subject ${partition.subjectId || ""}`
+        : `Year ${partition.year ?? ""}`;
 
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
   }
@@ -1149,9 +1183,7 @@ export class AdvancedMatchingService {
         const otherParticipants = match.participants
           .filter((p: MatchParticipant) => p.userId !== participant.userId)
           .map((p: MatchParticipant) => {
-            const otherUser = users.find(
-              (u: UserRecord) => u.id === p.userId
-            );
+            const otherUser = users.find((u: UserRecord) => u.id === p.userId);
             return otherUser ? otherUser.name : "Utilizador";
           });
 
@@ -1170,11 +1202,12 @@ export class AdvancedMatchingService {
           dashboardUrl: baseUrl,
         };
 
-        const notificationReserved = await this.reserveMatchNotificationDelivery(
-          matchId,
-          user.id,
-          user.email
-        );
+        const notificationReserved =
+          await this.reserveMatchNotificationDelivery(
+            matchId,
+            user.id,
+            user.email
+          );
 
         if (!notificationReserved) {
           console.log(
@@ -1244,8 +1277,8 @@ export class AdvancedMatchingService {
       return true;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        const existingDelivery = await prisma.matchNotificationDelivery.findUnique(
-          {
+        const existingDelivery =
+          await prisma.matchNotificationDelivery.findUnique({
             where: {
               matchId_userId_notificationType: {
                 matchId,
@@ -1257,8 +1290,7 @@ export class AdvancedMatchingService {
               status: true,
               updatedAt: true,
             },
-          }
-        );
+          });
 
         if (!existingDelivery) {
           return false;
@@ -1386,10 +1418,11 @@ export class AdvancedMatchingService {
             : match.isProvisional;
 
         // Guard: prevent duplicate active proposals for the same participants.
-        const userIds = match.participants.map((p: MatchParticipant) => p.userId);
-        const existingForUsers = await this.findProvisionalMatchesForUsers(
-          userIds
+        const userIds = match.participants.map(
+          (p: MatchParticipant) => p.userId
         );
+        const existingForUsers =
+          await this.findProvisionalMatchesForUsers(userIds);
         const overlapDecision = decideMatchOverlap(
           isProvisional,
           match.satisfactionScore,
@@ -1437,20 +1470,28 @@ export class AdvancedMatchingService {
               where: { id: { in: match.singleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
             });
-            const allActive = singles.every((s) => s.status === "ACTIVE" && !s.provisionalMatchId);
+            const allActive = singles.every(
+              (s) => s.status === "ACTIVE" && !s.provisionalMatchId
+            );
             if (!allActive) {
-              throw new Error('Single swap requests no longer active - race condition detected');
+              throw new Error(
+                "Single swap requests no longer active - race condition detected"
+              );
             }
           }
-          
+
           if (match.bundleSwapRequestIds.length > 0) {
             const bundles = await tx.bundleSwapRequest.findMany({
               where: { id: { in: match.bundleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
             });
-            const allActive = bundles.every((b) => b.status === "ACTIVE" && !b.provisionalMatchId);
+            const allActive = bundles.every(
+              (b) => b.status === "ACTIVE" && !b.provisionalMatchId
+            );
             if (!allActive) {
-              throw new Error('Bundle swap requests no longer active - race condition detected');
+              throw new Error(
+                "Bundle swap requests no longer active - race condition detected"
+              );
             }
           }
 
@@ -1466,7 +1507,8 @@ export class AdvancedMatchingService {
               satisfactionScore: match.satisfactionScore,
               processingTime: match.processingTime,
               graphPartition: match.graphPartition,
-              participants: match.participants as unknown as Prisma.InputJsonValue[],
+              participants:
+                match.participants as unknown as Prisma.InputJsonValue[],
               singleSwapRequestIds: match.singleSwapRequestIds,
               bundleSwapRequestIds: match.bundleSwapRequestIds,
             },
@@ -1502,10 +1544,14 @@ export class AdvancedMatchingService {
 
         // Send email notifications to all participants (outside transaction)
         await this.sendMatchNotifications(result.createdMatch.id, result.match);
-        
       } catch (error) {
-        if (error instanceof Error && error.message.includes('race condition detected')) {
-          console.log(`⚡ Race condition detected for match - skipping (another machine already processed these requests)`);
+        if (
+          error instanceof Error &&
+          error.message.includes("race condition detected")
+        ) {
+          console.log(
+            `⚡ Race condition detected for match - skipping (another machine already processed these requests)`
+          );
         } else {
           console.error(`❌ Error creating match:`, error);
         }
@@ -1740,17 +1786,14 @@ export class AdvancedMatchingService {
    * Get comprehensive matching statistics
    */
   async getAdvancedStats(): Promise<AdvancedStats> {
-    const [partitions, matches, activeRequests] = await Promise.all([
+    const [partitions, matches, totalActiveRequests] = await Promise.all([
       prisma.graphPartition.findMany(),
       prisma.match.findMany({
         where: {
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
       }),
-      Promise.all([
-        prisma.singleSwapRequest.count({ where: { status: "ACTIVE" } }),
-        prisma.bundleSwapRequest.count({ where: { status: "ACTIVE" } }),
-      ]),
+      this.countActiveRequests(),
     ]);
 
     const m = matches as unknown as StoredMatch[];
@@ -1758,10 +1801,13 @@ export class AdvancedMatchingService {
 
     return {
       partitions: partitions.length,
-      activePartitions: partitions.filter((p: GraphPartition) => p.activeRequests > 0).length,
-      totalActiveRequests: (activeRequests[0] as number) + (activeRequests[1] as number),
+      activePartitions: partitions.filter(
+        (p: GraphPartition) => p.activeRequests > 0
+      ).length,
+      totalActiveRequests,
       matches24h: m.length,
-      provisionalMatches: m.filter((mm: StoredMatch) => mm.isProvisional).length,
+      provisionalMatches: m.filter((mm: StoredMatch) => mm.isProvisional)
+        .length,
       averageSatisfactionScore:
         m.reduce(
           (sum: number, mm: StoredMatch) => sum + (mm.satisfactionScore || 0),
@@ -1780,5 +1826,13 @@ export class AdvancedMatchingService {
         avgProcessingTime: p.avgProcessingTime ?? null,
       })),
     };
+  }
+
+  async countActiveRequests(): Promise<number> {
+    const [single, bundle] = await Promise.all([
+      prisma.singleSwapRequest.count({ where: { status: "ACTIVE" } }),
+      prisma.bundleSwapRequest.count({ where: { status: "ACTIVE" } }),
+    ]);
+    return single + bundle;
   }
 }
