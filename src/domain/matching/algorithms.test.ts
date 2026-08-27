@@ -115,6 +115,13 @@ test("honors whether preference order affects satisfaction", () => {
     ),
     1
   );
+  assert.equal(
+    getIndividualSatisfaction(
+      { ...ordered, preferenceOrderMatters: undefined },
+      "class-c"
+    ),
+    1
+  );
 });
 
 test("rejects a match when a request disappeared after graph creation", () => {
