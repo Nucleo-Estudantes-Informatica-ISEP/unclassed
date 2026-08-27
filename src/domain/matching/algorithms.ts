@@ -6,7 +6,7 @@ export interface MatchingRequest {
   userId: string;
   currentClassId: string;
   preferredClassIds: string[];
-  preferenceOrderMatters?: boolean;
+  preferenceOrderMatters: boolean;
   requestType: "single" | "bundle";
   priority: number;
   createdAt: Date;

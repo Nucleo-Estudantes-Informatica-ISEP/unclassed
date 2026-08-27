@@ -8,6 +8,7 @@ import {
   cycleToParticipants,
   decideMatchOverlap,
   findCycles,
+  getIndividualSatisfaction,
   type MatchingRequest,
 } from "./algorithms";
 
@@ -101,6 +102,19 @@ test("does not match unsatisfiable preferences", () => {
 
   assert.deepEqual(findCycles(graph, "a", 2), []);
   assert.equal(graph.outgoingEdges("a").length, 0);
+});
+
+test("honors whether preference order affects satisfaction", () => {
+  const ordered = request("a", "user-a", "class-a", ["class-b", "class-c"]);
+
+  assert.equal(getIndividualSatisfaction(ordered, "class-c"), 0.85);
+  assert.equal(
+    getIndividualSatisfaction(
+      { ...ordered, preferenceOrderMatters: false },
+      "class-c"
+    ),
+    1
+  );
 });
 
 test("rejects a match when a request disappeared after graph creation", () => {
