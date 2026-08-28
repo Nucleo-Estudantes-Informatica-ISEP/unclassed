@@ -18,22 +18,16 @@ import {
   findCycles,
   getIndividualSatisfaction,
   type CompatibilityEdge,
+  type CycleMatch,
   type MatchingRequest,
   type MatchParticipant,
 } from "@/domain/matching/algorithms";
 
 // ===== INTERFACES =====
 
-interface MatchResult {
-  pattern: "DIRECT" | "THREE_WAY" | "MULTI_WAY";
-  participants: MatchParticipant[];
-  satisfactionScore: number;
-  processingTime: number;
+type MatchResult = Omit<CycleMatch, "isProvisional"> & {
   isProvisional: boolean;
-  graphPartition: string;
-  singleSwapRequestIds: string[];
-  bundleSwapRequestIds: string[];
-}
+};
 
 interface ProcessingContext {
   timeLimit: number; // Max processing time in ms
@@ -108,6 +102,28 @@ interface BundleSwapRequestRecord {
   status?: string;
 }
 
+function toMatchingRequest(
+  request: SingleSwapRequestRecord | BundleSwapRequestRecord
+): MatchingRequest {
+  const matchingRequest = {
+    requestId: request.id,
+    userId: request.userId,
+    currentClassId: request.currentClassId,
+    preferredClassIds: request.preferredClassIds,
+    preferenceOrderMatters: request.preferenceOrderMatters,
+    priority: request.priority,
+    createdAt: request.createdAt,
+  };
+
+  return "subjectId" in request
+    ? {
+        ...matchingRequest,
+        requestType: "single",
+        subjectId: request.subjectId,
+      }
+    : { ...matchingRequest, requestType: "bundle" };
+}
+
 interface UserRecord {
   id: string;
   name: string;
@@ -147,6 +163,42 @@ interface AdvancedStats {
     successRate: number | null;
     avgProcessingTime: number | null;
   }>;
+}
+
+export function assembleCycleMatch(
+  cycle: string[],
+  graph: Graph<MatchingRequest, CompatibilityEdge>,
+  graphPartition: string,
+  startTime: number
+) {
+  const match = cycleToMatch(
+    cycle,
+    graph,
+    graphPartition,
+    Date.now() - startTime
+  );
+
+  if (match) return match;
+
+  for (let index = 0; index < cycle.length; index++) {
+    const requestId = cycle[index];
+    const nextRequestId = cycle[(index + 1) % cycle.length];
+    const edge = graph
+      .outgoingEdges(requestId)
+      .find(({ to }) => to === nextRequestId);
+
+    if (!edge) {
+      console.warn(`⚠️ Missing edge from ${requestId} to ${nextRequestId}`);
+      return null;
+    }
+
+    if (!graph.vertex(requestId)) {
+      console.warn(`⚠️ Request details not found for ${requestId}`);
+      return null;
+    }
+  }
+
+  return null;
 }
 
 // ===== MAIN SERVICE =====
@@ -697,18 +749,9 @@ export class MatchingOrchestrator {
     });
 
     if (singleRequest) {
-      const sr = singleRequest as unknown as SingleSwapRequestRecord;
-      return {
-        requestId: sr.id,
-        userId: sr.userId,
-        currentClassId: sr.currentClassId,
-        preferredClassIds: sr.preferredClassIds,
-        preferenceOrderMatters: sr.preferenceOrderMatters,
-        requestType: "single",
-        priority: sr.priority,
-        createdAt: sr.createdAt,
-        subjectId: sr.subjectId,
-      };
+      return toMatchingRequest(
+        singleRequest as unknown as SingleSwapRequestRecord
+      );
     }
 
     // Try bundle swap request
@@ -717,17 +760,9 @@ export class MatchingOrchestrator {
     });
 
     if (bundleRequest) {
-      const br = bundleRequest as unknown as BundleSwapRequestRecord;
-      return {
-        requestId: br.id,
-        userId: br.userId,
-        currentClassId: br.currentClassId,
-        preferredClassIds: br.preferredClassIds,
-        preferenceOrderMatters: br.preferenceOrderMatters,
-        requestType: "bundle",
-        priority: br.priority,
-        createdAt: br.createdAt,
-      };
+      return toMatchingRequest(
+        bundleRequest as unknown as BundleSwapRequestRecord
+      );
     }
 
     return null;
@@ -751,17 +786,7 @@ export class MatchingOrchestrator {
 
       const filtered = await this.filterUsersWithAcceptedMatches(requests);
 
-      return filtered.map((r: SingleSwapRequestRecord) => ({
-        requestId: r.id,
-        userId: r.userId,
-        currentClassId: r.currentClassId,
-        preferredClassIds: r.preferredClassIds,
-        preferenceOrderMatters: r.preferenceOrderMatters,
-        requestType: "single",
-        priority: r.priority,
-        createdAt: r.createdAt,
-        subjectId: r.subjectId,
-      }));
+      return filtered.map(toMatchingRequest);
     }
 
     const requests = (await prisma.bundleSwapRequest.findMany({
@@ -774,16 +799,7 @@ export class MatchingOrchestrator {
 
     const filtered = await this.filterUsersWithAcceptedMatches(requests);
 
-    return filtered.map((r: BundleSwapRequestRecord) => ({
-      requestId: r.id,
-      userId: r.userId,
-      currentClassId: r.currentClassId,
-      preferredClassIds: r.preferredClassIds,
-      preferenceOrderMatters: r.preferenceOrderMatters,
-      requestType: "bundle",
-      priority: r.priority,
-      createdAt: r.createdAt,
-    }));
+    return filtered.map(toMatchingRequest);
   }
 
   private shouldProcessPartition(
@@ -911,19 +927,7 @@ export class MatchingOrchestrator {
       const filtered =
         await this.filterUsersWithAcceptedMatches(singleRequests);
 
-      requests = filtered.map(
-        (r: SingleSwapRequestRecord): MatchingRequest => ({
-          requestId: r.id,
-          userId: r.userId,
-          currentClassId: r.currentClassId,
-          preferredClassIds: r.preferredClassIds,
-          preferenceOrderMatters: r.preferenceOrderMatters,
-          requestType: "single",
-          priority: r.priority,
-          createdAt: r.createdAt,
-          subjectId: r.subjectId,
-        })
-      );
+      requests = filtered.map(toMatchingRequest);
     } else {
       const bundleRequests = (await prisma.bundleSwapRequest.findMany({
         where: {
@@ -935,18 +939,7 @@ export class MatchingOrchestrator {
       const filtered =
         await this.filterUsersWithAcceptedMatches(bundleRequests);
 
-      requests = filtered.map(
-        (r: BundleSwapRequestRecord): MatchingRequest => ({
-          requestId: r.id,
-          userId: r.userId,
-          currentClassId: r.currentClassId,
-          preferredClassIds: r.preferredClassIds,
-          preferenceOrderMatters: r.preferenceOrderMatters,
-          requestType: "bundle",
-          priority: r.priority,
-          createdAt: r.createdAt,
-        })
-      );
+      requests = filtered.map(toMatchingRequest);
     }
 
     const graph = buildCompatibilityGraph(requests);
@@ -1609,19 +1602,7 @@ export class MatchingOrchestrator {
         const filteredSingleRequests =
           await this.filterUsersWithAcceptedMatches(singleRequests);
 
-        requests = filteredSingleRequests.map(
-          (r: SingleSwapRequestRecord): MatchingRequest => ({
-            requestId: r.id,
-            userId: r.userId,
-            currentClassId: r.currentClassId,
-            preferredClassIds: r.preferredClassIds,
-            preferenceOrderMatters: r.preferenceOrderMatters,
-            requestType: "single" as const,
-            priority: r.priority,
-            createdAt: r.createdAt,
-            subjectId: r.subjectId,
-          })
-        );
+        requests = filteredSingleRequests.map(toMatchingRequest);
       } else {
         // Bundle swap requests for year-based swaps
         const bundleRequests = (await prisma.bundleSwapRequest.findMany({
@@ -1635,18 +1616,7 @@ export class MatchingOrchestrator {
         const filteredBundleRequests =
           await this.filterUsersWithAcceptedMatches(bundleRequests);
 
-        requests = filteredBundleRequests.map(
-          (r: BundleSwapRequestRecord): MatchingRequest => ({
-            requestId: r.id,
-            userId: r.userId,
-            currentClassId: r.currentClassId,
-            preferredClassIds: r.preferredClassIds,
-            preferenceOrderMatters: r.preferenceOrderMatters,
-            requestType: "bundle" as const,
-            priority: r.priority,
-            createdAt: r.createdAt,
-          })
-        );
+        requests = filteredBundleRequests.map(toMatchingRequest);
       }
 
       console.log(`📊 Found ${requests.length} active requests in partition`);
@@ -1675,11 +1645,11 @@ export class MatchingOrchestrator {
     try {
       console.log(`🔄 Converting cycle to match: ${cycle.join(" → ")}`);
 
-      const matchResult = cycleToMatch(
+      const matchResult = assembleCycleMatch(
         cycle,
         graph,
         context.partition.partitionKey,
-        Date.now() - context.startTime
+        context.startTime
       );
 
       if (matchResult) {
