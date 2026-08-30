@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Eye, Plus } from "lucide-react";
@@ -23,12 +24,12 @@ import {
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
-import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
 import type { MatchDto, MatchParticipant } from "@/types/match";
 
 interface UserDashboardProps {
   userId: string;
   userRole: "USER" | "ADMIN";
+  adminDashboard?: ReactNode;
 }
 
 function getClassName(value: MatchParticipant["fromClass"]): string {
@@ -72,6 +73,7 @@ function dedupeMatches(matches: MatchDto[]): MatchDto[] {
 export default function UserDashboard({
   userId,
   userRole,
+  adminDashboard,
 }: UserDashboardProps) {
   const router = useRouter();
 
@@ -187,11 +189,7 @@ export default function UserDashboard({
           </Card>
 
           {/* Admin Dashboard */}
-          {userRole === "ADMIN" && (
-            <div className="pt-4">
-              <AdvancedMatchingDashboard />
-            </div>
-          )}
+          {adminDashboard && <div className="pt-4">{adminDashboard}</div>}
         </div>
       </div>
     </div>

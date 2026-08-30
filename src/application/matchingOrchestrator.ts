@@ -148,7 +148,7 @@ interface BatchProcessingResult {
   errors: string[];
 }
 
-interface AdvancedStats {
+export interface AdvancedStats {
   partitions: number;
   activePartitions: number;
   totalActiveRequests: number;
