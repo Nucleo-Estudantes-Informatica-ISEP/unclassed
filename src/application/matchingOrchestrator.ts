@@ -178,24 +178,14 @@ export function assembleCycleMatch(
     Date.now() - startTime
   );
 
-  if (match) return match;
+  if (!match || !("reason" in match)) return match;
 
-  for (let index = 0; index < cycle.length; index++) {
-    const requestId = cycle[index];
-    const nextRequestId = cycle[(index + 1) % cycle.length];
-    const edge = graph
-      .outgoingEdges(requestId)
-      .find(({ to }) => to === nextRequestId);
-
-    if (!edge) {
-      console.warn(`⚠️ Missing edge from ${requestId} to ${nextRequestId}`);
-      return null;
-    }
-
-    if (!graph.vertex(requestId)) {
-      console.warn(`⚠️ Request details not found for ${requestId}`);
-      return null;
-    }
+  if (match.reason === "missing-edge") {
+    console.warn(
+      `⚠️ Missing edge from ${match.requestId} to ${match.nextRequestId}`
+    );
+  } else {
+    console.warn(`⚠️ Request details not found for ${match.requestId}`);
   }
 
   return null;

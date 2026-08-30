@@ -41,6 +41,17 @@ export interface CycleMatch {
   bundleSwapRequestIds: string[];
 }
 
+export type CycleFailure =
+  | {
+      reason: "missing-edge";
+      requestId: string;
+      nextRequestId: string;
+    }
+  | {
+      reason: "missing-request";
+      requestId: string;
+    };
+
 export interface RequestAvailability {
   id: string;
   status: string;
@@ -171,7 +182,7 @@ export function findCycles<V, E>(
 export function cycleToParticipants(
   cycle: string[],
   graph: Graph<MatchingRequest, CompatibilityEdge>
-): MatchParticipant[] | null {
+): MatchParticipant[] | CycleFailure {
   const participants: MatchParticipant[] = [];
 
   for (let index = 0; index < cycle.length; index++) {
@@ -182,7 +193,10 @@ export function cycleToParticipants(
       .outgoingEdges(requestId)
       .find(({ to }) => to === nextRequestId);
 
-    if (!request || !edge) return null;
+    if (!edge) {
+      return { reason: "missing-edge", requestId, nextRequestId };
+    }
+    if (!request) return { reason: "missing-request", requestId };
 
     participants.push({
       userId: request.userId,
@@ -202,9 +216,10 @@ export function cycleToMatch(
   graph: Graph<MatchingRequest, CompatibilityEdge>,
   graphPartition: string,
   processingTime: number
-): CycleMatch | null {
+): CycleMatch | CycleFailure | null {
   const participants = cycleToParticipants(cycle, graph);
-  if (!participants?.length) return null;
+  if (!Array.isArray(participants)) return participants;
+  if (!participants.length) return null;
 
   const requestType = participants[0].requestType;
   return {
