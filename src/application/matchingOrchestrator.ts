@@ -1,42 +1,33 @@
 import type { Prisma } from "@prisma/client";
 
 import { env } from "@/lib/env";
-
-import prisma from "../lib/prisma";
-import { emailService, MatchNotificationData } from "./emailService";
+import prisma from "@/lib/prisma";
 import {
-  buildPartitionGraph,
-  calculateEdgeWeight,
-  convertCycleToMatch as convertGraphCycleToMatch,
+  emailService,
+  type MatchNotificationData,
+} from "@/services/emailService";
+import { buildPartitionKey } from "@/services/partitionKey";
+import type { Graph } from "@/domain/graph/graph";
+import {
+  areAllRequestsAvailable,
+  buildCompatibilityGraph,
+  calculateCycleSatisfaction,
+  canSwapDirectly,
+  cycleToMatch,
   decideMatchOverlap,
-  findCyclesFromNode,
+  findCycles,
   getIndividualSatisfaction,
-  type GraphEdge,
-  type GraphNode,
-} from "./matchingCore";
-import { buildPartitionKey } from "./partitionKey";
+  type CompatibilityEdge,
+  type CycleMatch,
+  type MatchingRequest,
+  type MatchParticipant,
+} from "@/domain/matching/algorithms";
 
 // ===== INTERFACES =====
 
-interface MatchResult {
-  pattern: "DIRECT" | "THREE_WAY" | "MULTI_WAY";
-  participants: MatchParticipant[];
-  satisfactionScore: number;
-  processingTime: number;
+type MatchResult = Omit<CycleMatch, "isProvisional"> & {
   isProvisional: boolean;
-  graphPartition: string;
-  singleSwapRequestIds: string[];
-  bundleSwapRequestIds: string[];
-}
-
-interface MatchParticipant {
-  userId: string;
-  fromClass: string;
-  toClass: string;
-  requestId: string;
-  requestType: "single" | "bundle";
-  satisfactionScore: number; // Individual satisfaction (0-1)
-}
+};
 
 interface ProcessingContext {
   timeLimit: number; // Max processing time in ms
@@ -111,6 +102,28 @@ interface BundleSwapRequestRecord {
   status?: string;
 }
 
+function toMatchingRequest(
+  request: SingleSwapRequestRecord | BundleSwapRequestRecord
+): MatchingRequest {
+  const matchingRequest = {
+    requestId: request.id,
+    userId: request.userId,
+    currentClassId: request.currentClassId,
+    preferredClassIds: request.preferredClassIds,
+    preferenceOrderMatters: request.preferenceOrderMatters,
+    priority: request.priority,
+    createdAt: request.createdAt,
+  };
+
+  return "subjectId" in request
+    ? {
+        ...matchingRequest,
+        requestType: "single",
+        subjectId: request.subjectId,
+      }
+    : { ...matchingRequest, requestType: "bundle" };
+}
+
 interface UserRecord {
   id: string;
   name: string;
@@ -152,11 +165,35 @@ interface AdvancedStats {
   }>;
 }
 
+export function assembleCycleMatch(
+  cycle: string[],
+  graph: Graph<MatchingRequest, CompatibilityEdge>,
+  graphPartition: string,
+  startTime: number
+) {
+  const match = cycleToMatch(
+    cycle,
+    graph,
+    graphPartition,
+    Date.now() - startTime
+  );
+
+  if (!match || !("reason" in match)) return match;
+
+  if (match.reason === "missing-edge") {
+    console.warn(
+      `⚠️ Missing edge from ${match.requestId} to ${match.nextRequestId}`
+    );
+  } else {
+    console.warn(`⚠️ Request details not found for ${match.requestId}`);
+  }
+
+  return null;
+}
+
 // ===== MAIN SERVICE =====
 
-export class AdvancedMatchingService {
-  private activeGraphs = new Map<string, unknown>(); // In-memory graph cache
-  private readonly MAX_CYCLE_LENGTH = 10;
+export class MatchingOrchestrator {
   private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds
   private readonly DIRECT_MATCH_TIMEOUT = 5000; // 5 seconds
   private readonly PARTITION_LOCK_STALE_MS = 2 * 60 * 1000; // 2 minutes
@@ -239,10 +276,8 @@ export class AdvancedMatchingService {
       }
 
       // Check for direct swap possibility
-      const canSwapDirectly = this.canSwapDirectly(request, compatibleRequest);
-
-      if (canSwapDirectly) {
-        const satisfactionScore = this.calculateSatisfactionScore([
+      if (canSwapDirectly(request, compatibleRequest)) {
+        const satisfactionScore = calculateCycleSatisfaction([
           request,
           compatibleRequest,
         ]);
@@ -463,14 +498,14 @@ export class AdvancedMatchingService {
    * reliable fallback when immediate matching was skipped.
    */
   private async findBatchMatches(
-    graph: Map<string, GraphEdge[]>,
+    graph: Graph<MatchingRequest, CompatibilityEdge>,
     context: ProcessingContext
   ): Promise<MatchResult[]> {
     const matches: MatchResult[] = [];
     const processed = new Set<string>();
     const candidateCycleLengths = [2, 3];
 
-    for (const [nodeId] of Array.from(graph.entries())) {
+    for (const [nodeId] of graph.vertices()) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
         console.log(`⏱️ Batch processing timeout reached`);
@@ -486,18 +521,14 @@ export class AdvancedMatchingService {
           break;
         }
 
-        const cycles = findCyclesFromNode(nodeId, graph, cycleLength);
+        const cycles = findCycles(graph, nodeId, cycleLength);
 
         for (const cycle of cycles) {
           if (cycle.some((id: string) => processed.has(id))) {
             continue;
           }
 
-          const matchResult = await this.convertCycleToMatch(
-            cycle,
-            graph,
-            context
-          );
+          const matchResult = this.convertCycleToMatch(cycle, graph, context);
 
           if (matchResult) {
             matches.push(matchResult);
@@ -700,7 +731,7 @@ export class AdvancedMatchingService {
 
   private async getRequestDetails(
     requestId: string
-  ): Promise<GraphNode | null> {
+  ): Promise<MatchingRequest | null> {
     // Try single swap request first
     const singleRequest = await prisma.singleSwapRequest.findUnique({
       where: { id: requestId },
@@ -708,18 +739,9 @@ export class AdvancedMatchingService {
     });
 
     if (singleRequest) {
-      const sr = singleRequest as unknown as SingleSwapRequestRecord;
-      return {
-        requestId: sr.id,
-        userId: sr.userId,
-        currentClassId: sr.currentClassId,
-        preferredClassIds: sr.preferredClassIds,
-        preferenceOrderMatters: sr.preferenceOrderMatters,
-        requestType: "single",
-        priority: sr.priority,
-        createdAt: sr.createdAt,
-        subjectId: sr.subjectId,
-      };
+      return toMatchingRequest(
+        singleRequest as unknown as SingleSwapRequestRecord
+      );
     }
 
     // Try bundle swap request
@@ -728,57 +750,20 @@ export class AdvancedMatchingService {
     });
 
     if (bundleRequest) {
-      const br = bundleRequest as unknown as BundleSwapRequestRecord;
-      return {
-        requestId: br.id,
-        userId: br.userId,
-        currentClassId: br.currentClassId,
-        preferredClassIds: br.preferredClassIds,
-        preferenceOrderMatters: br.preferenceOrderMatters,
-        requestType: "bundle",
-        priority: br.priority,
-        createdAt: br.createdAt,
-      };
+      return toMatchingRequest(
+        bundleRequest as unknown as BundleSwapRequestRecord
+      );
     }
 
     return null;
   }
 
-  private canSwapDirectly(requestA: GraphNode, requestB: GraphNode): boolean {
-    // A wants B's class AND B wants A's class
-    return (
-      requestA.preferredClassIds.includes(requestB.currentClassId) &&
-      requestB.preferredClassIds.includes(requestA.currentClassId)
-    );
-  }
-
-  private calculateSatisfactionScore(nodes: GraphNode[]): number {
-    // Calculate overall satisfaction score (0-1)
-    let totalSatisfaction = 0;
-
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const nextNode = nodes[(i + 1) % nodes.length];
-
-      const preferenceIndex = node.preferredClassIds.indexOf(
-        nextNode.currentClassId
-      );
-      if (preferenceIndex === -1) return 0; // Invalid match
-
-      // Higher satisfaction for better preferences
-      const satisfaction = 1 - preferenceIndex / node.preferredClassIds.length;
-      totalSatisfaction += satisfaction;
-    }
-
-    return totalSatisfaction / nodes.length;
-  }
-
   private async findCompatibleRequests(
-    request: GraphNode,
+    request: MatchingRequest,
     context: ProcessingContext
-  ): Promise<GraphNode[]> {
+  ): Promise<MatchingRequest[]> {
     if (request.requestType === "single") {
-      const sr = request as GraphNode & { subjectId: string };
+      const sr = request as MatchingRequest & { subjectId: string };
       const requests = (await prisma.singleSwapRequest.findMany({
         where: {
           status: "ACTIVE",
@@ -791,17 +776,7 @@ export class AdvancedMatchingService {
 
       const filtered = await this.filterUsersWithAcceptedMatches(requests);
 
-      return filtered.map((r: SingleSwapRequestRecord) => ({
-        requestId: r.id,
-        userId: r.userId,
-        currentClassId: r.currentClassId,
-        preferredClassIds: r.preferredClassIds,
-        preferenceOrderMatters: r.preferenceOrderMatters,
-        requestType: "single",
-        priority: r.priority,
-        createdAt: r.createdAt,
-        subjectId: r.subjectId,
-      }));
+      return filtered.map(toMatchingRequest);
     }
 
     const requests = (await prisma.bundleSwapRequest.findMany({
@@ -814,16 +789,7 @@ export class AdvancedMatchingService {
 
     const filtered = await this.filterUsersWithAcceptedMatches(requests);
 
-    return filtered.map((r: BundleSwapRequestRecord) => ({
-      requestId: r.id,
-      userId: r.userId,
-      currentClassId: r.currentClassId,
-      preferredClassIds: r.preferredClassIds,
-      preferenceOrderMatters: r.preferenceOrderMatters,
-      requestType: "bundle",
-      priority: r.priority,
-      createdAt: r.createdAt,
-    }));
+    return filtered.map(toMatchingRequest);
   }
 
   private shouldProcessPartition(
@@ -937,7 +903,7 @@ export class AdvancedMatchingService {
     }
 
     // Build the list of active requests (nodes) mirroring buildPartitionGraph
-    let requests: GraphNode[] = [];
+    let requests: MatchingRequest[] = [];
 
     if (partition.ticketType === "SPECIFIC_CLASS") {
       const singleRequests = (await prisma.singleSwapRequest.findMany({
@@ -951,16 +917,7 @@ export class AdvancedMatchingService {
       const filtered =
         await this.filterUsersWithAcceptedMatches(singleRequests);
 
-      requests = filtered.map((r: SingleSwapRequestRecord): GraphNode => ({
-        requestId: r.id,
-        userId: r.userId,
-        currentClassId: r.currentClassId,
-        preferredClassIds: r.preferredClassIds,
-        requestType: "single",
-        priority: r.priority,
-        createdAt: r.createdAt,
-        subjectId: r.subjectId,
-      }));
+      requests = filtered.map(toMatchingRequest);
     } else {
       const bundleRequests = (await prisma.bundleSwapRequest.findMany({
         where: {
@@ -972,49 +929,20 @@ export class AdvancedMatchingService {
       const filtered =
         await this.filterUsersWithAcceptedMatches(bundleRequests);
 
-      requests = filtered.map((r: BundleSwapRequestRecord): GraphNode => ({
-        requestId: r.id,
-        userId: r.userId,
-        currentClassId: r.currentClassId,
-        preferredClassIds: r.preferredClassIds,
-        requestType: "bundle",
-        priority: r.priority,
-        createdAt: r.createdAt,
-      }));
+      requests = filtered.map(toMatchingRequest);
     }
 
-    // Build edges
-    const edges: Array<{
-      from: string;
-      to: string;
-      weight: number;
-      satisfactionScore: number;
-      fromClassId: string;
-      fromClassName?: string;
-      toClassId: string;
-      toClassName?: string;
-    }> = [];
-
-    for (const request of requests) {
-      for (const other of requests) {
-        if (request.requestId === other.requestId) continue;
-        if (request.preferredClassIds.includes(other.currentClassId)) {
-          const weight = calculateEdgeWeight(request, other);
-          const satisfactionScore = getIndividualSatisfaction(
-            request,
-            other.currentClassId
-          );
-          edges.push({
-            from: request.requestId,
-            to: other.requestId,
-            weight,
-            satisfactionScore,
-            fromClassId: request.currentClassId,
-            toClassId: other.currentClassId,
-          });
-        }
-      }
-    }
+    const graph = buildCompatibilityGraph(requests);
+    const edges = Array.from(graph.vertices()).flatMap(([requestId]) =>
+      graph.outgoingEdges(requestId).map(({ from, to, value }) => ({
+        from,
+        to,
+        weight: value.weight,
+        satisfactionScore: value.satisfactionScore,
+        fromClassId: value.fromClassId,
+        toClassId: value.toClassId,
+      }))
+    );
 
     // Enrich with names
     const nodeUserIds = Array.from(new Set(requests.map((r) => r.userId)));
@@ -1470,8 +1398,9 @@ export class AdvancedMatchingService {
               where: { id: { in: match.singleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
             });
-            const allActive = singles.every(
-              (s) => s.status === "ACTIVE" && !s.provisionalMatchId
+            const allActive = areAllRequestsAvailable(
+              match.singleSwapRequestIds,
+              singles
             );
             if (!allActive) {
               throw new Error(
@@ -1485,8 +1414,9 @@ export class AdvancedMatchingService {
               where: { id: { in: match.bundleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
             });
-            const allActive = bundles.every(
-              (b) => b.status === "ACTIVE" && !b.provisionalMatchId
+            const allActive = areAllRequestsAvailable(
+              match.bundleSwapRequestIds,
+              bundles
             );
             if (!allActive) {
               throw new Error(
@@ -1641,12 +1571,12 @@ export class AdvancedMatchingService {
   // Graph building and cycle detection methods
   private async buildPartitionGraph(
     partition: GraphPartition
-  ): Promise<Map<string, GraphEdge[]>> {
+  ): Promise<Graph<MatchingRequest, CompatibilityEdge>> {
     try {
       console.log(`🔗 Building graph for partition ${partition.partitionKey}`);
 
       // Get all active requests in this partition
-      let requests: GraphNode[];
+      let requests: MatchingRequest[];
 
       if (partition.ticketType === "SPECIFIC_CLASS") {
         // Single swap requests for specific subject
@@ -1662,18 +1592,7 @@ export class AdvancedMatchingService {
         const filteredSingleRequests =
           await this.filterUsersWithAcceptedMatches(singleRequests);
 
-        requests = filteredSingleRequests.map(
-          (r: SingleSwapRequestRecord): GraphNode => ({
-            requestId: r.id,
-            userId: r.userId,
-            currentClassId: r.currentClassId,
-            preferredClassIds: r.preferredClassIds,
-            requestType: "single" as const,
-            priority: r.priority,
-            createdAt: r.createdAt,
-            subjectId: r.subjectId,
-          })
-        );
+        requests = filteredSingleRequests.map(toMatchingRequest);
       } else {
         // Bundle swap requests for year-based swaps
         const bundleRequests = (await prisma.bundleSwapRequest.findMany({
@@ -1687,25 +1606,15 @@ export class AdvancedMatchingService {
         const filteredBundleRequests =
           await this.filterUsersWithAcceptedMatches(bundleRequests);
 
-        requests = filteredBundleRequests.map(
-          (r: BundleSwapRequestRecord): GraphNode => ({
-            requestId: r.id,
-            userId: r.userId,
-            currentClassId: r.currentClassId,
-            preferredClassIds: r.preferredClassIds,
-            requestType: "bundle" as const,
-            priority: r.priority,
-            createdAt: r.createdAt,
-          })
-        );
+        requests = filteredBundleRequests.map(toMatchingRequest);
       }
 
       console.log(`📊 Found ${requests.length} active requests in partition`);
 
-      const builtGraph = buildPartitionGraph(requests);
+      const builtGraph = buildCompatibilityGraph(requests);
 
       console.log(
-        `🔗 Built graph with ${builtGraph.size} nodes and ${Array.from(builtGraph.values()).reduce((sum: number, edges: GraphEdge[]) => sum + edges.length, 0)} edges`
+        `🔗 Built graph with ${builtGraph.size} nodes and ${builtGraph.edgeCount} edges`
       );
 
       return builtGraph;
@@ -1714,21 +1623,21 @@ export class AdvancedMatchingService {
         `❌ Error building graph for partition ${partition.partitionKey}:`,
         error
       );
-      return new Map();
+      return buildCompatibilityGraph([]);
     }
   }
 
-  private async convertCycleToMatch(
+  private convertCycleToMatch(
     cycle: string[],
-    graph: Map<string, GraphEdge[]>,
+    graph: Graph<MatchingRequest, CompatibilityEdge>,
     context: ProcessingContext
-  ): Promise<MatchResult | null> {
+  ): MatchResult | null {
     try {
       console.log(`🔄 Converting cycle to match: ${cycle.join(" → ")}`);
-      const matchResult = await convertGraphCycleToMatch(
+
+      const matchResult = assembleCycleMatch(
         cycle,
         graph,
-        (requestId) => this.getRequestDetails(requestId),
         context.partition.partitionKey,
         context.startTime
       );

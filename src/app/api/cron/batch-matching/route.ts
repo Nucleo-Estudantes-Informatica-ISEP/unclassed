@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest, hasValidCronSecret } from "@/lib/apiAccess";
-import { AdvancedMatchingService } from "@/services/advancedMatchingService";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 /**
  * GET/POST /api/cron/batch-matching
@@ -43,7 +43,7 @@ async function handleBatchMatching(
       `🔄 Starting batch matching triggered by ${triggerSource} at ${new Date().toISOString()}`
     );
 
-    const matchingService = new AdvancedMatchingService();
+    const matchingService = new MatchingOrchestrator();
 
     // Run batch processing
     const results = await matchingService.runBatchProcessing();

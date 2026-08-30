@@ -1,8 +1,8 @@
 import type { JobExecutionResult } from "./types";
-import { AdvancedMatchingService } from "@/services/advancedMatchingService";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 export class CronJobHandlers {
-  private readonly matchingOrchestrator = new AdvancedMatchingService();
+  private readonly matchingOrchestrator = new MatchingOrchestrator();
 
   async runBatchMatching(): Promise<JobExecutionResult> {
     const totalActiveRequests =
