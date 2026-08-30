@@ -44,3 +44,8 @@ cookies*.txt
 WARP.md
 pnpm-workspace.yaml
 scripts/
+
+# Local environment files (NEI)
+.env*
+!.env.example
+!**/.env.example

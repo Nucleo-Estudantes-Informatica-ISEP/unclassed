@@ -428,12 +428,12 @@ The repository includes:
 
 - `Dockerfile`
 - `docker-compose.yaml`
-- `.env.docker`
+- `.env.example`
 
 Quick start:
 
 ```bash
-cp .env.docker .env
+cp .env.example .env
 # edit .env with real values
 docker compose up --build
 ```
