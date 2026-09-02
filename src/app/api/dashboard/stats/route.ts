@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
 
 /**
  * GET /api/dashboard/stats
@@ -16,9 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all classes
-    const classes = await prisma.class.findMany({
-      select: { id: true, name: true },
-    });
+    const classes = await classRepo.findClasses();
     const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
     // Get all active requests

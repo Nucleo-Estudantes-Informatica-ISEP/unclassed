@@ -49,3 +49,4 @@ scripts/
 .env*
 !.env.example
 !**/.env.example
+.vscode/*

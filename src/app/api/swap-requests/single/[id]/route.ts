@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
 import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
 const updateSingleSwapRequestSchema = z.object({
@@ -58,10 +58,7 @@ export async function GET(
     }
 
     // Add preferred classes info
-    const preferredClasses = await prisma.class.findMany({
-      where: { id: { in: swapRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true }
-    });
+    const preferredClasses = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     return NextResponse.json(
       toSingleSwapRequestDto(swapRequest, preferredClasses)
@@ -110,9 +107,7 @@ export async function PUT(
 
     // If updating preferred classes, verify they exist
     if (validatedData.preferredClassIds) {
-      const preferredClasses = await prisma.class.findMany({
-        where: { id: { in: validatedData.preferredClassIds } }
-      });
+      const preferredClasses = await classRepo.findManyByIds(validatedData.preferredClassIds);
 
       if (preferredClasses.length !== validatedData.preferredClassIds.length) {
         return NextResponse.json(
@@ -142,10 +137,7 @@ export async function PUT(
     });
 
     // Add preferred classes info
-    const preferredClasses = await prisma.class.findMany({
-      where: { id: { in: updatedRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true }
-    });
+    const preferredClasses = await classRepo.findManyByIds(updatedRequest.preferredClassIds);
 
     return NextResponse.json(
       toSingleSwapRequestDto(updatedRequest, preferredClasses)

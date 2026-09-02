@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
@@ -62,10 +63,7 @@ export async function GET(request: NextRequest) {
     // Add preferred classes info
     const swapRequestsWithClasses = await Promise.all(
       swapRequests.map(async (request) => {
-        const preferredClasses = await prisma.class.findMany({
-          where: { id: { in: request.preferredClassIds } },
-          select: { id: true, name: true, year: true },
-        });
+        const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
         return toSingleSwapRequestDto(request, preferredClasses);
       })
     );
@@ -99,11 +97,9 @@ export async function POST(request: NextRequest) {
 
     // Verify the subject and classes exist
     const [subject, currentClass, preferredClasses] = await Promise.all([
-      prisma.subject.findUnique({ where: { id: validatedData.subjectId } }),
-      prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({
-        where: { id: { in: validatedData.preferredClassIds } },
-      }),
+      subjectRepo.findById(validatedData.subjectId),
+      classRepo.findById(validatedData.currentClassId),
+      classRepo.findManyByIds(validatedData.preferredClassIds),
     ]);
 
     if (!subject) {
@@ -184,10 +180,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Add preferred classes info
-    const preferredClassesInfo = await prisma.class.findMany({
-      where: { id: { in: swapRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true },
-    });
+    const preferredClassesInfo = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     // Trigger immediate matching in the background without relying on an internal HTTP hop.
     void triggerImmediateMatching(swapRequest.id, "single").catch((error) => {

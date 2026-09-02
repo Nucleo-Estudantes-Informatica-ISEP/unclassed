@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,13 +26,9 @@ export async function GET(request: NextRequest) {
       where.semester = parseInt(semester);
     }
 
-    const subjects = await prisma.subject.findMany({
-      where,
-      orderBy: [
-        { year: "asc" },
-        { semester: "asc" },
-        { code: "asc" }
-      ]
+    const subjects = await subjectRepo.findSubjects({
+      year: where.year as number | undefined,
+      semester: where.semester as number | undefined
     });
 
     return NextResponse.json(subjects);

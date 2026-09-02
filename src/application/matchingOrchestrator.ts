@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
 
 import { env } from "@/lib/env";
 import prisma from "@/lib/prisma";
@@ -205,12 +207,12 @@ export class MatchingOrchestrator {
    */
   async processImmediateMatches(requestId: string): Promise<MatchResult[]> {
     const startTime = Date.now();
-    const context: ProcessingContext = {
-      timeLimit: this.DIRECT_MATCH_TIMEOUT,
-      startTime,
-      processId: `immediate-${requestId}`,
-      partition: await this.getRequestPartition(requestId),
-    };
+      const context: ProcessingContext = {
+        timeLimit: this.DIRECT_MATCH_TIMEOUT,
+        startTime,
+        processId: `immediate-${requestId}`,
+        partition: await this.getRequestPartition(requestId),
+      };
 
     try {
       console.log(`🚀 Starting immediate processing for request ${requestId}`);
@@ -443,10 +445,7 @@ export class MatchingOrchestrator {
 
     try {
       // Lock partition for processing (distributed lock)
-      const acquired = await this.lockPartition(
-        partition.id,
-        context.processId
-      );
+      const acquired = await this.lockPartition(partition.id, context.processId);
       if (!acquired) {
         console.log(
           `🔒 Skipping partition ${partition.partitionKey}: lock already held by another worker`
@@ -645,10 +644,7 @@ export class MatchingOrchestrator {
         throw new Error(`Subject missing for request ${request.requestId}`);
       }
       // Get subject info
-      const subject = await prisma.subject.findUnique({
-        where: { id: request.subjectId },
-        select: { id: true, year: true },
-      });
+      const subject = await subjectRepo.findById(request.subjectId);
 
       partitionKey = buildPartitionKey({
         ticketType: "SPECIFIC_CLASS",
@@ -659,10 +655,7 @@ export class MatchingOrchestrator {
       year = subject?.year ?? undefined;
     } else {
       // Get class info for year
-      const currentClass = await prisma.class.findUnique({
-        where: { id: request.currentClassId },
-        select: { year: true },
-      });
+      const currentClass = await classRepo.findById(request.currentClassId);
 
       if (!currentClass) {
         throw new Error(`Current class ${request.currentClassId} not found`);
@@ -964,16 +957,10 @@ export class MatchingOrchestrator {
           })
         : Promise.resolve([] as { id: string; name: string }[]),
       classIds.size > 0
-        ? prisma.class.findMany({
-            where: { id: { in: Array.from(classIds) } },
-            select: { id: true, name: true },
-          })
+        ? classRepo.findManyByIds(Array.from(classIds))
         : Promise.resolve([] as { id: string; name: string }[]),
       subjectIds.length > 0
-        ? prisma.subject.findMany({
-            where: { id: { in: subjectIds } },
-            select: { id: true, name: true },
-          })
+        ? subjectRepo.findManyByIds(subjectIds)
         : Promise.resolve([] as { id: string; name: string }[]),
     ]);
 
@@ -1088,9 +1075,7 @@ export class MatchingOrchestrator {
           ...match.participants.map((p: MatchParticipant) => p.toClass),
         ])
       );
-      const classes = (await prisma.class.findMany({
-        where: { id: { in: allClassIds } },
-      })) as unknown as ClassRecord[];
+      const classes = (await classRepo.findManyByIds(allClassIds)) as unknown as ClassRecord[];
       const classMap = new Map<string, string>(
         classes.map((c: ClassRecord) => [c.id, c.name])
       );
