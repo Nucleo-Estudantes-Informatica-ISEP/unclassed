@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
 import { toBundleSwapRequestDto } from "@/services/swapRequestDto";
 

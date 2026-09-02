@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
 import { bundleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";

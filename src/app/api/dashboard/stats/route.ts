@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
 
 /**

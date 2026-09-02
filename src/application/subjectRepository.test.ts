@@ -17,8 +17,9 @@ describe("subjectRepository", () => {
 
     // Assert
     expect(spy).toHaveBeenCalled();
-    const callArg = spy.mock.calls[0][0];
-    expect(callArg.where).toMatchObject({ year: 2, semester: 1 });
+    const callArg = spy.mock.calls[0]?.[0];
+    expect(callArg).toBeDefined();
+    expect(callArg?.where).toMatchObject({ year: 2, semester: 1 });
     expect(result).toBe(mockSubjects);
 
     spy.mockRestore();

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import prisma from "@/lib/prisma";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";

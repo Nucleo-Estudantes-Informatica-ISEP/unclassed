@@ -15,8 +15,9 @@ describe("classRepository", () => {
 
     // Assert
     expect(spy).toHaveBeenCalled();
-    const arg = spy.mock.calls[0][0];
-    expect(arg.where).toMatchObject({ year: 2024 });
+    const arg = spy.mock.calls[0]?.[0];
+    expect(arg).toBeDefined();
+    expect(arg?.where).toMatchObject({ year: 2024 });
     expect(res).toBe(mock);
 
     spy.mockRestore();
