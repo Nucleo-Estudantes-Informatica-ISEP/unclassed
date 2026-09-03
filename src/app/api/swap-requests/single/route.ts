@@ -145,12 +145,12 @@ export async function POST(request: NextRequest) {
     const preferredClassesInfo = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     // Trigger immediate matching in the background without relying on an internal HTTP hop.
-    void triggerImmediateMatching(swapRequest.id, "single").catch((error) => {
+    void triggerImmediateMatching(swapRequest.id, "single").catch((error: unknown) => {
       console.warn("Failed to trigger immediate matching:", error);
     });
 
     if (session.onboardingCompletedAt === null) {
-      await userService.markOnboardingComplete(session.id).catch((error) => {
+      await userService.markOnboardingComplete(session.id).catch((error: unknown) => {
         console.warn("Failed to record onboarding completion:", error);
       });
     }

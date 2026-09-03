@@ -123,13 +123,13 @@ export async function GET(request: NextRequest) {
       .slice(0, 10);
 
     // Recent successful swaps
-    const recentSwaps = matches.map((m) => ({
+    const recentSwaps = matches.map((m: (typeof matches)[number]) => ({
       id: m.id,
       createdAt: m.createdAt,
       classes: [
         ...(m.singleSwapRequestIds || []),
         ...(m.bundleSwapRequestIds || []),
-      ].map((reqId) => {
+      ].map((reqId: string) => {
         const req = allActive.find((r) => r.id === reqId);
         return req
           ? classMap.get(req.currentClassId) || req.currentClassId
