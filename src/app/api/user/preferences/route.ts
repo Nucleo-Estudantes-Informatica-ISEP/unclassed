@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import * as userService from "@/application/services/userService";
 import { authorizeRequest } from "@/lib/apiAccess";
-import * as userPreferencesService from "@/application/services/userPreferencesService";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     }
     const { session } = authResult;
 
-    const user = await userPreferencesService.getPreferences(session.id);
+    const user = await userService.getPreferences(session.id);
 
     if (!user) {
       return NextResponse.json({ error: "Utilizador não encontrado" }, { status: 404 });
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
 
     const { emailNotifications, sharePhoneOnMatch, phone } = await req.json();
 
-    const result = await userPreferencesService.updatePreferences(session.id, {
+    const result = await userService.updatePreferences(session.id, {
       emailNotifications,
       sharePhoneOnMatch,
       phone,
