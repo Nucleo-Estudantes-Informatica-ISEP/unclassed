@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
 const updateSingleSwapRequestSchema = z.object({
@@ -31,19 +31,16 @@ export async function GET(
     }
     const { session } = authResult;
 
-    const swapRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true }
-        },
-        subject: {
-          select: { id: true, code: true, name: true, year: true }
-        },
-        currentClass: {
-          select: { id: true, name: true, year: true }
-        }
-      }
+    const swapRequest = await singleSwapRequestRepo.findById(id, {
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      subject: {
+        select: { id: true, code: true, name: true, year: true },
+      },
+      currentClass: {
+        select: { id: true, name: true, year: true },
+      },
     });
 
     if (!swapRequest) {
@@ -62,7 +59,10 @@ export async function GET(
     const preferredClasses = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     return NextResponse.json(
-      toSingleSwapRequestDto(swapRequest, preferredClasses)
+      toSingleSwapRequestDto(
+        swapRequest as Parameters<typeof toSingleSwapRequestDto>[0],
+        preferredClasses
+      )
     );
   } catch (error) {
     console.error("Error fetching single swap request:", error);
@@ -90,9 +90,7 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateSingleSwapRequestSchema.parse(body);
 
-    const existingRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id }
-    });
+    const existingRequest = await singleSwapRequestRepo.findById(id);
 
     if (!existingRequest) {
       return NextResponse.json(
@@ -118,30 +116,33 @@ export async function PUT(
       }
     }
 
-    const updatedRequest = await prisma.singleSwapRequest.update({
+    const updatedRequest = await singleSwapRequestRepo.update({
       where: { id },
       data: {
         ...validatedData,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         user: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         subject: {
-          select: { id: true, code: true, name: true, year: true }
+          select: { id: true, code: true, name: true, year: true },
         },
         currentClass: {
-          select: { id: true, name: true, year: true }
-        }
-      }
+          select: { id: true, name: true, year: true },
+        },
+      },
     });
 
     // Add preferred classes info
     const preferredClasses = await classRepo.findManyByIds(updatedRequest.preferredClassIds);
 
     return NextResponse.json(
-      toSingleSwapRequestDto(updatedRequest, preferredClasses)
+      toSingleSwapRequestDto(
+        updatedRequest as Parameters<typeof toSingleSwapRequestDto>[0],
+        preferredClasses
+      )
     );
 
   } catch (error) {
@@ -175,9 +176,7 @@ export async function DELETE(
     }
     const { session } = authResult;
 
-    const existingRequest = await prisma.singleSwapRequest.findUnique({
-      where: { id }
-    });
+    const existingRequest = await singleSwapRequestRepo.findById(id);
 
     if (!existingRequest) {
       return NextResponse.json(
@@ -191,8 +190,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Acesso proibido" }, { status: 403 });
     }
 
-    await prisma.singleSwapRequest.delete({
-      where: { id }
+    await singleSwapRequestRepo.remove({
+      where: { id },
     });
 
     return NextResponse.json({ message: "Pedido de permuta eliminado com sucesso" });

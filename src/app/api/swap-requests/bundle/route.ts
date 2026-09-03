@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import { bundleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       where.status = validatedStatus;
     }
 
-    const swapRequests = await prisma.bundleSwapRequest.findMany({
+    const swapRequests = await bundleSwapRequestRepo.findMany({
       where,
       include: {
         user: {
@@ -61,7 +62,10 @@ export async function GET(request: NextRequest) {
     const swapRequestsWithClasses = await Promise.all(
       swapRequests.map(async (request) => {
         const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
-        return toBundleSwapRequestDto(request, preferredClasses);
+        return toBundleSwapRequestDto(
+          request as Parameters<typeof toBundleSwapRequestDto>[0],
+          preferredClasses
+        );
       })
     );
 
@@ -123,12 +127,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has an active request for this class
-    const existingRequest = await prisma.bundleSwapRequest.findFirst({
-      where: {
-        userId: session.id,
-        currentClassId: validatedData.currentClassId,
-        status: "ACTIVE",
-      },
+    const existingRequest = await bundleSwapRequestRepo.findFirst({
+      userId: session.id,
+      currentClassId: validatedData.currentClassId,
+      status: "ACTIVE",
     });
 
     if (existingRequest) {
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const swapRequest = await prisma.bundleSwapRequest.create({
+    const swapRequest = await bundleSwapRequestRepo.create({
       data: {
         userId: session.id,
         currentClassId: validatedData.currentClassId,
@@ -197,7 +199,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        ...toBundleSwapRequestDto(swapRequest, preferredClassesInfo),
+        ...toBundleSwapRequestDto(
+          swapRequest as Parameters<typeof toBundleSwapRequestDto>[0],
+          preferredClassesInfo
+        ),
         message:
           "Pedido de permuta completa criado! A procurar matches imediatos...",
       },

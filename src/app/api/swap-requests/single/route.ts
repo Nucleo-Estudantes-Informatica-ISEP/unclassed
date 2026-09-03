@@ -6,6 +6,7 @@ import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
 import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
       where.status = validatedStatus;
     }
 
-    const swapRequests = await prisma.singleSwapRequest.findMany({
+    const swapRequests = await singleSwapRequestRepo.findMany({
       where,
       include: {
         user: {
@@ -65,7 +66,10 @@ export async function GET(request: NextRequest) {
     const swapRequestsWithClasses = await Promise.all(
       swapRequests.map(async (request) => {
         const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
-        return toSingleSwapRequestDto(request, preferredClasses);
+        return toSingleSwapRequestDto(
+          request as Parameters<typeof toSingleSwapRequestDto>[0],
+          preferredClasses
+        );
       })
     );
 
@@ -125,12 +129,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has an active request for this subject
-    const existingRequest = await prisma.singleSwapRequest.findFirst({
-      where: {
-        userId: session.id,
-        subjectId: validatedData.subjectId,
-        status: "ACTIVE",
-      },
+    const existingRequest = await singleSwapRequestRepo.findFirst({
+      userId: session.id,
+      subjectId: validatedData.subjectId,
+      status: "ACTIVE",
     });
 
     if (existingRequest) {
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const swapRequest = await prisma.singleSwapRequest.create({
+    const swapRequest = await singleSwapRequestRepo.create({
       data: {
         userId: session.id,
         subjectId: validatedData.subjectId,
@@ -201,7 +203,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        ...toSingleSwapRequestDto(swapRequest, preferredClassesInfo),
+        ...toSingleSwapRequestDto(
+          swapRequest as Parameters<typeof toSingleSwapRequestDto>[0],
+          preferredClassesInfo
+        ),
         message: "Pedido criado com sucesso! A procurar matches imediatos...",
       },
       { status: 201 }

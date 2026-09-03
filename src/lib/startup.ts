@@ -5,8 +5,8 @@
  * It's designed to be called once during app initialization.
  */
 
-import { initializeCronScheduler } from './cronInit';
-import { env } from './env';
+import { initializeCronScheduler } from "@/services/cronScheduler";
+import { env } from "@/lib/env";
 
 let isInitialized = false;
 

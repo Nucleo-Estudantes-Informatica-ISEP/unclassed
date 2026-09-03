@@ -248,6 +248,36 @@ export function getCronScheduler(): CronScheduler {
   return globalScheduler;
 }
 
+export function getCronSchedulerStatus() {
+  const enableScheduler = env.ENABLE_CRON_SCHEDULER;
+
+  try {
+    const cronScheduler = getCronScheduler();
+    const jobStatus = cronScheduler.getJobStatus();
+
+    return {
+      enabled: enableScheduler,
+      running: cronScheduler.isRunning(),
+      jobs: jobStatus.map((job) => ({
+        id: job.id,
+        name: job.name,
+        schedule: job.schedule,
+        enabled: job.enabled,
+        lastRun: job.lastRun,
+        nextRun: job.nextRun,
+        isRunning: job.isRunning,
+      })),
+    };
+  } catch (error) {
+    return {
+      enabled: enableScheduler,
+      running: false,
+      jobs: [],
+      error: error instanceof Error ? error.message : "Erro desconhecido",
+    };
+  }
+}
+
 export function initializeCronScheduler() {
   const scheduler = getCronScheduler();
   if (env.NODE_ENV === "production" || env.ENABLE_CRON_SCHEDULER) {

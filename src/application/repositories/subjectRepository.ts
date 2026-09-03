@@ -1,10 +1,11 @@
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 export type SubjectFilter = { year?: number; semester?: number };
 
+type SubjectWhereInput = NonNullable<Parameters<typeof prisma.subject.findMany>[0]>["where"];
+
 export async function findSubjects(filter: SubjectFilter = {}) {
-  const where: Prisma.SubjectWhereInput = {};
+  const where: SubjectWhereInput = {};
 
   if (filter.year !== undefined) {
     where.year = filter.year;

@@ -1,10 +1,11 @@
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 export type ClassFilter = { year?: number };
 
+type ClassWhereInput = NonNullable<Parameters<typeof prisma.class.findMany>[0]>["where"];
+
 export async function findClasses(filter: ClassFilter = {}) {
-  const where: Prisma.ClassWhereInput = {};
+  const where: ClassWhereInput = {};
   if (filter.year !== undefined) where.year = filter.year;
   return prisma.class.findMany({ where, orderBy: [{ year: "asc" }, { name: "asc" }] });
 }

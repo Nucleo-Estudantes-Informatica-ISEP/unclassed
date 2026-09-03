@@ -8,10 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import { getCronSchedulerStatus } from "@/lib/cronInit";
 import { env } from "@/lib/env";
 import prisma from "@/lib/prisma";
 import { isAppInitialized } from "@/lib/startup";
+import { getCronSchedulerStatus } from "@/services/cronScheduler";
 
 /**
  * Health check endpoint
