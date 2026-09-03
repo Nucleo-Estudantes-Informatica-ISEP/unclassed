@@ -50,6 +50,18 @@ export async function update(args: UpdateArgs) {
   return prisma.singleSwapRequest.update(args);
 }
 
+export async function updateMany(args: Parameters<typeof prisma.singleSwapRequest.updateMany>[0]) {
+  return prisma.singleSwapRequest.updateMany(args);
+}
+
+export async function count(args: Parameters<typeof prisma.singleSwapRequest.count>[0]) {
+  return prisma.singleSwapRequest.count(args);
+}
+
+export async function deleteMany(args: Parameters<typeof prisma.singleSwapRequest.deleteMany>[0]) {
+  return prisma.singleSwapRequest.deleteMany(args);
+}
+
 export async function remove(args: DeleteArgs) {
   return prisma.singleSwapRequest.delete(args);
 }

@@ -3,12 +3,11 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
-import * as subjectRepo from "@/application/repositories/subjectRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as userService from "@/application/services/userService";
+import * as requestService from "@/application/services/requestService";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
-import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { buildPartitionKey } from "@/services/partitionKey";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
@@ -100,57 +99,17 @@ export async function POST(request: NextRequest) {
       ...body,
     });
 
-    // Verify the subject and classes exist
-    const [subject, currentClass, preferredClasses] = await Promise.all([
-      subjectRepo.findById(validatedData.subjectId),
-      classRepo.findById(validatedData.currentClassId),
-      classRepo.findManyByIds(validatedData.preferredClassIds),
-    ]);
-
-    if (!subject) {
-      return NextResponse.json(
-        { error: "Disciplina não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (!currentClass) {
-      return NextResponse.json(
-        { error: "Turma atual não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json(
-        { error: "Uma ou mais turmas preferidas não foram encontradas" },
-        { status: 404 }
-      );
-    }
-
-    // Check if user already has an active request for this subject
-    const existingRequest = await singleSwapRequestRepo.findFirst({
+    const validation = await requestService.validateSingleRequestCreation({
       userId: session.id,
       subjectId: validatedData.subjectId,
-      status: "ACTIVE",
+      currentClassId: validatedData.currentClassId,
+      preferredClassIds: validatedData.preferredClassIds,
     });
 
-    if (existingRequest) {
+    if (!validation.ok) {
       return NextResponse.json(
-        { error: "Já tens um pedido ativo para esta disciplina" },
-        { status: 409 }
-      );
-    }
-
-    const userHasAcceptedMatch = await hasBlockingAcceptedMatch(session.id);
-
-    if (userHasAcceptedMatch) {
-      return NextResponse.json(
-        {
-          error:
-            "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro.",
-        },
-        { status: 409 }
+        { error: validation.error },
+        { status: validation.status }
       );
     }
 
@@ -191,14 +150,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (session.onboardingCompletedAt === null) {
-      await prisma.user
-        .updateMany({
-          where: { id: session.id, onboardingCompletedAt: null },
-          data: { onboardingCompletedAt: new Date() },
-        })
-        .catch((error) => {
-          console.warn("Failed to record onboarding completion:", error);
-        });
+      await userService.markOnboardingComplete(session.id).catch((error) => {
+        console.warn("Failed to record onboarding completion:", error);
+      });
     }
 
     return NextResponse.json(

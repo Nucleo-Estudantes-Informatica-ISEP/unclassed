@@ -39,6 +39,18 @@ export async function update(args: BundleSwapRequestUpdateArgs) {
   return prisma.bundleSwapRequest.update(args);
 }
 
+export async function updateMany(args: Parameters<typeof prisma.bundleSwapRequest.updateMany>[0]) {
+  return prisma.bundleSwapRequest.updateMany(args);
+}
+
+export async function count(args: Parameters<typeof prisma.bundleSwapRequest.count>[0]) {
+  return prisma.bundleSwapRequest.count(args);
+}
+
+export async function deleteMany(args: Parameters<typeof prisma.bundleSwapRequest.deleteMany>[0]) {
+  return prisma.bundleSwapRequest.deleteMany(args);
+}
+
 export async function remove(args: BundleSwapRequestDeleteArgs) {
   return prisma.bundleSwapRequest.delete(args);
 }

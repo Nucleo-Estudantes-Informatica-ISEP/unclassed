@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as userPreferencesService from "@/application/services/userPreferencesService";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,15 +11,7 @@ export async function GET(req: NextRequest) {
     }
     const { session } = authResult;
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.id },
-      select: {
-        phone: true,
-        emailNotifications: true,
-        emailVerified: true,
-        sharePhoneOnMatch: true
-      }
-    });
+    const user = await userPreferencesService.getPreferences(session.id);
 
     if (!user) {
       return NextResponse.json({ error: "Utilizador não encontrado" }, { status: 404 });
@@ -30,9 +21,8 @@ export async function GET(req: NextRequest) {
       phone: user.phone,
       emailNotifications: user.emailNotifications,
       emailVerified: user.emailVerified,
-      sharePhoneOnMatch: user.sharePhoneOnMatch
+      sharePhoneOnMatch: user.sharePhoneOnMatch,
     });
-
   } catch (error) {
     console.error("Error fetching user preferences:", error);
     return NextResponse.json(
@@ -54,69 +44,16 @@ export async function PATCH(req: NextRequest) {
 
     const { emailNotifications, sharePhoneOnMatch, phone } = await req.json();
 
-    // Validate inputs
-    const updateData: Prisma.UserUpdateInput = {};
-    
-    if (emailNotifications !== undefined) {
-      if (typeof emailNotifications !== "boolean") {
-        return NextResponse.json(
-          { error: "emailNotifications deve ser um valor booleano" },
-          { status: 400 }
-        );
-      }
-      updateData.emailNotifications = emailNotifications;
-    }
-    
-    if (sharePhoneOnMatch !== undefined) {
-      if (typeof sharePhoneOnMatch !== "boolean") {
-        return NextResponse.json(
-          { error: "sharePhoneOnMatch deve ser um valor booleano" },
-          { status: 400 }
-        );
-      }
-      updateData.sharePhoneOnMatch = sharePhoneOnMatch;
-    }
-
-    if (phone !== undefined) {
-      if (phone !== null && typeof phone !== "string") {
-        return NextResponse.json(
-          { error: "phone deve ser texto ou null" },
-          { status: 400 }
-        );
-      }
-
-      const trimmedPhone = phone?.trim() || null;
-      const isValidPhone =
-        trimmedPhone === null || /^9[1236]\d{7}$/.test(trimmedPhone);
-
-      if (!isValidPhone) {
-        return NextResponse.json(
-          { error: "Número de telemóvel inválido" },
-          { status: 400 }
-        );
-      }
-
-      updateData.phone = trimmedPhone;
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: session.id },
-      data: updateData,
-      select: {
-        phone: true,
-        emailNotifications: true,
-        emailVerified: true,
-        sharePhoneOnMatch: true,
-        name: true,
-        email: true
-      }
+    const result = await userPreferencesService.updatePreferences(session.id, {
+      emailNotifications,
+      sharePhoneOnMatch,
+      phone,
     });
 
     return NextResponse.json({
       message: "Preferências atualizadas com sucesso",
-      user: updatedUser
+      user: result,
     });
-
   } catch (error) {
     console.error("Error updating user preferences:", error);
     return NextResponse.json(

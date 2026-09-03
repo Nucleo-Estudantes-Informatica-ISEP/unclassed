@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as singleSwapRequestRepository from "@/application/repositories/singleSwapRequestRepository";
+import * as bundleSwapRequestRepository from "@/application/repositories/bundleSwapRequestRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
 
 /**
  * GET /api/dashboard/stats
@@ -21,23 +23,20 @@ export async function GET(request: NextRequest) {
     const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
     // Get all active requests
-    const activeSingle = await prisma.singleSwapRequest.findMany({
-      where: { status: "ACTIVE" },
-    });
-    const activeBundle = await prisma.bundleSwapRequest.findMany({
-      where: { status: "ACTIVE" },
-    });
-    const allActive = [...activeSingle, ...activeBundle];
+    const [activeSingle, activeBundle, matches] = await Promise.all([
+      singleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
+      bundleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
+      matchRepository.findMany({
+        where: {
+          status: { in: ["ACCEPTED", "COMPLETED"] },
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+    ]);
 
-    // Get all matches in last 30 days
-    const matches = await prisma.match.findMany({
-      where: {
-        status: { in: ["ACCEPTED", "COMPLETED"] },
-        createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
+    const allActive = [...activeSingle, ...activeBundle];
 
     // Popular classes to swap INTO
     const intoCounts: Record<string, number> = {};

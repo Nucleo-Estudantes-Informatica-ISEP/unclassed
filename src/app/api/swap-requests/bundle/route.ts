@@ -3,11 +3,11 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as userService from "@/application/services/userService";
+import * as requestService from "@/application/services/requestService";
 import { bundleSwapRequestSchema } from "@/schemas/swapRequestSchema";
-import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { buildPartitionKey } from "@/services/partitionKey";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
@@ -96,63 +96,20 @@ export async function POST(request: NextRequest) {
       ...body,
     });
 
-    // Verify the classes exist
-    const [currentClass, preferredClasses] = await Promise.all([
-      classRepo.findById(validatedData.currentClassId),
-      classRepo.findManyByIds(validatedData.preferredClassIds),
-    ]);
-
-    if (!currentClass) {
-      return NextResponse.json(
-        { error: "Turma atual não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json(
-        { error: "Uma ou mais turmas preferidas não foram encontradas" },
-        { status: 404 }
-      );
-    }
-
-    // Verify classes are from the same year
-    const allClasses = [currentClass, ...preferredClasses];
-    const years = Array.from(new Set(allClasses.map((c) => c.year)));
-    if (years.length > 1) {
-      return NextResponse.json(
-        { error: "Todas as turmas têm de ser do mesmo ano letivo" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already has an active request for this class
-    const existingRequest = await bundleSwapRequestRepo.findFirst({
+    const validation = await requestService.validateBundleRequestCreation({
       userId: session.id,
       currentClassId: validatedData.currentClassId,
-      status: "ACTIVE",
+      preferredClassIds: validatedData.preferredClassIds,
     });
 
-    if (existingRequest) {
+    if (!validation.ok) {
       return NextResponse.json(
-        {
-          error: "Já tens um pedido de permuta completa ativo para esta turma",
-        },
-        { status: 409 }
+        { error: validation.error },
+        { status: validation.status }
       );
     }
 
-    const userHasAcceptedMatch = await hasBlockingAcceptedMatch(session.id);
-
-    if (userHasAcceptedMatch) {
-      return NextResponse.json(
-        {
-          error:
-            "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro.",
-        },
-        { status: 409 }
-      );
-    }
+    const { currentClass } = validation;
 
     const swapRequest = await bundleSwapRequestRepo.create({
       data: {
@@ -187,14 +144,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (session.onboardingCompletedAt === null) {
-      await prisma.user
-        .updateMany({
-          where: { id: session.id, onboardingCompletedAt: null },
-          data: { onboardingCompletedAt: new Date() },
-        })
-        .catch((error) => {
-          console.warn("Failed to record onboarding completion:", error);
-        });
+      await userService.markOnboardingComplete(session.id).catch((error) => {
+        console.warn("Failed to record onboarding completion:", error);
+      });
     }
 
     return NextResponse.json(
