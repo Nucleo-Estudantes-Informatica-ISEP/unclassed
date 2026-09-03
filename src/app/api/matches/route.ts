@@ -3,12 +3,13 @@ import { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
-import prisma from "@/lib/prisma";
 
 interface MatchLike {
   id: string;
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
       where.matchType = validatedMatchType;
     }
 
-    const matches = await prisma.match.findMany({
+    const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
-        const users = await prisma.user.findMany({
+        const users = await userRepository.findMany({
           where: { id: { in: userIds } },
           select: {
             id: true,

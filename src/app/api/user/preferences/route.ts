@@ -44,16 +44,23 @@ export async function PATCH(req: NextRequest) {
 
     const { emailNotifications, sharePhoneOnMatch, phone } = await req.json();
 
-    const result = await userService.updatePreferences(session.id, {
-      emailNotifications,
-      sharePhoneOnMatch,
-      phone,
-    });
+    try {
+      const result = await userService.updatePreferences(session.id, {
+        emailNotifications,
+        sharePhoneOnMatch,
+        phone,
+      });
 
-    return NextResponse.json({
-      message: "Preferências atualizadas com sucesso",
-      user: result,
-    });
+      return NextResponse.json({
+        message: "Preferências atualizadas com sucesso",
+        user: result,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro interno do servidor";
+
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   } catch (error) {
     console.error("Error updating user preferences:", error);
     return NextResponse.json(

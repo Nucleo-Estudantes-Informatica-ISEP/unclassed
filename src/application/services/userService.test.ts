@@ -90,16 +90,42 @@ describe("userService", () => {
       .mockResolvedValue(preferences as never);
     const updatePreferencesSpy = vi
       .spyOn(userRepository, "updatePreferences")
-      .mockResolvedValue({ ...preferences, phone: "999999999" } as never);
+      .mockResolvedValue({ ...preferences, phone: "912345678" } as never);
 
     await expect(getPreferences("user-3")).resolves.toBe(preferences);
     await expect(
-      updatePreferences("user-3", { phone: "999999999" })
-    ).resolves.toEqual({ ...preferences, phone: "999999999" });
+      updatePreferences("user-3", { phone: "912345678" })
+    ).resolves.toEqual({ ...preferences, phone: "912345678" });
 
     expect(getPreferencesSpy).toHaveBeenCalledWith("user-3");
     expect(updatePreferencesSpy).toHaveBeenCalledWith("user-3", {
-      phone: "999999999",
+      phone: "912345678",
+    });
+  });
+
+  it("validates boolean and phone fields before updating user preferences", async () => {
+    const updatePreferencesSpy = vi
+      .spyOn(userRepository, "updatePreferences")
+      .mockResolvedValue({ phone: "912345678" } as never);
+
+    await expect(
+      updatePreferences("user-5", { emailNotifications: "yes" as never })
+    ).rejects.toThrow("emailNotifications deve ser um valor booleano");
+
+    await expect(
+      updatePreferences("user-5", { sharePhoneOnMatch: "no" as never })
+    ).rejects.toThrow("sharePhoneOnMatch deve ser um valor booleano");
+
+    await expect(
+      updatePreferences("user-5", { phone: "abc" })
+    ).rejects.toThrow("Número de telemóvel inválido");
+
+    await expect(
+      updatePreferences("user-5", { phone: "912345678" })
+    ).resolves.toEqual({ phone: "912345678" });
+
+    expect(updatePreferencesSpy).toHaveBeenCalledWith("user-5", {
+      phone: "912345678",
     });
   });
 

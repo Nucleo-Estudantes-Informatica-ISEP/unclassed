@@ -1,4 +1,5 @@
 import * as userRepository from "@/application/repositories/userRepository";
+import { isAdmin } from "@/lib/auth-nei-roles";
 import { exclude } from "@/lib/exclude";
 
 type SessionLike = {
@@ -56,7 +57,7 @@ export async function resolveSessionUser(
     name: safeUser.name ?? "",
     email: safeUser.email ?? "",
     roles,
-    role: roles.includes("admin") ? "ADMIN" : "USER",
+    role: isAdmin(session.user) ? "ADMIN" : "USER",
   } as SessionUser;
 }
 
@@ -72,7 +73,40 @@ export async function updatePreferences(
   userId: string,
   updateData: Record<string, unknown>
 ) {
-  return userRepository.updatePreferences(userId, updateData);
+  const validatedData: Record<string, unknown> = {};
+
+  if (updateData.emailNotifications !== undefined) {
+    if (typeof updateData.emailNotifications !== "boolean") {
+      throw new Error("emailNotifications deve ser um valor booleano");
+    }
+    validatedData.emailNotifications = updateData.emailNotifications;
+  }
+
+  if (updateData.sharePhoneOnMatch !== undefined) {
+    if (typeof updateData.sharePhoneOnMatch !== "boolean") {
+      throw new Error("sharePhoneOnMatch deve ser um valor booleano");
+    }
+    validatedData.sharePhoneOnMatch = updateData.sharePhoneOnMatch;
+  }
+
+  if (updateData.phone !== undefined) {
+    const phoneValue = updateData.phone;
+    if (phoneValue !== null && typeof phoneValue !== "string") {
+      throw new Error("phone deve ser texto ou null");
+    }
+
+    const trimmedPhone = (phoneValue ?? "").trim() || null;
+    const isValidPhone =
+      trimmedPhone === null || /^9[1236]\d{7}$/.test(trimmedPhone);
+
+    if (!isValidPhone) {
+      throw new Error("Número de telemóvel inválido");
+    }
+
+    validatedData.phone = trimmedPhone;
+  }
+
+  return userRepository.updatePreferences(userId, validatedData);
 }
 
 export async function markOnboardingComplete(userId: string) {
