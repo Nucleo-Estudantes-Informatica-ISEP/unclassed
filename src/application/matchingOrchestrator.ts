@@ -207,12 +207,12 @@ export class MatchingOrchestrator {
    */
   async processImmediateMatches(requestId: string): Promise<MatchResult[]> {
     const startTime = Date.now();
-      const context: ProcessingContext = {
-        timeLimit: this.DIRECT_MATCH_TIMEOUT,
-        startTime,
-        processId: `immediate-${requestId}`,
-        partition: await this.getRequestPartition(requestId),
-      };
+    const context: ProcessingContext = {
+      timeLimit: this.DIRECT_MATCH_TIMEOUT,
+      startTime,
+      processId: `immediate-${requestId}`,
+      partition: await this.getRequestPartition(requestId),
+    };
 
     try {
       console.log(`🚀 Starting immediate processing for request ${requestId}`);
