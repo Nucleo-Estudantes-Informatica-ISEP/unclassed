@@ -30,8 +30,8 @@ export function getAuthNeiRoles(
 }
 
 type RolesSource = {
-  roles?: readonly AuthNeiRole[];
-  authNeiRoles?: readonly AuthNeiRole[];
+  roles?: readonly string[];
+  authNeiRoles?: readonly string[];
 };
 
 export function hasAuthNeiRole(

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as singleSwapRequestRepository from "@/application/repositories/singleSwapRequestRepository";
+import * as bundleSwapRequestRepository from "@/application/repositories/bundleSwapRequestRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
 
 /**
  * GET /api/dashboard/stats
@@ -16,29 +19,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all classes
-    const classes = await prisma.class.findMany({
-      select: { id: true, name: true },
-    });
+    const classes = await classRepo.findClasses();
     const classMap = new Map(classes.map((c) => [c.id, c.name]));
 
     // Get all active requests
-    const activeSingle = await prisma.singleSwapRequest.findMany({
-      where: { status: "ACTIVE" },
-    });
-    const activeBundle = await prisma.bundleSwapRequest.findMany({
-      where: { status: "ACTIVE" },
-    });
-    const allActive = [...activeSingle, ...activeBundle];
+    const [activeSingle, activeBundle, matches] = await Promise.all([
+      singleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
+      bundleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
+      matchRepository.findMany({
+        where: {
+          status: { in: ["ACCEPTED", "COMPLETED"] },
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+    ]);
 
-    // Get all matches in last 30 days
-    const matches = await prisma.match.findMany({
-      where: {
-        status: { in: ["ACCEPTED", "COMPLETED"] },
-        createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
+    const allActive = [...activeSingle, ...activeBundle];
 
     // Popular classes to swap INTO
     const intoCounts: Record<string, number> = {};
@@ -125,13 +123,13 @@ export async function GET(request: NextRequest) {
       .slice(0, 10);
 
     // Recent successful swaps
-    const recentSwaps = matches.map((m) => ({
+    const recentSwaps = matches.map((m: (typeof matches)[number]) => ({
       id: m.id,
       createdAt: m.createdAt,
       classes: [
         ...(m.singleSwapRequestIds || []),
         ...(m.bundleSwapRequestIds || []),
-      ].map((reqId) => {
+      ].map((reqId: string) => {
         const req = allActive.find((r) => r.id === reqId);
         return req
           ? classMap.get(req.currentClassId) || req.currentClassId

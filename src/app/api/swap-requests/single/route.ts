@@ -3,9 +3,11 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as userService from "@/application/services/userService";
+import * as requestService from "@/application/services/requestService";
 import { singleSwapRequestSchema } from "@/schemas/swapRequestSchema";
-import { hasBlockingAcceptedMatch } from "@/services/matchParticipation";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { buildPartitionKey } from "@/services/partitionKey";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
       where.status = validatedStatus;
     }
 
-    const swapRequests = await prisma.singleSwapRequest.findMany({
+    const swapRequests = await singleSwapRequestRepo.findMany({
       where,
       include: {
         user: {
@@ -62,11 +64,11 @@ export async function GET(request: NextRequest) {
     // Add preferred classes info
     const swapRequestsWithClasses = await Promise.all(
       swapRequests.map(async (request) => {
-        const preferredClasses = await prisma.class.findMany({
-          where: { id: { in: request.preferredClassIds } },
-          select: { id: true, name: true, year: true },
-        });
-        return toSingleSwapRequestDto(request, preferredClasses);
+        const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
+        return toSingleSwapRequestDto(
+          request as Parameters<typeof toSingleSwapRequestDto>[0],
+          preferredClasses
+        );
       })
     );
 
@@ -97,65 +99,21 @@ export async function POST(request: NextRequest) {
       ...body,
     });
 
-    // Verify the subject and classes exist
-    const [subject, currentClass, preferredClasses] = await Promise.all([
-      prisma.subject.findUnique({ where: { id: validatedData.subjectId } }),
-      prisma.class.findUnique({ where: { id: validatedData.currentClassId } }),
-      prisma.class.findMany({
-        where: { id: { in: validatedData.preferredClassIds } },
-      }),
-    ]);
-
-    if (!subject) {
-      return NextResponse.json(
-        { error: "Disciplina não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (!currentClass) {
-      return NextResponse.json(
-        { error: "Turma atual não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    if (preferredClasses.length !== validatedData.preferredClassIds.length) {
-      return NextResponse.json(
-        { error: "Uma ou mais turmas preferidas não foram encontradas" },
-        { status: 404 }
-      );
-    }
-
-    // Check if user already has an active request for this subject
-    const existingRequest = await prisma.singleSwapRequest.findFirst({
-      where: {
-        userId: session.id,
-        subjectId: validatedData.subjectId,
-        status: "ACTIVE",
-      },
+    const validation = await requestService.validateSingleRequestCreation({
+      userId: session.id,
+      subjectId: validatedData.subjectId,
+      currentClassId: validatedData.currentClassId,
+      preferredClassIds: validatedData.preferredClassIds,
     });
 
-    if (existingRequest) {
+    if (!validation.ok) {
       return NextResponse.json(
-        { error: "Já tens um pedido ativo para esta disciplina" },
-        { status: 409 }
+        { error: validation.error },
+        { status: validation.status }
       );
     }
 
-    const userHasAcceptedMatch = await hasBlockingAcceptedMatch(session.id);
-
-    if (userHasAcceptedMatch) {
-      return NextResponse.json(
-        {
-          error:
-            "Não é possível criar novos pedidos enquanto tens matches aceites pendentes. Por favor conclui ou rejeita os matches existentes primeiro.",
-        },
-        { status: 409 }
-      );
-    }
-
-    const swapRequest = await prisma.singleSwapRequest.create({
+    const swapRequest = await singleSwapRequestRepo.create({
       data: {
         userId: session.id,
         subjectId: validatedData.subjectId,
@@ -184,30 +142,25 @@ export async function POST(request: NextRequest) {
     });
 
     // Add preferred classes info
-    const preferredClassesInfo = await prisma.class.findMany({
-      where: { id: { in: swapRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true },
-    });
+    const preferredClassesInfo = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     // Trigger immediate matching in the background without relying on an internal HTTP hop.
-    void triggerImmediateMatching(swapRequest.id, "single").catch((error) => {
+    void triggerImmediateMatching(swapRequest.id, "single").catch((error: unknown) => {
       console.warn("Failed to trigger immediate matching:", error);
     });
 
     if (session.onboardingCompletedAt === null) {
-      await prisma.user
-        .updateMany({
-          where: { id: session.id, onboardingCompletedAt: null },
-          data: { onboardingCompletedAt: new Date() },
-        })
-        .catch((error) => {
-          console.warn("Failed to record onboarding completion:", error);
-        });
+      await userService.markOnboardingComplete(session.id).catch((error: unknown) => {
+        console.warn("Failed to record onboarding completion:", error);
+      });
     }
 
     return NextResponse.json(
       {
-        ...toSingleSwapRequestDto(swapRequest, preferredClassesInfo),
+        ...toSingleSwapRequestDto(
+          swapRequest as Parameters<typeof toSingleSwapRequestDto>[0],
+          preferredClassesInfo
+        ),
         message: "Pedido criado com sucesso! A procurar matches imediatos...",
       },
       { status: 201 }

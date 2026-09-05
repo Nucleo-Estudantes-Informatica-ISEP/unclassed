@@ -242,18 +242,64 @@ export class CronScheduler {
 }
 
 let globalScheduler: CronScheduler | null = null;
+let gracefulShutdownHooksRegistered = false;
 
 export function getCronScheduler(): CronScheduler {
   globalScheduler ??= new CronScheduler();
   return globalScheduler;
 }
 
+export function getCronSchedulerStatus() {
+  const enableScheduler = env.ENABLE_CRON_SCHEDULER;
+
+  try {
+    const cronScheduler = getCronScheduler();
+    const jobStatus = cronScheduler.getJobStatus();
+
+    return {
+      enabled: enableScheduler,
+      running: cronScheduler.isRunning(),
+      jobs: jobStatus.map((job) => ({
+        id: job.id,
+        name: job.name,
+        schedule: job.schedule,
+        enabled: job.enabled,
+        lastRun: job.lastRun,
+        nextRun: job.nextRun,
+        isRunning: job.isRunning,
+      })),
+    };
+  } catch (error) {
+    return {
+      enabled: enableScheduler,
+      running: false,
+      jobs: [],
+      error: error instanceof Error ? error.message : "Erro desconhecido",
+    };
+  }
+}
+
+function registerGracefulShutdownHandlers() {
+  if (gracefulShutdownHooksRegistered) return;
+
+  const shutdown = () => {
+    console.log("🛑 Received shutdown signal, stopping cron scheduler...");
+    shutdownCronScheduler();
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+  gracefulShutdownHooksRegistered = true;
+}
+
 export function initializeCronScheduler() {
   const scheduler = getCronScheduler();
-  if (env.NODE_ENV === "production" || env.ENABLE_CRON_SCHEDULER) {
+  if (env.ENABLE_CRON_SCHEDULER) {
     scheduler.start();
+    registerGracefulShutdownHandlers();
   } else {
-    console.log("🔄 Cron scheduler disabled (development mode)");
+    console.log("Cron scheduler disabled");
   }
 }
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import { toBundleSwapRequestDto } from "@/services/swapRequestDto";
 
 const updateBundleSwapRequestSchema = z.object({
@@ -30,16 +31,13 @@ export async function GET(
     }
     const { session } = authResult;
 
-    const swapRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true }
-        },
-        currentClass: {
-          select: { id: true, name: true, year: true }
-        }
-      }
+    const swapRequest = await bundleSwapRequestRepo.findById(id, {
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      currentClass: {
+        select: { id: true, name: true, year: true },
+      },
     });
 
     if (!swapRequest) {
@@ -55,13 +53,13 @@ export async function GET(
     }
 
     // Add preferred classes info
-    const preferredClasses = await prisma.class.findMany({
-      where: { id: { in: swapRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true }
-    });
+    const preferredClasses = await classRepo.findManyByIds(swapRequest.preferredClassIds);
 
     return NextResponse.json(
-      toBundleSwapRequestDto(swapRequest, preferredClasses)
+      toBundleSwapRequestDto(
+        swapRequest as Parameters<typeof toBundleSwapRequestDto>[0],
+        preferredClasses
+      )
     );
   } catch (error) {
     console.error("Error fetching bundle swap request:", error);
@@ -89,12 +87,7 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateBundleSwapRequestSchema.parse(body);
 
-    const existingRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id },
-      include: {
-        currentClass: true
-      }
-    });
+    const existingRequest = await bundleSwapRequestRepo.findById(id);
 
     if (!existingRequest) {
       return NextResponse.json(
@@ -110,9 +103,7 @@ export async function PUT(
 
     // If updating preferred classes, verify they exist and are from the same year
     if (validatedData.preferredClassIds) {
-      const preferredClasses = await prisma.class.findMany({
-        where: { id: { in: validatedData.preferredClassIds } }
-      });
+      const preferredClasses = await classRepo.findManyByIds(validatedData.preferredClassIds);
 
       if (preferredClasses.length !== validatedData.preferredClassIds.length) {
         return NextResponse.json(
@@ -121,9 +112,19 @@ export async function PUT(
         );
       }
 
+      const currentClass = await classRepo.findById(existingRequest.currentClassId);
+      if (!currentClass) {
+        return NextResponse.json(
+          { error: "Turma atual não encontrada" },
+          { status: 404 }
+        );
+      }
+
       // Verify all classes are from the same year as current class
-      const allClasses = [existingRequest.currentClass, ...preferredClasses];
-      const years = Array.from(new Set(allClasses.map(c => c.year)));
+      const allClasses = [currentClass, ...preferredClasses].filter(Boolean) as Array<{
+        year: number;
+      }>;
+      const years = Array.from(new Set(allClasses.map((c) => c.year)));
       if (years.length > 1) {
         return NextResponse.json(
           { error: "Todas as turmas têm de ser do mesmo ano letivo" },
@@ -132,30 +133,30 @@ export async function PUT(
       }
     }
 
-    const updatedRequest = await prisma.bundleSwapRequest.update({
+    const updatedRequest = await bundleSwapRequestRepo.update({
       where: { id },
       data: {
         ...validatedData,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         user: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         currentClass: {
-          select: { id: true, name: true, year: true }
-        }
-      }
+          select: { id: true, name: true, year: true },
+        },
+      },
     });
 
     // Add preferred classes info
-    const preferredClasses = await prisma.class.findMany({
-      where: { id: { in: updatedRequest.preferredClassIds } },
-      select: { id: true, name: true, year: true }
-    });
+    const preferredClasses = await classRepo.findManyByIds(updatedRequest.preferredClassIds);
 
     return NextResponse.json(
-      toBundleSwapRequestDto(updatedRequest, preferredClasses)
+      toBundleSwapRequestDto(
+        updatedRequest as Parameters<typeof toBundleSwapRequestDto>[0],
+        preferredClasses
+      )
     );
 
   } catch (error) {
@@ -189,9 +190,7 @@ export async function DELETE(
     }
     const { session } = authResult;
 
-    const existingRequest = await prisma.bundleSwapRequest.findUnique({
-      where: { id }
-    });
+    const existingRequest = await bundleSwapRequestRepo.findById(id);
 
     if (!existingRequest) {
       return NextResponse.json(
@@ -205,8 +204,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Acesso proibido" }, { status: 403 });
     }
 
-    await prisma.bundleSwapRequest.delete({
-      where: { id }
+    await bundleSwapRequestRepo.remove({
+      where: { id },
     });
 
     return NextResponse.json({ message: "Pedido de permuta completa eliminado com sucesso" });

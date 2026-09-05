@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
-import prisma from "@/lib/prisma";
 
 interface MatchLike {
   id: string;
@@ -131,7 +133,7 @@ export async function GET(request: NextRequest) {
       where.matchType = validatedMatchType;
     }
 
-    const matches = await prisma.match.findMany({
+    const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
@@ -163,7 +165,7 @@ export async function GET(request: NextRequest) {
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
-        const users = await prisma.user.findMany({
+        const users = await userRepository.findMany({
           where: { id: { in: userIds } },
           select: {
             id: true,
@@ -178,10 +180,7 @@ export async function GET(request: NextRequest) {
           ...participants.map((p) => p.fromClass),
           ...participants.map((p) => p.toClass),
         ].filter((id): id is string => id !== undefined);
-        const classes = await prisma.class.findMany({
-          where: { id: { in: classIds } },
-          select: { id: true, name: true, year: true },
-        });
+        const classes = await classRepo.findManyByIds(classIds);
 
         const enrichedParticipants = participants.map((p) => {
           const user = users.find((u) => u.id === p.userId);

@@ -7,8 +7,10 @@ import { JobLock } from "./cron/jobLock";
 import { JobRegistry } from "./cron/jobRegistry";
 import {
   CronScheduler,
+  getCronScheduler,
   getLeaseHeartbeatInterval,
   getNextCronRun,
+  initializeCronScheduler,
 } from "./cronScheduler";
 
 test("renews cron leases well before their expiry", () => {
@@ -143,5 +145,51 @@ test("recovers after an invalid schedule fails startup", () => {
   } finally {
     scheduler.stop();
     env.CRON_BATCH_MATCHING = originalSchedule;
+  }
+});
+
+test("registers graceful shutdown hooks for SIGINT and SIGTERM when enabled", () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalEnableCronScheduler = env.ENABLE_CRON_SCHEDULER;
+  const originalOn = process.on;
+  const calls: Array<[string, (...args: unknown[]) => unknown]> = [];
+
+  env.NODE_ENV = "production";
+  env.ENABLE_CRON_SCHEDULER = true;
+  process.on = ((signal: string, listener: (...args: unknown[]) => unknown) => {
+    calls.push([signal, listener]);
+    return process;
+  }) as typeof process.on;
+
+  try {
+    initializeCronScheduler();
+
+    assert.deepEqual(
+      calls.map(([signal]) => signal).sort(),
+      ["SIGINT", "SIGTERM"].sort()
+    );
+  } finally {
+    process.on = originalOn;
+    env.NODE_ENV = originalNodeEnv;
+    env.ENABLE_CRON_SCHEDULER = originalEnableCronScheduler;
+  }
+});
+
+test("does not start scheduler in production when ENABLE_CRON_SCHEDULER is false", () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalEnableCronScheduler = env.ENABLE_CRON_SCHEDULER;
+
+  // Stop global scheduler if previous tests left it running
+  getCronScheduler().stop();
+
+  env.NODE_ENV = "production";
+  env.ENABLE_CRON_SCHEDULER = false;
+
+  try {
+    initializeCronScheduler();
+    assert.equal(getCronScheduler().isRunning(), false);
+  } finally {
+    env.NODE_ENV = originalNodeEnv;
+    env.ENABLE_CRON_SCHEDULER = originalEnableCronScheduler;
   }
 });

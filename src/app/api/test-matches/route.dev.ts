@@ -3,6 +3,8 @@ import type { Class, SingleSwapRequest, Subject, User } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
 
 import bcrypt from "bcryptjs";
 
@@ -71,9 +73,7 @@ async function createSampleUsers(): Promise<User[]> {
 
 async function getSeededClasses(): Promise<Class[]> {
   const names = ["1DA", "1DB", "1DC", "1DD"];
-  const classes = await prisma.class.findMany({
-    where: { name: { in: names } },
-  });
+  const classes = await classRepo.findByNames(names);
   const byName = new Map(classes.map((entry) => [entry.name, entry]));
 
   return names.map((name) => {
@@ -84,7 +84,7 @@ async function getSeededClasses(): Promise<Class[]> {
 }
 
 async function getSeededSubject(): Promise<Subject> {
-  const subject = await prisma.subject.findUnique({ where: { code: "ALGAN" } });
+  const subject = await subjectRepo.findByCode("ALGAN");
   if (!subject) throw new Error("Missing seeded subject ALGAN; run pnpm seed");
   return subject;
 }

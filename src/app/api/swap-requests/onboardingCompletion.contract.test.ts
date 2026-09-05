@@ -12,9 +12,11 @@ for (const routePath of requestRoutes) {
   test(`${routePath} records onboarding completion idempotently`, () => {
     const source = readFileSync(path.join(process.cwd(), routePath), "utf8");
 
-    assert.match(
-      source,
-      /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?await prisma\.user\s*\.updateMany\(\{[\s\S]*?where: \{ id: session\.id, onboardingCompletedAt: null \},[\s\S]*?data: \{ onboardingCompletedAt: new Date\(\) \},[\s\S]*?\}\)[\s\S]*?\.catch\(/,
+    const directPrismaUpdate = /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?await prisma\.user\s*\.updateMany\(\{[\s\S]*?where: \{ id: session\.id, onboardingCompletedAt: null \},[\s\S]*?data: \{ onboardingCompletedAt: new Date\(\) \},[\s\S]*?\}\)[\s\S]*?\.catch\(/;
+    const viaService = /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?await userService\.markOnboardingComplete\(session\.id\)[\s\S]*?\.catch\(/;
+
+    assert.ok(
+      directPrismaUpdate.test(source) || viaService.test(source),
       "first-request completion must be awaited and guarded against duplicate writes"
     );
   });
