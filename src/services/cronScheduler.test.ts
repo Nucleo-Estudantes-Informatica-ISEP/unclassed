@@ -7,6 +7,7 @@ import { JobLock } from "./cron/jobLock";
 import { JobRegistry } from "./cron/jobRegistry";
 import {
   CronScheduler,
+  getCronScheduler,
   getLeaseHeartbeatInterval,
   getNextCronRun,
   initializeCronScheduler,
@@ -147,7 +148,7 @@ test("recovers after an invalid schedule fails startup", () => {
   }
 });
 
-test("registers graceful shutdown hooks for SIGINT and SIGTERM", () => {
+test("registers graceful shutdown hooks for SIGINT and SIGTERM when enabled", () => {
   const originalNodeEnv = env.NODE_ENV;
   const originalEnableCronScheduler = env.ENABLE_CRON_SCHEDULER;
   const originalOn = process.on;
@@ -169,6 +170,25 @@ test("registers graceful shutdown hooks for SIGINT and SIGTERM", () => {
     );
   } finally {
     process.on = originalOn;
+    env.NODE_ENV = originalNodeEnv;
+    env.ENABLE_CRON_SCHEDULER = originalEnableCronScheduler;
+  }
+});
+
+test("does not start scheduler in production when ENABLE_CRON_SCHEDULER is false", () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalEnableCronScheduler = env.ENABLE_CRON_SCHEDULER;
+
+  // Stop global scheduler if previous tests left it running
+  getCronScheduler().stop();
+
+  env.NODE_ENV = "production";
+  env.ENABLE_CRON_SCHEDULER = false;
+
+  try {
+    initializeCronScheduler();
+    assert.equal(getCronScheduler().isRunning(), false);
+  } finally {
     env.NODE_ENV = originalNodeEnv;
     env.ENABLE_CRON_SCHEDULER = originalEnableCronScheduler;
   }

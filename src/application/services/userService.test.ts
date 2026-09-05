@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import * as userRepository from "@/application/repositories/userRepository";
 import {
+  ValidationError,
   getPreferences,
   markOnboardingComplete,
   resolveSessionUser,
@@ -127,6 +128,23 @@ describe("userService", () => {
     expect(updatePreferencesSpy).toHaveBeenCalledWith("user-5", {
       phone: "912345678",
     });
+  });
+
+  it("separates validation errors from repository failures", async () => {
+    const updatePreferencesSpy = vi
+      .spyOn(userRepository, "updatePreferences")
+      .mockRejectedValue(new Error("Database unavailable"));
+
+    await expect(
+      updatePreferences("user-6", { emailNotifications: "yes" as never })
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    await expect(
+      updatePreferences("user-7", { phone: "912345678" })
+    ).rejects.toThrow("Database unavailable");
+
+    expect(updatePreferencesSpy).toHaveBeenCalledTimes(1);
+    expect(updatePreferencesSpy).toHaveBeenCalledWith("user-7", { phone: "912345678" });
   });
 
   it("delegates onboarding completion to the user repository", async () => {

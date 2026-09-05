@@ -2,6 +2,8 @@ import * as userRepository from "@/application/repositories/userRepository";
 import { isAdmin } from "@/lib/auth-nei-roles";
 import { exclude } from "@/lib/exclude";
 
+export class ValidationError extends Error {}
+
 type SessionLike = {
   user?: {
     id?: string | null;
@@ -77,14 +79,14 @@ export async function updatePreferences(
 
   if (updateData.emailNotifications !== undefined) {
     if (typeof updateData.emailNotifications !== "boolean") {
-      throw new Error("emailNotifications deve ser um valor booleano");
+      throw new ValidationError("emailNotifications deve ser um valor booleano");
     }
     validatedData.emailNotifications = updateData.emailNotifications;
   }
 
   if (updateData.sharePhoneOnMatch !== undefined) {
     if (typeof updateData.sharePhoneOnMatch !== "boolean") {
-      throw new Error("sharePhoneOnMatch deve ser um valor booleano");
+      throw new ValidationError("sharePhoneOnMatch deve ser um valor booleano");
     }
     validatedData.sharePhoneOnMatch = updateData.sharePhoneOnMatch;
   }
@@ -92,7 +94,7 @@ export async function updatePreferences(
   if (updateData.phone !== undefined) {
     const phoneValue = updateData.phone;
     if (phoneValue !== null && typeof phoneValue !== "string") {
-      throw new Error("phone deve ser texto ou null");
+      throw new ValidationError("phone deve ser texto ou null");
     }
 
     const trimmedPhone = (phoneValue ?? "").trim() || null;
@@ -100,7 +102,7 @@ export async function updatePreferences(
       trimmedPhone === null || /^9[1236]\d{7}$/.test(trimmedPhone);
 
     if (!isValidPhone) {
-      throw new Error("Número de telemóvel inválido");
+      throw new ValidationError("Número de telemóvel inválido");
     }
 
     validatedData.phone = trimmedPhone;

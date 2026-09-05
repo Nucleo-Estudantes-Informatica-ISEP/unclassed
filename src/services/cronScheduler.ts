@@ -295,11 +295,11 @@ function registerGracefulShutdownHandlers() {
 
 export function initializeCronScheduler() {
   const scheduler = getCronScheduler();
-  if (env.NODE_ENV === "production" || env.ENABLE_CRON_SCHEDULER) {
+  if (env.ENABLE_CRON_SCHEDULER) {
     scheduler.start();
     registerGracefulShutdownHandlers();
   } else {
-    console.log("🔄 Cron scheduler disabled (development mode)");
+    console.log("Cron scheduler disabled");
   }
 }
 

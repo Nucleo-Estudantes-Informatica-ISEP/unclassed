@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import * as userService from "@/application/services/userService";
+import { ValidationError } from "@/application/services/userService";
 import { authorizeRequest } from "@/lib/apiAccess";
 
 export async function GET(req: NextRequest) {
@@ -56,10 +57,14 @@ export async function PATCH(req: NextRequest) {
         user: result,
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro interno do servidor";
+      if (error instanceof ValidationError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        );
+      }
 
-      return NextResponse.json({ error: message }, { status: 400 });
+      throw error;
     }
   } catch (error) {
     console.error("Error updating user preferences:", error);
