@@ -76,13 +76,13 @@ importers:
         version: 16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       next-auth:
         specifier: 5.0.0-beta.32
-        version: 5.0.0-beta.32(next@16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@9.0.5)(react@19.2.8)
+        version: 5.0.0-beta.32(next@16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@9.1.1)(react@19.2.8)
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       nodemailer:
-        specifier: ^9.0.5
-        version: 9.0.5
+        specifier: ^9.1.1
+        version: 9.1.1
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -2476,6 +2476,7 @@ packages:
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -3206,8 +3207,8 @@ packages:
     resolution: {integrity: sha512-D9UOmYG3UH1V+ENW56t5QXBwJw1YEY18ruVeus89Rw+SyIgjPkCO84bRzO3uNIYosJbNwiabWVn48o3uJLjxFQ==}
     engines: {node: '>=18'}
 
-  nodemailer@9.0.5:
-    resolution: {integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==}
+  nodemailer@9.1.1:
+    resolution: {integrity: sha512-izw9mVKFix6YSnC9eLgV6g1opl9DUlRio9ZNcq+Wu9Ujn2UwF+8Nl0B8nz22kEC+CTZCvinkxwJ0DeFbb6NwcQ==}
     engines: {node: '>=6.0.0'}
 
   nypm@0.6.9:
@@ -4034,7 +4035,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@auth/core@0.41.3(nodemailer@9.0.5)':
+  '@auth/core@0.41.3(nodemailer@9.1.1)':
     dependencies:
       '@panva/hkdf': 1.2.1
       jose: 6.2.9
@@ -4042,7 +4043,7 @@ snapshots:
       preact: 10.24.3
       preact-render-to-string: 6.5.11(preact@10.24.3)
     optionalDependencies:
-      nodemailer: 9.0.5
+      nodemailer: 9.1.1
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -6851,13 +6852,13 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next-auth@5.0.0-beta.32(next@16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@9.0.5)(react@19.2.8):
+  next-auth@5.0.0-beta.32(next@16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@9.1.1)(react@19.2.8):
     dependencies:
-      '@auth/core': 0.41.3(nodemailer@9.0.5)
+      '@auth/core': 0.41.3(nodemailer@9.1.1)
       next: 16.3.1(@babel/core@7.29.0)(@types/node@25.9.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
     optionalDependencies:
-      nodemailer: 9.0.5
+      nodemailer: 9.1.1
 
   next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
@@ -6902,7 +6903,7 @@ snapshots:
 
   node-releases@2.0.53: {}
 
-  nodemailer@9.0.5: {}
+  nodemailer@9.1.1: {}
 
   nypm@0.6.9:
     dependencies:
