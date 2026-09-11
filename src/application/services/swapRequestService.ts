@@ -186,6 +186,9 @@ export async function createSingleSwapRequest(
     if (validation.status === 409) {
       throw new SwapRequestConflictError(validation.error);
     }
+    if (validation.status === 404) {
+      throw new SwapRequestNotFoundError(validation.error);
+    }
     throw new SwapRequestValidationError(validation.error);
   }
 
@@ -230,6 +233,9 @@ export async function createBundleSwapRequest(
   if (!validation.ok) {
     if (validation.status === 409) {
       throw new SwapRequestConflictError(validation.error);
+    }
+    if (validation.status === 404) {
+      throw new SwapRequestNotFoundError(validation.error);
     }
     throw new SwapRequestValidationError(validation.error);
   }

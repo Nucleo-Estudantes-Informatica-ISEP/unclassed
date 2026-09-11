@@ -116,6 +116,9 @@ export async function handleCreateSwapRequest(
     const { session } = authResult;
 
     const rawBody = await request.json();
+    if (rawBody && typeof rawBody === "object" && rawBody.preferenceOrderMatters === undefined) {
+      rawBody.preferenceOrderMatters = true;
+    }
 
     if (type === "single") {
       const body = singleSwapRequestSchema.parse(rawBody);

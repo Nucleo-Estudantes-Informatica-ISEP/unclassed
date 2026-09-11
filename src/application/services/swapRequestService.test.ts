@@ -258,21 +258,21 @@ describe("swapRequestService", () => {
       ).rejects.toThrow(ConflictError);
     });
 
-    it("throws ValidationError when pre-validation detects bad request", async () => {
+    it("throws NotFoundError when pre-validation detects missing resource", async () => {
       vi.spyOn(requestService, "validateSingleRequestCreation").mockResolvedValueOnce({
         ok: false,
         status: 404,
-        error: "Turma atual e preferida não podem ser a mesma",
+        error: "Disciplina não encontrada",
       });
 
       await expect(
         createSingleSwapRequest(normalUser, {
           subjectId: "sub-1",
           currentClassId: "c1",
-          preferredClassIds: ["c1"],
+          preferredClassIds: ["c2"],
           preferenceOrderMatters: true,
         }, mockRepo)
-      ).rejects.toThrow(ValidationError);
+      ).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -320,7 +320,7 @@ describe("swapRequestService", () => {
     it("throws ValidationError when pre-validation detects bad request", async () => {
       vi.spyOn(requestService, "validateBundleRequestCreation").mockResolvedValueOnce({
         ok: false,
-        status: 404,
+        status: 400,
         error: "Erro de validação de bundle",
       });
 

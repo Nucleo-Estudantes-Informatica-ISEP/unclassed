@@ -166,6 +166,52 @@ describe("swap-requests HTTP handlers", () => {
       );
     });
 
+    it("applies default preferenceOrderMatters: true when field is omitted", async () => {
+      vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
+        ok: true,
+        session: { id: "user-1", role: "USER" },
+      } as never);
+
+      const createSpy = vi.spyOn(SwapRequestService, "createSingleSwapRequest").mockResolvedValueOnce({
+        id: "sr-1",
+        userId: "user-1",
+        subjectId: "sub-1",
+        currentClassId: "c1",
+        preferredClassIds: ["c2"],
+        preferenceOrderMatters: true,
+        ticketType: "SPECIFIC_CLASS",
+        status: "ACTIVE",
+        priority: 1,
+        satisfactionScore: null,
+        provisionalUntil: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: "user-1", name: "User", email: "user@example.com" },
+        subject: { id: "sub-1", code: "PROG", name: "Prog", year: 1 },
+        currentClass: { id: "c1", name: "LEI11", year: 1 },
+        preferredClasses: [],
+      } as never);
+
+      const req = new NextRequest("http://localhost:3000/api/swap-requests/single", {
+        method: "POST",
+        body: JSON.stringify({
+          subjectId: "sub-1",
+          currentClassId: "c1",
+          preferredClassIds: ["c2"],
+          // Omit preferenceOrderMatters
+        }),
+      });
+
+      const res = await handleCreateSwapRequest(req, "single");
+      expect(res.status).toBe(201);
+      
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ preferenceOrderMatters: true }),
+        expect.anything()
+      );
+    });
+
     it("returns 400 when body fails schema validation", async () => {
       vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
         ok: true,
