@@ -8,8 +8,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import { getCronSchedulerStatus } from "@/lib/cronInit";
 import { initializeApplication, isAppInitialized } from "@/lib/startup";
+import { getCronSchedulerStatus } from "@/services/cronScheduler";
 
 /**
  * Initialize application services

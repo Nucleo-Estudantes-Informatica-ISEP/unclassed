@@ -1,4 +1,4 @@
-import { AdvancedMatchingService } from "@/services/advancedMatchingService";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 type RequestType = "single" | "bundle";
 
@@ -6,7 +6,7 @@ export async function triggerImmediateMatching(
   requestId: string,
   requestType: RequestType
 ) {
-  const matchingService = new AdvancedMatchingService();
+  const matchingService = new MatchingOrchestrator();
 
   await matchingService.updateRequestPartition(requestId, requestType);
   return matchingService.processImmediateMatches(requestId);

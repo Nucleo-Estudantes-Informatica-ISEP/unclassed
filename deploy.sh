@@ -22,8 +22,8 @@ echo "==============================================="
 # Check if .env exists
 if [ ! -f .env ]; then
     echo -e "${YELLOW}⚠️  .env file not found. Creating from template...${NC}"
-    if [ -f .env.docker ]; then
-        cp .env.docker .env
+    if [ -f .env.example ]; then
+        cp .env.example .env
         echo -e "${RED}📝 Please edit .env file with your configuration before continuing!${NC}"
         exit 1
     else

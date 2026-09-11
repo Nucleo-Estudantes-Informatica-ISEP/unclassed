@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isAdmin } from "@/lib/auth-nei-roles";
+import { isDevOnlyRequestAllowed } from "@/lib/devOnly";
 import { env } from "@/lib/env";
 import { validateOrigin } from "@/lib/originValidation";
 import getServerSession, {
@@ -35,6 +36,7 @@ type AuthorizationOptions = {
   requireAuth?: boolean;
   requireAdmin?: boolean;
   allowCronSecret?: boolean;
+  devOnly?: boolean;
   enforceSameOriginForSessionWrites?: boolean;
   rateLimit?: RateLimitPolicy;
 };
@@ -45,8 +47,7 @@ type SessionAuthorizationOptions = AuthorizationOptions & {
 };
 
 type AuthorizationSuccess =
-  | SessionAuthorizationSuccess
-  | SessionlessAuthorizationSuccess;
+  SessionAuthorizationSuccess | SessionlessAuthorizationSuccess;
 
 function isSafeMethod(method: string) {
   return method === "GET" || method === "HEAD" || method === "OPTIONS";
@@ -104,10 +105,18 @@ export async function authorizeRequest(
     requireAuth = true,
     requireAdmin = false,
     allowCronSecret = false,
+    devOnly = false,
     enforceSameOriginForSessionWrites = false,
     rateLimit,
   }: AuthorizationOptions = {}
 ): Promise<AuthorizationSuccess | AuthorizationFailure> {
+  if (!isDevOnlyRequestAllowed(devOnly, env.NODE_ENV)) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Não encontrado" }, { status: 404 }),
+    };
+  }
+
   if (allowCronSecret && hasValidCronSecret(request)) {
     if (rateLimit) {
       const limited = await enforceRateLimit(request, rateLimit, {

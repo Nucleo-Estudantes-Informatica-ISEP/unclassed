@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import { AdvancedMatchingService } from "@/services/advancedMatchingService";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,11 +17,11 @@ export async function POST(request: NextRequest) {
       return authResult.response;
     }
 
-    const matchingService = new AdvancedMatchingService();
-    
+    const matchingService = new MatchingOrchestrator();
+
     // Run batch processing (equivalent to the old algorithm)
     const results = await matchingService.runBatchProcessing();
-    
+
     // Also expire provisional matches
     const expiredCount = await matchingService.expireProvisionalMatches();
 
@@ -31,9 +31,8 @@ export async function POST(request: NextRequest) {
       processedPartitions: results.processedPartitions,
       expiredProvisionalMatches: expiredCount,
       totalProcessingTime: results.totalProcessingTime,
-      errors: results.errors
+      errors: results.errors,
     });
-
   } catch (error) {
     console.error("Error running advanced matching algorithm:", error);
     return NextResponse.json(
@@ -50,11 +49,10 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    const matchingService = new AdvancedMatchingService();
+    const matchingService = new MatchingOrchestrator();
     const stats = await matchingService.getAdvancedStats();
 
     return NextResponse.json(stats);
-
   } catch (error) {
     console.error("Error getting matching stats:", error);
     return NextResponse.json(

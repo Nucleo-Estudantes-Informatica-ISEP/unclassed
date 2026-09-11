@@ -11,14 +11,14 @@ type PublicClass = Pick<Class, "id" | "name" | "year">;
 type PublicSubject = Pick<Subject, "id" | "code" | "name" | "year">;
 
 type SingleSwapRequestRecord = SingleSwapRequest & {
-  user: PublicUser;
-  subject: PublicSubject;
-  currentClass: PublicClass;
+  user?: PublicUser;
+  subject?: PublicSubject;
+  currentClass?: PublicClass;
 };
 
 type BundleSwapRequestRecord = BundleSwapRequest & {
-  user: PublicUser;
-  currentClass: PublicClass;
+  user?: PublicUser;
+  currentClass?: PublicClass;
 };
 
 export function toSingleSwapRequestDto(

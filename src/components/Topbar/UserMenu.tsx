@@ -25,6 +25,8 @@ export default function UserMenu({ user }: UserMenuProps) {
 
   const handleManageProfile = () => {
     setShowMenu(false);
+    // Full navigation required: this API route redirects to external AuthNEI.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/auth/profile-url";
   };
 

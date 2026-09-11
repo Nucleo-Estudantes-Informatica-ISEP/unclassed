@@ -64,6 +64,7 @@ const classesData = [
   { name: "1DL", year: 1 },
   { name: "1DM", year: 1 },
   { name: "1DN", year: 1 },
+  { name: "1DO", year: 1 },
   { name: "1DP", year: 1 },
   { name: "1NA", year: 1 },
   { name: "1NB", year: 1 },

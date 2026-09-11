@@ -8,10 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import { getCronSchedulerStatus } from "@/lib/cronInit";
 import { env } from "@/lib/env";
-import prisma from "@/lib/prisma";
+import * as userRepository from "@/application/repositories/userRepository";
 import { isAppInitialized } from "@/lib/startup";
+import { getCronSchedulerStatus } from "@/services/cronScheduler";
 
 /**
  * Health check endpoint
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     let dbResponseTime = 0;
     try {
       const dbStart = Date.now();
-      await prisma.user.findFirst();
+      await userRepository.findFirst();
       dbResponseTime = Date.now() - dbStart;
     } catch (error) {
       dbHealth = "unhealthy";

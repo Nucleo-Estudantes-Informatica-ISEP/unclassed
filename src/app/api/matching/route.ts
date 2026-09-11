@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import { AdvancedMatchingService } from "@/services/advancedMatchingService";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 const matchingRequestSchema = z.object({
   requestId: z.string().min(1),
@@ -92,7 +92,7 @@ export async function PUT(request: NextRequest) {
 
     console.log("🔄 Batch processing requested");
 
-    const matchingService = new AdvancedMatchingService();
+    const matchingService = new MatchingOrchestrator();
 
     // Run batch processing
     const results = await matchingService.runBatchProcessing();
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    const matchingService = new AdvancedMatchingService();
+    const matchingService = new MatchingOrchestrator();
     const stats = await matchingService.getAdvancedStats();
 
     return NextResponse.json({

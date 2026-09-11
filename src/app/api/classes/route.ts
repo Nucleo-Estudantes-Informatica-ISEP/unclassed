@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,13 +21,7 @@ export async function GET(request: NextRequest) {
       where.year = parseInt(year);
     }
 
-    const classes = await prisma.class.findMany({
-      where,
-      orderBy: [
-        { year: "asc" },
-        { name: "asc" }
-      ]
-    });
+    const classes = await classRepo.findClasses({ year: where.year as number | undefined });
 
     return NextResponse.json(classes);
   } catch (error) {

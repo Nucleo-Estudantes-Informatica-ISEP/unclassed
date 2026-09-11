@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import prisma from "@/lib/prisma";
+import * as userRepository from "@/application/repositories/userRepository";
 import getServerSession from "@/services/getServerSession";
 import { ProfileClient } from "@/components/ProfileClient";
 
@@ -12,18 +12,7 @@ export default async function ProfilePage() {
   }
 
   // Get user preferences
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      emailVerified: true,
-      emailNotifications: true,
-      sharePhoneOnMatch: true,
-    },
-  });
+  const user = await userRepository.findProfileById(session.id);
 
   if (!user) {
     redirect("/login");

@@ -41,7 +41,7 @@ For each task:
 | Database | MongoDB via Prisma 6 (`prisma/schema.prisma`) |
 | Auth | NextAuth 5 beta + AuthNEI OIDC through ZITADEL |
 | Validation | Zod; React Hook Form in client forms |
-| Matching | Custom graph/cycle matcher in `src/services/advancedMatchingService.ts` |
+| Matching | Pure graph/algorithm domain core with a Prisma-backed application orchestrator |
 | Background work | In-process cron scheduler with MongoDB-backed locks |
 | Email | Nodemailer |
 | Package manager | pnpm 9 (`packageManager` in `package.json`) |
@@ -74,10 +74,12 @@ Removed legacy `populate`, `test-cron`, and `test-cron-system` commands must not
 
 ```text
 src/
+├── application/   # use-case orchestration and persistence/notification adapters
 ├── app/          # App Router pages, layouts, and API routes
 ├── components/   # shared/client UI
 ├── config/       # app configuration
 ├── context/      # React context providers
+├── domain/       # pure graph structures and matching algorithms (never Prisma)
 ├── hooks/        # client hooks
 ├── lib/          # Prisma singleton, OIDC helpers, startup, request-auth (apiAccess), generic utilities
 │   └── components/ui/ # reusable UI primitives
@@ -95,9 +97,9 @@ docs/domain-model/ # PlantUML domain diagram
 Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
-- `CronScheduler` uses the shared Prisma singleton. Scheduler start/stop manages job timers, not the application-owned database connection.
+- `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
 - Prisma and server services belong only in server-side code—never client components or browser hooks.
-- Put reusable non-HTTP logic in `src/services/`; do not duplicate it across API routes.
+- Put pure domain logic in `src/domain/`, use-case orchestration in `src/application/`, and reusable infrastructure logic in `src/services/`; do not duplicate logic across API routes.
 - Put reusable Zod schemas in `src/schemas/`. Legacy inline schemas exist, but do not create a second copy of a rule already defined there.
 - Reuse `src/lib/components/ui/` primitives and existing Tailwind patterns before adding UI abstractions.
 
@@ -105,10 +107,11 @@ Routes currently own request orchestration: authenticate, validate input, enforc
 
 - A `SingleSwapRequest` is scoped to a subject/current class; its `graphPartition` is `subject-<subjectId>`.
 - A `BundleSwapRequest` moves a student across a year's classes; its partition is year-based.
-- `AdvancedMatchingService` finds direct, three-way, and multi-way cycles; it records `Match` documents and manages provisional-match upgrades/expiry.
+- `MatchingOrchestrator` loads requests, delegates compatibility/cycle work to `src/domain/matching/algorithms.ts`, records `Match` documents, and manages provisional-match upgrades/expiry.
+- `src/domain/graph/` and `src/domain/matching/` stay pure and synchronous; never import Prisma, email, or framework modules there.
 - Users with blocking accepted matches cannot create new requests. Reuse `hasBlockingAcceptedMatch()`.
 - Creating a request calls `triggerImmediateMatching()` asynchronously. Keep matching non-blocking: request creation must not wait for background matching.
-- Batch matching, provisional cleanup, and health checks run via `CronScheduler`. Its `CronLock` documents prevent concurrent job execution; do not bypass them.
+- Batch matching, provisional cleanup, and health checks run through `CronJobHandlers`; `CronScheduler` schedules them and `JobLock` uses `CronLock` documents to prevent concurrent execution. Do not bypass the lock module.
 
 ## Authentication and authorization
 
@@ -174,10 +177,10 @@ Before finishing a change:
 
 ## Gotchas
 
-- `CronScheduler` uses the shared Prisma client and database locks. Its start/stop lifecycle only manages scheduled jobs.
+- `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
-- `src/app/api/test-matches/route.ts` and `prisma/reset.ts` are development/destructive surfaces. Treat them as unsafe outside an explicit, confirmed local task.
+- `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.

@@ -1,6 +1,7 @@
 import getServerSession from "@/services/getServerSession";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import * as classRepo from "@/application/repositories/classRepository";
 import { CheckCircle2, History, Zap, Search } from "lucide-react";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -118,10 +119,7 @@ export default async function MatchesPage() {
         ...participants.map((p) => p.fromClass),
         ...participants.map((p) => p.toClass),
       ];
-      const classes = await prisma.class.findMany({
-        where: { id: { in: classIds } },
-        select: { id: true, name: true, year: true },
-      });
+      const classes = await classRepo.findManyByIds(classIds);
 
       // Get subject information for single swaps
       let subject = null;
