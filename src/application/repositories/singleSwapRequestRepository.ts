@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { RequestStatus } from "@prisma/client";
 import * as classRepo from "./classRepository";
 import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
@@ -35,14 +36,8 @@ type FindManyArgs =
 type FindFirstArgs =
   Parameters<typeof prisma.singleSwapRequest.findFirst>[0];
 
-type CreateArgs =
-  Parameters<typeof prisma.singleSwapRequest.create>[0];
-
 type UpdateArgs =
   Parameters<typeof prisma.singleSwapRequest.update>[0];
-
-type DeleteArgs =
-  Parameters<typeof prisma.singleSwapRequest.delete>[0];
 
 type WhereInput = NonNullable<FindFirstArgs>["where"];
 
@@ -71,35 +66,22 @@ export async function findFirst(input: WhereInput | { where: WhereInput } | unde
   return prisma.singleSwapRequest.findFirst({ where });
 }
 
-export async function create(args: CreateArgs) {
-  return prisma.singleSwapRequest.create(args);
-}
+
 
 export async function update(args: UpdateArgs) {
   return prisma.singleSwapRequest.update(args);
 }
 
-export async function updateMany(args: Parameters<typeof prisma.singleSwapRequest.updateMany>[0]) {
-  return prisma.singleSwapRequest.updateMany(args);
-}
 
-export async function count(args: Parameters<typeof prisma.singleSwapRequest.count>[0]) {
-  return prisma.singleSwapRequest.count(args);
-}
 
-export async function deleteMany(args: Parameters<typeof prisma.singleSwapRequest.deleteMany>[0]) {
-  return prisma.singleSwapRequest.deleteMany(args);
-}
+export async function listWithDetails(filters: { userId?: string; status?: string }) {
+  const where: WhereInput = {};
+  if (filters.userId) where.userId = filters.userId;
+  if (filters.status) where.status = filters.status as RequestStatus;
 
-export async function remove(args: DeleteArgs) {
-  return prisma.singleSwapRequest.delete(args);
-}
-
-// --- Domain-level Encapsulated Methods ---
-
-export async function listWithDetails(args: FindManyArgs) {
   const requests = await prisma.singleSwapRequest.findMany({
-    ...args,
+    where,
+    orderBy: { createdAt: "desc" },
     include: singleInclude,
   });
   const enriched = await batchEnrichPreferredClasses(requests);
@@ -118,20 +100,49 @@ export async function getByIdWithDetails(id: string) {
   return toSingleSwapRequestDto(request, preferredClasses);
 }
 
-export async function createWithDetails(args: CreateArgs) {
+export async function create(data: {
+  userId: string;
+  subjectId: string;
+  currentClassId: string;
+  preferredClassIds: string[];
+  preferenceOrderMatters: boolean;
+}) {
   const request = await prisma.singleSwapRequest.create({
-    ...args,
+    data: {
+      ...data,
+      ticketType: "SPECIFIC_CLASS",
+      priority: 1,
+      status: "ACTIVE",
+      graphPartition: `subject-${data.subjectId}`,
+    },
     include: singleInclude,
   });
   const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
   return toSingleSwapRequestDto(request, preferredClasses);
 }
 
-export async function updateWithDetails(args: UpdateArgs) {
+export async function updatePreferredClasses(id: string, preferredClassIds: string[]) {
   const request = await prisma.singleSwapRequest.update({
-    ...args,
+    where: { id },
+    data: { preferredClassIds, updatedAt: new Date() },
     include: singleInclude,
   });
   const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
   return toSingleSwapRequestDto(request, preferredClasses);
+}
+
+export async function cancel(id: string) {
+  const request = await prisma.singleSwapRequest.update({
+    where: { id },
+    data: { status: "CANCELLED", updatedAt: new Date() },
+    include: singleInclude,
+  });
+  const preferredClasses = await classRepo.findManyByIds(request.preferredClassIds);
+  return toSingleSwapRequestDto(request, preferredClasses);
+}
+
+export async function remove(id: string): Promise<void> {
+  await prisma.singleSwapRequest.delete({
+    where: { id }
+  });
 }

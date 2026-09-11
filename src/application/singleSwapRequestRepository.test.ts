@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import prisma from "@/lib/prisma";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 
 describe("singleSwapRequestRepository", () => {
   it("findMany calls prisma.singleSwapRequest.findMany with where and include", async () => {
@@ -68,30 +69,37 @@ describe("singleSwapRequestRepository", () => {
     spy.mockRestore();
   });
 
-  it("create calls prisma.singleSwapRequest.create with args", async () => {
+  it("create calls prisma.singleSwapRequest.create with mapped args", async () => {
     // Arrange
-    const args = {
-      data: {
-        userId: "u1",
-        subjectId: "s1",
-        currentClassId: "c1",
-        preferredClassIds: ["c2"],
-        ticketType: "SPECIFIC_CLASS" as const,
-        status: "ACTIVE" as const,
-        graphPartition: "subject-s1",
-      },
+    const data = {
+      userId: "u1",
+      subjectId: "s1",
+      currentClassId: "c1",
+      preferredClassIds: ["c2"],
+      preferenceOrderMatters: true,
     };
-    const mock = { id: "sr-2", ...args.data };
+    const mock = { id: "sr-2", ...data };
+    
+    // We also need to mock classRepo.findManyByIds because the new create uses it
+    vi.spyOn(classRepo, "findManyByIds").mockResolvedValueOnce([{ id: "c2", name: "LEI12", year: 1 }] as never);
+
     const spy = vi
       .spyOn(prisma.singleSwapRequest, "create")
-      .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.singleSwapRequest.create>>);
+      .mockResolvedValueOnce(mock as never);
 
     // Act
-    const result = await singleSwapRequestRepo.create(args);
+    const result = await singleSwapRequestRepo.create(data);
 
     // Assert
-    expect(spy).toHaveBeenCalledWith(args);
-    expect(result).toBe(mock);
+    expect(spy).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "u1",
+        subjectId: "s1",
+        ticketType: "SPECIFIC_CLASS",
+      }),
+      include: expect.any(Object),
+    });
+    expect(result.id).toBe(mock.id);
 
     spy.mockRestore();
   });
@@ -117,20 +125,18 @@ describe("singleSwapRequestRepository", () => {
     spy.mockRestore();
   });
 
-  it("remove calls prisma.singleSwapRequest.delete with args", async () => {
+  it("remove calls prisma.singleSwapRequest.delete with id", async () => {
     // Arrange
-    const args = { where: { id: "sr-1" } } as const;
     const mock = { id: "sr-1", status: "CANCELLED" };
     const spy = vi
       .spyOn(prisma.singleSwapRequest, "delete")
       .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.singleSwapRequest.delete>>);
 
     // Act
-    const result = await singleSwapRequestRepo.remove(args);
+    await singleSwapRequestRepo.remove("sr-1");
 
     // Assert
-    expect(spy).toHaveBeenCalledWith(args);
-    expect(result).toBe(mock);
+    expect(spy).toHaveBeenCalledWith({ where: { id: "sr-1" } });
 
     spy.mockRestore();
   });

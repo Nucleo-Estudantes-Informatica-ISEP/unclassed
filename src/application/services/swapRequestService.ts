@@ -1,12 +1,9 @@
 import { SessionUser } from "./userService";
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as requestService from "@/application/services/requestService";
 import * as userService from "@/application/services/userService";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
-import { buildPartitionKey } from "@/services/partitionKey";
 
 // ============================================================================
 // Domain Errors
@@ -51,10 +48,71 @@ export class SwapRequestValidationError extends SwapRequestError {
 // Helpers
 // ============================================================================
 
+export type SwapRequestStatus = "ACTIVE" | "CANCELLED" | "MATCHED" | "COMPLETED" | "EXPIRED";
+
+export interface SwapRequestEntity {
+  id: string;
+  userId: string;
+  status: SwapRequestStatus;
+  currentClassId: string;
+  provisionalUntil: Date | null;
+  preferredClasses?: { id: string; name: string; year: number }[];
+}
+
+function isSwapRequestStatus(value: string): value is SwapRequestStatus {
+  return [
+    "ACTIVE",
+    "CANCELLED",
+    "MATCHED",
+    "COMPLETED",
+    "EXPIRED",
+  ].includes(value);
+}
+
+export interface ISwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> {
+  getByIdWithDetails(id: string): Promise<TEntity | null>;
+  listWithDetails(filters: { userId?: string; status?: SwapRequestStatus }): Promise<TEntity[]>;
+  updatePreferredClasses(id: string, preferredClassIds: string[]): Promise<TEntity>;
+  cancel(id: string): Promise<TEntity>;
+  remove(id: string): Promise<void>;
+}
+
+export interface ISingleSwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> extends ISwapRequestRepository<TEntity> {
+  create(data: {
+    userId: string;
+    subjectId: string;
+    currentClassId: string;
+    preferredClassIds: string[];
+    preferenceOrderMatters: boolean;
+  }): Promise<TEntity>;
+}
+
+export interface IBundleSwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> extends ISwapRequestRepository<TEntity> {
+  create(data: {
+    userId: string;
+    currentClassId: string;
+    preferredClassIds: string[];
+    preferenceOrderMatters: boolean;
+    year: number;
+  }): Promise<TEntity>;
+}
+
 function assertCanManageSwapRequest(session: SessionUser, requestUserId: string) {
   if (session.role !== "ADMIN" && requestUserId !== session.id) {
     throw new SwapRequestForbiddenError();
   }
+}
+
+async function getExistingRequest(session: SessionUser, id: string, repo: ISwapRequestRepository) {
+  const existing = await repo.getByIdWithDetails(id);
+  
+  if (!existing) {
+    throw new SwapRequestNotFoundError();
+  }
+  
+  assertCanManageSwapRequest(session, existing.userId);
+  
+  return existing;
 }
 
 function triggerMatchingSilently(id: string, type: "single" | "bundle", context: string) {
@@ -79,49 +137,28 @@ export interface ListSwapRequestsInput {
   session: SessionUser;
   queryUserId?: string | null;
   queryStatus?: string | null;
-  type: "single" | "bundle";
+  repo: ISwapRequestRepository;
 }
 
 export async function listSwapRequests(input: ListSwapRequestsInput) {
-  const { session, queryUserId, queryStatus, type } = input;
+  const { session, queryUserId, queryStatus, repo } = input;
 
-  const where: { userId?: string; status?: "ACTIVE" | "CANCELLED" } = {};
+  const userId = session.role !== "ADMIN" ? session.id : (queryUserId || undefined);
 
-  if (session.role !== "ADMIN") {
-    where.userId = session.id;
-  } else if (queryUserId) {
-    where.userId = queryUserId;
-  }
+  const status =
+    queryStatus && isSwapRequestStatus(queryStatus)
+      ? queryStatus
+      : undefined;
 
-  if (queryStatus === "ACTIVE" || queryStatus === "CANCELLED") {
-    where.status = queryStatus;
-  }
-
-  if (type === "single") {
-    return singleSwapRequestRepo.listWithDetails({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
-  } else {
-    return bundleSwapRequestRepo.listWithDetails({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
-  }
+  return repo.listWithDetails({
+    userId,
+    status,
+  });
 }
 
-export async function getSwapRequestById(session: SessionUser, id: string, type: "single" | "bundle") {
-  const request =
-    type === "single"
-      ? await singleSwapRequestRepo.getByIdWithDetails(id)
-      : await bundleSwapRequestRepo.getByIdWithDetails(id);
-
-  if (!request) {
-    throw new SwapRequestNotFoundError();
-  }
-
-  assertCanManageSwapRequest(session, request.userId);
-  return request;
+export async function getSwapRequestById(session: SessionUser, id: string, repo: ISwapRequestRepository) {
+  const existing = await getExistingRequest(session, id, repo);
+  return existing;
 }
 
 export interface CreateSingleSwapRequestInput {
@@ -131,7 +168,11 @@ export interface CreateSingleSwapRequestInput {
   preferenceOrderMatters: boolean;
 }
 
-export async function createSingleSwapRequest(session: SessionUser, input: CreateSingleSwapRequestInput) {
+export async function createSingleSwapRequest(
+  session: SessionUser, 
+  input: CreateSingleSwapRequestInput,
+  repo: ISingleSwapRequestRepository
+) {
   const validation = await requestService.validateSingleRequestCreation({
     userId: session.id,
     subjectId: input.subjectId,
@@ -147,21 +188,12 @@ export async function createSingleSwapRequest(session: SessionUser, input: Creat
   }
 
   try {
-    const requestDto = await singleSwapRequestRepo.createWithDetails({
-      data: {
-        userId: session.id,
-        subjectId: input.subjectId,
-        currentClassId: input.currentClassId,
-        preferredClassIds: input.preferredClassIds,
-        preferenceOrderMatters: input.preferenceOrderMatters,
-        ticketType: "SPECIFIC_CLASS",
-        priority: 1,
-        status: "ACTIVE",
-        graphPartition: buildPartitionKey({
-          ticketType: "SPECIFIC_CLASS",
-          subjectId: input.subjectId,
-        }),
-      },
+    const requestDto = await repo.create({
+      userId: session.id,
+      subjectId: input.subjectId,
+      currentClassId: input.currentClassId,
+      preferredClassIds: input.preferredClassIds,
+      preferenceOrderMatters: input.preferenceOrderMatters,
     });
 
     triggerMatchingSilently(requestDto.id, "single", "creation");
@@ -182,7 +214,11 @@ export interface CreateBundleSwapRequestInput {
   preferenceOrderMatters: boolean;
 }
 
-export async function createBundleSwapRequest(session: SessionUser, input: CreateBundleSwapRequestInput) {
+export async function createBundleSwapRequest(
+  session: SessionUser, 
+  input: CreateBundleSwapRequestInput,
+  repo: IBundleSwapRequestRepository
+) {
   const validation = await requestService.validateBundleRequestCreation({
     userId: session.id,
     currentClassId: input.currentClassId,
@@ -197,20 +233,12 @@ export async function createBundleSwapRequest(session: SessionUser, input: Creat
   }
 
   try {
-    const requestDto = await bundleSwapRequestRepo.createWithDetails({
-      data: {
-        userId: session.id,
-        currentClassId: input.currentClassId,
-        preferredClassIds: input.preferredClassIds,
-        preferenceOrderMatters: input.preferenceOrderMatters,
-        ticketType: "ALL_CLASSES",
-        priority: 1,
-        status: "ACTIVE",
-        graphPartition: buildPartitionKey({
-          ticketType: "ALL_CLASSES",
-          year: validation.currentClass.year,
-        }),
-      },
+    const requestDto = await repo.create({
+      userId: session.id,
+      currentClassId: input.currentClassId,
+      preferredClassIds: input.preferredClassIds,
+      preferenceOrderMatters: input.preferenceOrderMatters,
+      year: validation.currentClass.year,
     });
 
     triggerMatchingSilently(requestDto.id, "bundle", "creation");
@@ -229,59 +257,25 @@ export async function updateSwapRequestPreferredClasses(
   session: SessionUser,
   id: string,
   type: "single" | "bundle",
+  repo: ISwapRequestRepository,
   preferredClassIds: string[]
 ) {
   if (preferredClassIds.length === 0) {
     throw new SwapRequestValidationError("Por favor seleciona pelo menos uma turma preferida");
   }
 
-  if (type === "single") {
-    const existing = await singleSwapRequestRepo.getByIdWithDetails(id);
-    if (!existing) {
-      throw new SwapRequestNotFoundError();
-    }
-    assertCanManageSwapRequest(session, existing.userId);
+  const existing = await getExistingRequest(session, id, repo);
 
-    if (existing.status !== "ACTIVE") {
-      throw new SwapRequestConflictError("Apenas pedidos ativos podem ser editados");
-    }
+  if (existing.status !== "ACTIVE") {
+    throw new SwapRequestConflictError("Apenas pedidos ativos podem ser editados");
+  }
 
-    const preferredClasses = await classRepo.findManyByIds(preferredClassIds);
-    if (preferredClasses.length !== preferredClassIds.length) {
-      throw new SwapRequestNotFoundError("Uma ou mais turmas preferidas não foram encontradas");
-    }
+  const preferredClasses = await classRepo.findManyByIds(preferredClassIds);
+  if (preferredClasses.length !== preferredClassIds.length) {
+    throw new SwapRequestNotFoundError("Uma ou mais turmas preferidas não foram encontradas");
+  }
 
-    const result = await singleSwapRequestRepo.updateMany({
-      where: { id, status: "ACTIVE" },
-      data: { preferredClassIds, updatedAt: new Date() },
-    });
-    if (result.count === 0) {
-      throw new SwapRequestConflictError("O pedido foi alterado ou já não se encontra ativo.");
-    }
-
-    const updatedDto = await singleSwapRequestRepo.getByIdWithDetails(id);
-    if (!updatedDto) {
-      throw new SwapRequestNotFoundError();
-    }
-
-    triggerMatchingSilently(id, "single", "update");
-    return updatedDto;
-  } else {
-    const existing = await bundleSwapRequestRepo.getByIdWithDetails(id);
-    if (!existing) {
-      throw new SwapRequestNotFoundError();
-    }
-    assertCanManageSwapRequest(session, existing.userId);
-
-    if (existing.status !== "ACTIVE") {
-      throw new SwapRequestConflictError("Apenas pedidos ativos podem ser editados");
-    }
-
-    const preferredClasses = await classRepo.findManyByIds(preferredClassIds);
-    if (preferredClasses.length !== preferredClassIds.length) {
-      throw new SwapRequestNotFoundError("Uma ou mais turmas preferidas não foram encontradas");
-    }
-
+  if (type === "bundle") {
     const currentClass = await classRepo.findById(existing.currentClassId);
     if (!currentClass) {
       throw new SwapRequestNotFoundError("Turma atual não encontrada");
@@ -292,96 +286,40 @@ export async function updateSwapRequestPreferredClasses(
     if (years.length > 1) {
       throw new SwapRequestValidationError("Todas as turmas têm de ser do mesmo ano letivo");
     }
-
-    const result = await bundleSwapRequestRepo.updateMany({
-      where: { id, status: "ACTIVE" },
-      data: { preferredClassIds, updatedAt: new Date() },
-    });
-    if (result.count === 0) {
-      throw new SwapRequestConflictError("O pedido foi alterado ou já não se encontra ativo.");
-    }
-
-    const updatedDto = await bundleSwapRequestRepo.getByIdWithDetails(id);
-    if (!updatedDto) {
-      throw new SwapRequestNotFoundError();
-    }
-
-    triggerMatchingSilently(id, "bundle", "update");
-    return updatedDto;
   }
+
+  const updatedDto = await repo.updatePreferredClasses(id, preferredClassIds);
+
+  triggerMatchingSilently(id, type, "update");
+  return updatedDto;
 }
 
-export async function cancelSwapRequest(session: SessionUser, id: string, type: "single" | "bundle") {
-  if (type === "single") {
-    const existing = await singleSwapRequestRepo.getByIdWithDetails(id);
-    if (!existing) {
-      throw new SwapRequestNotFoundError();
-    }
-    assertCanManageSwapRequest(session, existing.userId);
+export async function cancelSwapRequest(
+  session: SessionUser, 
+  id: string, 
+  repo: ISwapRequestRepository
+) {
+  const existing = await getExistingRequest(session, id, repo);
 
-    if (existing.status !== "ACTIVE") {
-      throw new SwapRequestConflictError("Apenas pedidos ativos podem ser cancelados");
-    }
-
-    const result = await singleSwapRequestRepo.updateMany({
-      where: { id, status: "ACTIVE" },
-      data: { status: "CANCELLED", updatedAt: new Date() },
-    });
-    if (result.count === 0) {
-      throw new SwapRequestConflictError("O pedido já não se encontra ativo.");
-    }
-
-    const updatedDto = await singleSwapRequestRepo.getByIdWithDetails(id);
-    if (!updatedDto) {
-      throw new SwapRequestNotFoundError();
-    }
-    return updatedDto;
-  } else {
-    const existing = await bundleSwapRequestRepo.getByIdWithDetails(id);
-    if (!existing) {
-      throw new SwapRequestNotFoundError();
-    }
-    assertCanManageSwapRequest(session, existing.userId);
-
-    if (existing.status !== "ACTIVE") {
-      throw new SwapRequestConflictError("Apenas pedidos ativos podem ser cancelados");
-    }
-
-    const result = await bundleSwapRequestRepo.updateMany({
-      where: { id, status: "ACTIVE" },
-      data: { status: "CANCELLED", updatedAt: new Date() },
-    });
-    if (result.count === 0) {
-      throw new SwapRequestConflictError("O pedido já não se encontra ativo.");
-    }
-
-    const updatedDto = await bundleSwapRequestRepo.getByIdWithDetails(id);
-    if (!updatedDto) {
-      throw new SwapRequestNotFoundError();
-    }
-    return updatedDto;
+  if (existing.status !== "ACTIVE") {
+    throw new SwapRequestConflictError("Apenas pedidos ativos podem ser cancelados");
   }
+
+  const updatedDto = await repo.cancel(id);
+  
+  return updatedDto;
 }
 
-export async function deleteSwapRequest(session: SessionUser, id: string, type: "single" | "bundle") {
-  const repo = type === "single" ? singleSwapRequestRepo : bundleSwapRequestRepo;
-
-  const existingRequest = await repo.getByIdWithDetails(id);
-  if (!existingRequest) {
-    throw new SwapRequestNotFoundError();
-  }
-
-  assertCanManageSwapRequest(session, existingRequest.userId);
+export async function deleteSwapRequest(
+  session: SessionUser, 
+  id: string, 
+  repo: ISwapRequestRepository
+) {
+  const existingRequest = await getExistingRequest(session, id, repo);
 
   if (existingRequest.status === "MATCHED" || existingRequest.status === "COMPLETED" || !!existingRequest.provisionalUntil) {
     throw new SwapRequestConflictError("Não é possível eliminar um pedido que possui matches associados.");
   }
 
-  await repo.remove({ where: { id } });
-
-  return { 
-    message: type === "single"
-      ? "Pedido de permuta eliminado com sucesso"
-      : "Pedido de permuta completa eliminado com sucesso"
-  };
+  await repo.remove(id);
 }

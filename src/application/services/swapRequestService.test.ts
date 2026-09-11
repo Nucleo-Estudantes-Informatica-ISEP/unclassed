@@ -1,8 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import * as classRepo from "@/application/repositories/classRepository";
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as requestService from "@/application/services/requestService";
 import * as userService from "@/application/services/userService";
 import * as matchingTriggers from "@/services/matchingTriggers";
@@ -18,10 +16,25 @@ import {
   SwapRequestForbiddenError as ForbiddenError,
   SwapRequestConflictError as ConflictError,
   SwapRequestValidationError as ValidationError,
+  ISingleSwapRequestRepository,
+  IBundleSwapRequestRepository,
 } from "./swapRequestService";
 import { SessionUser } from "@/application/services/userService";
 
 describe("swapRequestService", () => {
+  const mockRepo = {
+    getByIdWithDetails: vi.fn(),
+    updatePreferredClasses: vi.fn(),
+    cancel: vi.fn(),
+    remove: vi.fn(),
+    listWithDetails: vi.fn(),
+    create: vi.fn(),
+  } satisfies ISingleSwapRequestRepository & IBundleSwapRequestRepository;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   const normalUser: SessionUser = {
     id: "user-1",
     name: "User One",
@@ -53,20 +66,54 @@ describe("swapRequestService", () => {
 
   describe("listSwapRequests", () => {
     it("allows admin to filter by target userId and status", async () => {
-      const findManySpy = vi
-        .spyOn(singleSwapRequestRepo, "listWithDetails")
-        .mockResolvedValueOnce([]);
+      mockRepo.listWithDetails.mockResolvedValueOnce([]);
 
       await listSwapRequests({
         session: adminUser,
         queryUserId: "target-user",
         queryStatus: "ACTIVE",
-        type: "single",
+        repo: mockRepo,
       });
 
-      expect(findManySpy).toHaveBeenCalledWith(
+      expect(mockRepo.listWithDetails).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: "target-user", status: "ACTIVE" },
+          userId: "target-user",
+          status: "ACTIVE",
+        })
+      );
+    });
+
+    it("ignores queryUserId for normal users and uses their own id", async () => {
+      mockRepo.listWithDetails.mockResolvedValueOnce([]);
+
+      await listSwapRequests({
+        session: normalUser,
+        queryUserId: "target-user",
+        queryStatus: "ACTIVE",
+        repo: mockRepo,
+      });
+
+      expect(mockRepo.listWithDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: normalUser.id,
+          status: "ACTIVE",
+        })
+      );
+    });
+
+    it("passes undefined for invalid queryStatus", async () => {
+      mockRepo.listWithDetails.mockResolvedValueOnce([]);
+
+      await listSwapRequests({
+        session: normalUser,
+        queryStatus: "INVALID_STATUS",
+        repo: mockRepo,
+      });
+
+      expect(mockRepo.listWithDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: normalUser.id,
+          status: undefined,
         })
       );
     });
@@ -87,21 +134,19 @@ describe("swapRequestService", () => {
         preferredClasses: [{ id: "c2", name: "LEI12", year: 1 }] as never,
       });
 
-      const createSpy = vi
-        .spyOn(singleSwapRequestRepo, "createWithDetails")
-        .mockResolvedValueOnce({
-          id: "sr-1",
-          userId: "user-1",
-          subjectId: "sub-1",
-          currentClassId: "c1",
-          preferredClassIds: ["c2"],
-          preferenceOrderMatters: true,
-          ticketType: "SPECIFIC_CLASS",
-          status: "ACTIVE",
-          priority: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as never);
+      mockRepo.create.mockResolvedValueOnce({
+        id: "sr-1",
+        userId: "user-1",
+        subjectId: "sub-1",
+        currentClassId: "c1",
+        preferredClassIds: ["c2"],
+        preferenceOrderMatters: true,
+        ticketType: "SPECIFIC_CLASS",
+        status: "ACTIVE",
+        priority: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
 
       vi.spyOn(classRepo, "findManyByIds").mockResolvedValueOnce([
         { id: "c2", name: "LEI12", year: 1 },
@@ -119,16 +164,12 @@ describe("swapRequestService", () => {
         currentClassId: "c1",
         preferredClassIds: ["c2"],
         preferenceOrderMatters: true,
-      });
+      }, mockRepo);
 
-      expect(createSpy).toHaveBeenCalledWith(
+      expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            userId: "user-1",
-            subjectId: "sub-1",
-            ticketType: "SPECIFIC_CLASS",
-            graphPartition: "subject-sub-1",
-          }),
+          userId: "user-1",
+          subjectId: "sub-1",
         })
       );
       expect(result.id).toBe("sr-1");
@@ -145,7 +186,7 @@ describe("swapRequestService", () => {
         preferredClasses: [{ id: "c2", name: "LEI12", year: 1 }] as never,
       });
 
-      vi.spyOn(singleSwapRequestRepo, "createWithDetails").mockResolvedValueOnce({
+      mockRepo.create.mockResolvedValueOnce({
         id: "sr-2",
         userId: "user-1",
         subjectId: "sub-1",
@@ -172,7 +213,7 @@ describe("swapRequestService", () => {
         currentClassId: "c1",
         preferredClassIds: ["c2"],
         preferenceOrderMatters: true,
-      });
+      }, mockRepo);
 
       expect(result.id).toBe("sr-2");
     });
@@ -188,7 +229,7 @@ describe("swapRequestService", () => {
 
       const uniqueError = new Error("Unique constraint failed");
       Object.assign(uniqueError, { code: "P2002" });
-      vi.spyOn(singleSwapRequestRepo, "createWithDetails").mockRejectedValueOnce(uniqueError);
+      mockRepo.create.mockRejectedValueOnce(uniqueError);
 
       await expect(
         createSingleSwapRequest(normalUser, {
@@ -196,7 +237,7 @@ describe("swapRequestService", () => {
           currentClassId: "c1",
           preferredClassIds: ["c2"],
           preferenceOrderMatters: true,
-        })
+        }, mockRepo)
       ).rejects.toThrow(ConflictError);
     });
 
@@ -213,8 +254,25 @@ describe("swapRequestService", () => {
           currentClassId: "c1",
           preferredClassIds: ["c2"],
           preferenceOrderMatters: true,
-        })
+        }, mockRepo)
       ).rejects.toThrow(ConflictError);
+    });
+
+    it("throws ValidationError when pre-validation detects bad request", async () => {
+      vi.spyOn(requestService, "validateSingleRequestCreation").mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        error: "Turma atual e preferida não podem ser a mesma",
+      });
+
+      await expect(
+        createSingleSwapRequest(normalUser, {
+          subjectId: "sub-1",
+          currentClassId: "c1",
+          preferredClassIds: ["c1"],
+          preferenceOrderMatters: true,
+        }, mockRepo)
+      ).rejects.toThrow(ValidationError);
     });
   });
 
@@ -227,20 +285,18 @@ describe("swapRequestService", () => {
         preferredClasses: [{ id: "c2", name: "LEI22", year: 2 }] as never,
       });
 
-      const createSpy = vi
-        .spyOn(bundleSwapRequestRepo, "createWithDetails")
-        .mockResolvedValueOnce({
-          id: "br-1",
-          userId: "user-1",
-          currentClassId: "c1",
-          preferredClassIds: ["c2"],
-          preferenceOrderMatters: true,
-          ticketType: "ALL_CLASSES",
-          status: "ACTIVE",
-          priority: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as never);
+      mockRepo.create.mockResolvedValueOnce({
+        id: "br-1",
+        userId: "user-1",
+        currentClassId: "c1",
+        preferredClassIds: ["c2"],
+        preferenceOrderMatters: true,
+        ticketType: "ALL_CLASSES",
+        status: "ACTIVE",
+        priority: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
 
       vi.spyOn(classRepo, "findManyByIds").mockResolvedValueOnce([
         { id: "c2", name: "LEI22", year: 2 },
@@ -250,44 +306,78 @@ describe("swapRequestService", () => {
         currentClassId: "c1",
         preferredClassIds: ["c2"],
         preferenceOrderMatters: true,
-      });
+      }, mockRepo);
 
-      expect(createSpy).toHaveBeenCalledWith(
+      expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            userId: "user-1",
-            ticketType: "ALL_CLASSES",
-            graphPartition: "year-2",
-          }),
+          userId: "user-1",
+          year: 2,
         })
       );
       expect(result.id).toBe("br-1");
+    });
+
+    it("throws ValidationError when pre-validation detects bad request", async () => {
+      vi.spyOn(requestService, "validateBundleRequestCreation").mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        error: "Erro de validação de bundle",
+      });
+
+      await expect(
+        createBundleSwapRequest(normalUser, {
+          currentClassId: "c1",
+          preferredClassIds: ["c2"],
+          preferenceOrderMatters: true,
+        }, mockRepo)
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it("throws ConflictError on unique constraint violation", async () => {
+      vi.spyOn(requestService, "validateBundleRequestCreation").mockResolvedValueOnce({
+        ok: true,
+        userId: "user-1",
+        currentClass: { id: "c1", name: "LEI21", year: 2 } as never,
+        preferredClasses: [{ id: "c2", name: "LEI22", year: 2 }] as never,
+      });
+
+      const uniqueError = new Error("Unique constraint failed");
+      Object.assign(uniqueError, { code: "P2002" });
+      mockRepo.create.mockRejectedValueOnce(uniqueError);
+
+      await expect(
+        createBundleSwapRequest(normalUser, {
+          currentClassId: "c1",
+          preferredClassIds: ["c2"],
+          preferenceOrderMatters: true,
+        }, mockRepo)
+      ).rejects.toThrow(ConflictError);
     });
   });
 
   describe("getSwapRequestById", () => {
     it("throws NotFoundError when request does not exist", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce(null);
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce(null);
 
       await expect(
-        getSwapRequestById(normalUser, "non-existent", "single")
+        getSwapRequestById(normalUser, "non-existent", mockRepo)
       ).rejects.toThrow(NotFoundError);
     });
 
     it("throws ForbiddenError when normal user attempts to access another user's request (IDOR)", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "other-user",
         preferredClassIds: [],
       } as never);
 
       await expect(
-        getSwapRequestById(normalUser, "req-1", "single")
+        getSwapRequestById(normalUser, "req-1", mockRepo)
       ).rejects.toThrow(ForbiddenError);
     });
 
     it("allows admin to access another user's request", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "other-user",
         preferredClassIds: ["c1"],
@@ -296,84 +386,83 @@ describe("swapRequestService", () => {
         { id: "c1", name: "LEI11", year: 1 },
       ] as never);
 
-      const result = await getSwapRequestById(adminUser, "req-1", "single");
+      const result = await getSwapRequestById(adminUser, "req-1", mockRepo);
       expect(result.id).toBe("req-1");
     });
   });
 
   describe("cancelSwapRequest", () => {
     it("cancels an ACTIVE request and returns updated DTO", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails")
-        .mockResolvedValueOnce({
-          id: "req-1",
-          userId: "user-1",
-          status: "ACTIVE",
-          preferredClassIds: ["c1"],
-        } as never)
-        .mockResolvedValueOnce({
-          id: "req-1",
-          userId: "user-1",
-          status: "CANCELLED",
-          preferredClassIds: ["c1"],
-        } as never);
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "ACTIVE",
+        preferredClassIds: ["c1"],
+      } as never);
 
-      const updateSpy = vi
-        .spyOn(singleSwapRequestRepo, "updateMany")
-        .mockResolvedValueOnce({ count: 1 } as never);
+      mockRepo.cancel.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "CANCELLED",
+        preferredClassIds: ["c1"],
+      } as never);
 
       vi.spyOn(classRepo, "findManyByIds").mockResolvedValueOnce([
         { id: "c1", name: "LEI11", year: 1 },
       ] as never);
 
-      const result = await cancelSwapRequest(normalUser, "req-1", "single");
+      const result = await cancelSwapRequest(normalUser, "req-1", mockRepo);
 
-      expect(updateSpy).toHaveBeenCalledWith({
-        where: { id: "req-1", status: "ACTIVE" },
-        data: { status: "CANCELLED", updatedAt: expect.any(Date) },
-      });
+      expect(mockRepo.cancel).toHaveBeenCalledWith("req-1");
       expect(result.status).toBe("CANCELLED");
     });
 
     it("throws ConflictError when attempting to cancel a non-active request", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "user-1",
         status: "CANCELLED",
       } as never);
 
       await expect(
-        cancelSwapRequest(normalUser, "req-1", "single")
+        cancelSwapRequest(normalUser, "req-1", mockRepo)
       ).rejects.toThrow(ConflictError);
     });
   });
 
   describe("updateSwapRequestPreferredClasses", () => {
+    it("throws ValidationError when preferredClassIds is empty", async () => {
+      await expect(
+        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", mockRepo, [])
+      ).rejects.toThrow(ValidationError);
+    });
+
     it("throws ForbiddenError when user tries to update another user's request (IDOR)", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "other-user",
         status: "ACTIVE",
       } as never);
 
       await expect(
-        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", ["c2"])
+        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", mockRepo, ["c2"])
       ).rejects.toThrow(ForbiddenError);
     });
 
     it("throws ConflictError when trying to edit a CANCELLED request", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "user-1",
         status: "CANCELLED",
       } as never);
 
       await expect(
-        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", ["c1"])
+        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", mockRepo, ["c1"])
       ).rejects.toThrow(ConflictError);
     });
 
     it("throws NotFoundError when preferred classes do not exist in DB", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "user-1",
         status: "ACTIVE",
@@ -384,7 +473,7 @@ describe("swapRequestService", () => {
       ] as never);
 
       await expect(
-        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", [
+        updateSwapRequestPreferredClasses(normalUser, "req-1", "single", mockRepo, [
           "c1",
           "missing-class",
         ])
@@ -392,7 +481,7 @@ describe("swapRequestService", () => {
     });
 
     it("enforces same-year validation for bundle updates and throws ValidationError on mismatch", async () => {
-      vi.spyOn(bundleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "br-1",
         userId: "user-1",
         currentClassId: "c1",
@@ -410,29 +499,44 @@ describe("swapRequestService", () => {
       } as never);
 
       await expect(
-        updateSwapRequestPreferredClasses(normalUser, "br-1", "bundle", ["c2"])
+        updateSwapRequestPreferredClasses(normalUser, "br-1", "bundle", mockRepo, ["c2"])
       ).rejects.toThrow(ValidationError);
     });
 
-    it("updates preferred classes with strict allowlist", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails")
-        .mockResolvedValueOnce({
-          id: "req-1",
-          userId: "user-1",
-          status: "ACTIVE",
-          preferredClassIds: ["c1"],
-        } as never)
-        .mockResolvedValueOnce({
-          id: "req-1",
-          userId: "user-1",
-          status: "ACTIVE",
-          preferredClassIds: ["c2"],
-          preferredClasses: [{ id: "c2", name: "LEI12", year: 1 }],
-        } as never);
+    it("throws NotFoundError when currentClass is missing for bundle update", async () => {
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
+        id: "br-1",
+        userId: "user-1",
+        status: "ACTIVE",
+        currentClassId: "c1",
+      } as never);
 
-      const updateSpy = vi
-        .spyOn(singleSwapRequestRepo, "updateMany")
-        .mockResolvedValueOnce({ count: 1 } as never);
+      vi.spyOn(classRepo, "findManyByIds").mockResolvedValueOnce([
+        { id: "c2", name: "LEI21", year: 2 },
+      ] as never);
+
+      vi.spyOn(classRepo, "findById").mockResolvedValueOnce(null);
+
+      await expect(
+        updateSwapRequestPreferredClasses(normalUser, "br-1", "bundle", mockRepo, ["c2"])
+      ).rejects.toThrow(NotFoundError);
+    });
+
+    it("updates preferred classes with strict allowlist", async () => {
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "ACTIVE",
+        preferredClassIds: ["c1"],
+      } as never);
+
+      mockRepo.updatePreferredClasses.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "ACTIVE",
+        preferredClassIds: ["c2"],
+        preferredClasses: [{ id: "c2", name: "LEI12", year: 1 }],
+      } as never);
 
       vi.spyOn(classRepo, "findManyByIds")
         .mockResolvedValueOnce([{ id: "c2", name: "LEI12", year: 1 }] as never)
@@ -442,16 +546,11 @@ describe("swapRequestService", () => {
         normalUser,
         "req-1",
         "single",
+        mockRepo,
         ["c2"]
       );
 
-      expect(updateSpy).toHaveBeenCalledWith({
-        where: { id: "req-1", status: "ACTIVE" },
-        data: {
-          preferredClassIds: ["c2"],
-          updatedAt: expect.any(Date),
-        },
-      });
+      expect(mockRepo.updatePreferredClasses).toHaveBeenCalledWith("req-1", ["c2"]);
       expect(result.preferredClasses).toEqual([
         { id: "c2", name: "LEI12", year: 1 },
       ]);
@@ -460,33 +559,53 @@ describe("swapRequestService", () => {
 
   describe("deleteSwapRequest", () => {
     it("hard deletes request when authorized", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValue({
+      mockRepo.getByIdWithDetails.mockResolvedValue({
         id: "req-1",
         userId: "user-1",
         status: "ACTIVE",
       } as never);
 
-      const removeSpy = vi
-        .spyOn(singleSwapRequestRepo, "remove")
-        .mockResolvedValueOnce({} as never);
+      mockRepo.remove.mockResolvedValueOnce(undefined as never);
 
-      const result = await deleteSwapRequest(normalUser, "req-1", "single");
+      await deleteSwapRequest(normalUser, "req-1", mockRepo);
 
-      expect(removeSpy).toHaveBeenCalledWith({
-        where: { id: "req-1" },
-      });
-      expect(result.message).toBe("Pedido de permuta eliminado com sucesso");
+      expect(mockRepo.remove).toHaveBeenCalledWith("req-1");
     });
 
     it("throws ForbiddenError when non-admin tries to delete another user's request", async () => {
-      vi.spyOn(singleSwapRequestRepo, "getByIdWithDetails").mockResolvedValueOnce({
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
         id: "req-1",
         userId: "other-user",
       } as never);
 
       await expect(
-        deleteSwapRequest(normalUser, "req-1", "single")
+        deleteSwapRequest(normalUser, "req-1", mockRepo)
       ).rejects.toThrow(ForbiddenError);
+    });
+
+    it("throws ConflictError when attempting to delete a MATCHED request", async () => {
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "MATCHED",
+      } as never);
+
+      await expect(
+        deleteSwapRequest(normalUser, "req-1", mockRepo)
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it("throws ConflictError when attempting to delete a request with provisional matches", async () => {
+      mockRepo.getByIdWithDetails.mockResolvedValueOnce({
+        id: "req-1",
+        userId: "user-1",
+        status: "ACTIVE",
+        provisionalUntil: new Date(),
+      } as never);
+
+      await expect(
+        deleteSwapRequest(normalUser, "req-1", mockRepo)
+      ).rejects.toThrow(ConflictError);
     });
   });
 });

@@ -7,7 +7,12 @@ vi.mock("@/lib/apiAccess", () => ({
 
 import * as apiAccess from "@/lib/apiAccess";
 import * as SwapRequestService from "@/application/services/swapRequestService";
-import { SwapRequestForbiddenError, SwapRequestNotFoundError } from "@/application/services/swapRequestService";
+import {
+  SwapRequestForbiddenError,
+  SwapRequestNotFoundError,
+} from "@/application/services/swapRequestService";
+
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 
 import {
   handleCreateSwapRequest,
@@ -70,7 +75,7 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
         queryUserId: null,
         queryStatus: null,
-        type: "single",
+        repo: singleSwapRequestRepo,
       });
     });
   });
@@ -217,9 +222,7 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      vi.spyOn(SwapRequestService, "deleteSwapRequest").mockResolvedValueOnce({
-        message: "Pedido de permuta eliminado com sucesso",
-      });
+      vi.spyOn(SwapRequestService, "deleteSwapRequest").mockResolvedValueOnce(undefined);
 
       const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1", {
         method: "DELETE",
