@@ -13,6 +13,10 @@ const preferredClassIdsSchema = z
   .max(
     MAX_PREFERRED_CLASSES,
     `Só podes selecionar até ${MAX_PREFERRED_CLASSES} turmas preferidas`
+  )
+  .refine(
+    (ids) => new Set(ids).size === ids.length,
+    { message: "Não é permitido selecionar turmas duplicadas" }
   );
 
 export const singleSwapRequestSchema = z.object({
@@ -28,5 +32,17 @@ export const bundleSwapRequestSchema = z.object({
   preferenceOrderMatters: z.boolean(),
 });
 
+export const updateSwapRequestSchema = z
+  .object({
+    preferredClassIds: preferredClassIdsSchema.optional(),
+    status: z.enum(["CANCELLED"]).optional(),
+  })
+  .strict()
+  .refine(
+    (data) => (data.preferredClassIds !== undefined) !== (data.status !== undefined),
+    { message: "É necessário fornecer preferredClassIds ou status, mas não ambos" }
+  );
+
 export type SingleSwapRequestForm = z.infer<typeof singleSwapRequestSchema>;
 export type BundleSwapRequestForm = z.infer<typeof bundleSwapRequestSchema>;
+export type UpdateSwapRequestInput = z.infer<typeof updateSwapRequestSchema>;
