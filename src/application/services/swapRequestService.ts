@@ -121,11 +121,13 @@ function triggerMatchingSilently(id: string, type: "single" | "bundle", context:
   });
 }
 
-function ensureOnboardingRecorded(session: SessionUser) {
+async function ensureOnboardingRecorded(session: SessionUser) {
   if (session.onboardingCompletedAt === null) {
-    void userService.markOnboardingComplete(session.id).catch((error: unknown) => {
+    try {
+      await userService.markOnboardingComplete(session.id);
+    } catch (error) {
       console.warn("Failed to record onboarding completion:", error);
-    });
+    }
   }
 }
 
@@ -197,7 +199,7 @@ export async function createSingleSwapRequest(
     });
 
     triggerMatchingSilently(requestDto.id, "single", "creation");
-    ensureOnboardingRecorded(session);
+    await ensureOnboardingRecorded(session);
 
     return requestDto;
   } catch (error) {
@@ -242,7 +244,7 @@ export async function createBundleSwapRequest(
     });
 
     triggerMatchingSilently(requestDto.id, "bundle", "creation");
-    ensureOnboardingRecorded(session);
+    await ensureOnboardingRecorded(session);
 
     return requestDto;
   } catch (error) {

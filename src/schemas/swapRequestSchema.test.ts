@@ -68,7 +68,7 @@ test("validates updateSwapRequestSchema strictly", () => {
       preferredClassIds: [validId],
       status: "CANCELLED",
     }).success,
-    true
+    false
   );
 
   // Rejects empty object

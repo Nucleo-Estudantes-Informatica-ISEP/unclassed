@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { updateSwapRequestSchema } from "@/schemas/swapRequestSchema";
+import { 
+  updateSwapRequestSchema,
+  singleSwapRequestSchema,
+  bundleSwapRequestSchema
+} from "@/schemas/swapRequestSchema";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 
@@ -111,9 +115,10 @@ export async function handleCreateSwapRequest(
     if (!authResult.ok) return authResult.response;
     const { session } = authResult;
 
-    const body = await request.json();
+    const rawBody = await request.json();
 
     if (type === "single") {
+      const body = singleSwapRequestSchema.parse(rawBody);
       const result = await createSingleSwapRequest(session, body, singleSwapRequestRepo);
       return NextResponse.json(
         {
@@ -123,6 +128,7 @@ export async function handleCreateSwapRequest(
         { status: 201 }
       );
     } else {
+      const body = bundleSwapRequestSchema.parse(rawBody);
       const result = await createBundleSwapRequest(session, body, bundleSwapRequestRepo);
       return NextResponse.json(
         {

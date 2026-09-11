@@ -165,6 +165,28 @@ describe("swap-requests HTTP handlers", () => {
         "Pedido de permuta completa criado! A procurar matches imediatos..."
       );
     });
+
+    it("returns 400 when body fails schema validation", async () => {
+      vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
+        ok: true,
+        session: { id: "user-1", role: "USER" },
+      } as never);
+
+      const req = new NextRequest("http://localhost:3000/api/swap-requests/single", {
+        method: "POST",
+        body: JSON.stringify({
+          subjectId: "sub-1",
+          currentClassId: "c1",
+          preferredClassIds: [], // Empty array should fail Zod validation
+        }),
+      });
+
+      const res = await handleCreateSwapRequest(req, "single");
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Validação falhou");
+      expect(json.details).toBeDefined();
+    });
   });
 
   describe("handleGetSwapRequestById", () => {

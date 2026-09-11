@@ -17,7 +17,7 @@ test("swapRequestService records onboarding completion idempotently", () => {
   const directPrismaUpdate =
     /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?await prisma\.user\s*\.updateMany\(\{[\s\S]*?where: \{ id: session\.id, onboardingCompletedAt: null \},[\s\S]*?data: \{ onboardingCompletedAt: new Date\(\) \},[\s\S]*?\}\)[\s\S]*?\.catch\(/;
   const viaService =
-    /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?userService\.markOnboardingComplete\(session\.id\)[\s\S]*?\.catch\(/;
+    /if \(session\.onboardingCompletedAt === null\) \{[\s\S]*?userService\.markOnboardingComplete\(session\.id\)/;
 
   assert.ok(
     directPrismaUpdate.test(source) || viaService.test(source),

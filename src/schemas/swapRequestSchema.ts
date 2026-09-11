@@ -39,8 +39,8 @@ export const updateSwapRequestSchema = z
   })
   .strict()
   .refine(
-    (data) => data.preferredClassIds !== undefined || data.status !== undefined,
-    { message: "É necessário fornecer preferredClassIds ou status" }
+    (data) => (data.preferredClassIds !== undefined) !== (data.status !== undefined),
+    { message: "É necessário fornecer preferredClassIds ou status, mas não ambos" }
   );
 
 export type SingleSwapRequestForm = z.infer<typeof singleSwapRequestSchema>;
