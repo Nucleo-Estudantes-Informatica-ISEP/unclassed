@@ -1,6 +1,6 @@
 {
   "functions": {
-    "src/app/api/cron/batch-matching/route.ts": {
+    "src/app/api/matching/route.ts": {
       "maxDuration": 300
     }
   },
