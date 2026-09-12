@@ -18,17 +18,17 @@ export function initializeApplication(): void {
     return; // Prevent multiple initializations
   }
 
-  console.log('🚀 Initializing application...');
+  console.log('Initializing application...');
 
   try {
     // Initialize cron scheduler for self-hosted deployments
     initializeCronScheduler();
 
     isInitialized = true;
-    console.log('✅ Application initialization completed');
+    console.log('Application initialization completed');
 
   } catch (error) {
-    console.error('❌ Application initialization failed:', error);
+    console.error('Application initialization failed:', error);
     // Don't exit in production, just log the error
     if (env.NODE_ENV !== 'production') {
       process.exit(1);

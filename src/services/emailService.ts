@@ -67,11 +67,11 @@ class EmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log("✅ Match notification sent:", result.messageId);
+      console.log("Match notification sent:", result.messageId);
 
       return true;
     } catch (error) {
-      console.error("❌ Failed to send match notification:", error);
+      console.error("Failed to send match notification:", error);
       return false;
     }
   }
@@ -114,10 +114,10 @@ class EmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log("✅ Match status update sent:", result.messageId);
+      console.log("Match status update sent:", result.messageId);
       return true;
     } catch (error) {
-      console.error("❌ Failed to send match status update:", error);
+      console.error("Failed to send match status update:", error);
       return false;
     }
   }
@@ -129,10 +129,10 @@ class EmailService {
 
     try {
       await this.transporter.verify();
-      console.log("✅ Email service connection verified");
+      console.log("Email service connection verified");
       return true;
     } catch (error) {
-      console.error("❌ Email service connection failed:", error);
+      console.error("Email service connection failed:", error);
       return false;
     }
   }

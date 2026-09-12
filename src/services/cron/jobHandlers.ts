@@ -13,7 +13,7 @@ export class CronJobHandlers {
       `🔄 Batch matching completed: ${results.matchesFound} matches found, ${results.processedPartitions} partitions processed`
     );
     if (results.errors.length > 0) {
-      console.warn("⚠️ Batch matching errors:", results.errors);
+      console.warn("Batch matching errors:", results.errors);
     }
 
     return {
@@ -29,7 +29,7 @@ export class CronJobHandlers {
     const expiredMatches =
       await this.matchingOrchestrator.expireProvisionalMatches();
     if (expiredMatches > 0) {
-      console.log(`🧹 Expired ${expiredMatches} provisional matches`);
+      console.log(`Expired ${expiredMatches} provisional matches`);
     }
 
     return {
@@ -55,7 +55,7 @@ export class CronJobHandlers {
     if (stats.averageSatisfactionScore < 0.5) {
       errors.push(`Low satisfaction score: ${stats.averageSatisfactionScore}`);
     }
-    for (const warning of errors) console.warn(`⚠️ ${warning}`);
+    for (const warning of errors) console.warn(`${warning}`);
 
     return {
       processedPartitions: stats.activePartitions,

@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       matches: immediateMatches,
       message:
         immediateMatches.length > 0
-          ? `🎉 Encontrado(s) ${immediateMatches.length} match(es) imediato(s)!`
-          : "⏳ Não foram encontrados matches imediatos; pedido adicionado à fila de processamento em lote",
+          ? `Encontrado(s) ${immediateMatches.length} match(es) imediato(s)!`
+          : "Não foram encontrados matches imediatos; pedido adicionado à fila de processamento em lote",
       requestId,
       requestType,
       requestedBy:
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest) {
       return authResult.response;
     }
 
-    console.log("🔄 Batch processing requested");
+    console.log("Batch processing requested");
 
     const matchingService = new MatchingOrchestrator();
 
