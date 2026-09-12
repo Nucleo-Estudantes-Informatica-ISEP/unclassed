@@ -93,6 +93,7 @@ const classesData = [
   { name: "2NA", year: 2 },
   { name: "2NB", year: 2 },
   { name: "2NC", year: 2 },
+  { name: "2ND", year: 2 },
 
   // 3rd Year Classes
   { name: "3DA", year: 3 },
