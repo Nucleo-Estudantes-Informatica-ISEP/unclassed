@@ -287,10 +287,7 @@ Key API routes:
 - `/api/matches`
 - `/api/matches/[matchId]`
 - `/api/matching` - matching stats and batch trigger
-- `/api/matches/run-matching` - admin-triggered matching
 - `/api/admin/cron` - cron monitoring and controls
-- `/api/cron/batch-matching` - scheduled batch matching endpoint
-- `/api/init` - application initialization
 - `/api/health` - health endpoint
 
 ## Matching Engine Overview
@@ -357,7 +354,7 @@ ENABLE_CRON_SCHEDULER=false
 
 In that mode, trigger:
 
-  - `POST /api/cron/batch-matching`
+  - `PUT /api/matching`
 
 with:
 
@@ -382,8 +379,6 @@ Main operational endpoints:
 
 - `/api/admin/cron`
 - `/api/matching`
-- `/api/matches/run-matching`
-- `/api/init`
 - `/api/health`
 
 ## Health Checks

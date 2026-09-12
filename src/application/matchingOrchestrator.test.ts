@@ -63,7 +63,7 @@ test("warns when a malformed cycle has no edge", () => {
   );
 
   assert.equal(match, null);
-  assert.deepEqual(warn.mock.calls, [["⚠️ Missing edge from a to missing"]]);
+  assert.deepEqual(warn.mock.calls, [["Missing edge from a to missing"]]);
 });
 
 test("warns when a malformed cycle has no request details", () => {
@@ -83,5 +83,5 @@ test("warns when a malformed cycle has no request details", () => {
   const match = assembleCycleMatch(["a", "b"], graph, "subject-1", 1_000);
 
   assert.equal(match, null);
-  assert.deepEqual(warn.mock.calls, [["⚠️ Request details not found for a"]]);
+  assert.deepEqual(warn.mock.calls, [["Request details not found for a"]]);
 });

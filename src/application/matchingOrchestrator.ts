@@ -119,10 +119,10 @@ function toMatchingRequest(
 
   return "subjectId" in request
     ? {
-        ...matchingRequest,
-        requestType: "single",
-        subjectId: request.subjectId,
-      }
+      ...matchingRequest,
+      requestType: "single",
+      subjectId: request.subjectId,
+    }
     : { ...matchingRequest, requestType: "bundle" };
 }
 
@@ -184,10 +184,9 @@ export function assembleCycleMatch(
 
   if (match.reason === "missing-edge") {
     console.warn(
-      `⚠️ Missing edge from ${match.requestId} to ${match.nextRequestId}`
-    );
+      `Missing edge from ${match.requestId} to ${match.nextRequestId}`);
   } else {
-    console.warn(`⚠️ Request details not found for ${match.requestId}`);
+    console.warn(`Request details not found for ${match.requestId}`);
   }
 
   return null;
@@ -215,7 +214,7 @@ export class MatchingOrchestrator {
     };
 
     try {
-      console.log(`🚀 Starting immediate processing for request ${requestId}`);
+      console.log(`Starting immediate processing for request ${requestId}`);
 
       // Acquire partition lock for immediate processing to prevent race conditions
       const lockAcquired = await this.lockPartition(
@@ -224,8 +223,7 @@ export class MatchingOrchestrator {
       );
       if (!lockAcquired) {
         console.log(
-          `🔒 Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`
-        );
+          `Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`);
         return [];
       }
 
@@ -234,20 +232,19 @@ export class MatchingOrchestrator {
 
         if (matches.length > 0) {
           console.log(
-            `✅ Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`
-          );
+            `Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`);
 
           return await this.createMatches(matches); // Use the calculated isProvisional from matches
         }
 
-        console.log(`⏳ No immediate matches found for ${requestId}`);
+        console.log(`No immediate matches found for ${requestId}`);
         return [];
       } finally {
         // Always unlock the partition
         await this.unlockPartition(context.partition.id, context.processId);
       }
     } catch (error) {
-      console.error(`❌ Immediate processing failed for ${requestId}:`, error);
+      console.error(`Immediate processing failed for ${requestId}:`, error);
       return [];
     }
   }
@@ -273,7 +270,7 @@ export class MatchingOrchestrator {
     for (const compatibleRequest of compatibleRequests) {
       // Check if processing time exceeded
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`⏱️ Direct matching timeout reached`);
+        console.log(`Direct matching timeout reached`);
         break;
       }
 
@@ -338,8 +335,7 @@ export class MatchingOrchestrator {
         // If this is a perfect match (100% satisfaction for both), return immediately
         if (isFirstChoiceForAll) {
           console.log(
-            `🎯 Perfect match found (both get 1st choice) - stopping search`
-          );
+            `Perfect match found (both get 1st choice) - stopping search`);
           return [matchCandidate];
         }
 
@@ -348,8 +344,7 @@ export class MatchingOrchestrator {
           bestMatch = matchCandidate;
           bestSatisfactionScore = satisfactionScore;
           console.log(
-            `⭐ Better match found (${(satisfactionScore * 100).toFixed(1)}% satisfaction)`
-          );
+            `Better match found (${(satisfactionScore * 100).toFixed(1)}% satisfaction)`);
         }
       }
     }
@@ -357,8 +352,7 @@ export class MatchingOrchestrator {
     // Return the single best match, or empty array if no matches found
     if (bestMatch) {
       console.log(
-        `✅ Best match selected with ${(bestSatisfactionScore * 100).toFixed(1)}% satisfaction`
-      );
+        `Best match selected with ${(bestSatisfactionScore * 100).toFixed(1)}% satisfaction`);
       return [bestMatch];
     }
 
@@ -389,8 +383,7 @@ export class MatchingOrchestrator {
       const partitions = await this.getActivePartitions();
 
       console.log(
-        `🔄 Starting batch processing for ${partitions.length} partitions`
-      );
+        `Starting batch processing for ${partitions.length} partitions`);
 
       // Process per-class graphs first (higher frequency)
       const specificClassPartitions = partitions.filter(
@@ -418,11 +411,10 @@ export class MatchingOrchestrator {
 
       results.totalProcessingTime = Date.now() - startTime;
       console.log(
-        `✅ Batch processing completed: ${results.matchesFound} matches in ${results.totalProcessingTime}ms`
-      );
+        `Batch processing completed: ${results.matchesFound} matches in ${results.totalProcessingTime}ms`);
     } catch (error) {
       results.errors.push(`Batch processing failed: ${String(error)}`);
-      console.error("❌ Batch processing error:", error);
+      console.error("Batch processing error:", error);
     }
 
     return results;
@@ -448,14 +440,12 @@ export class MatchingOrchestrator {
       const acquired = await this.lockPartition(partition.id, context.processId);
       if (!acquired) {
         console.log(
-          `🔒 Skipping partition ${partition.partitionKey}: lock already held by another worker`
-        );
+          `Skipping partition ${partition.partitionKey}: lock already held by another worker`);
         return;
       }
 
       console.log(
-        `🔧 Processing partition ${partition.partitionKey} (${partition.activeRequests} active requests)`
-      );
+        `Processing partition ${partition.partitionKey} (${partition.activeRequests} active requests)`);
 
       // Build graph for this partition
       const graph = await this.buildPartitionGraph(partition);
@@ -479,10 +469,9 @@ export class MatchingOrchestrator {
       results.processedPartitions++;
     } catch (error) {
       results.errors.push(
-        `Partition ${partition.partitionKey}: ${String(error)}`
-      );
+        `Partition ${partition.partitionKey}: ${String(error)}`);
       console.error(
-        `❌ Error processing partition ${partition.partitionKey}:`,
+        `Error processing partition ${partition.partitionKey}:`,
         error
       );
     } finally {
@@ -507,7 +496,7 @@ export class MatchingOrchestrator {
     for (const [nodeId] of graph.vertices()) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`⏱️ Batch processing timeout reached`);
+        console.log(`Batch processing timeout reached`);
         break;
       }
 
@@ -567,8 +556,7 @@ export class MatchingOrchestrator {
 
         if (shouldUpgrade) {
           console.log(
-            `⬆️ Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`
-          );
+            `Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
 
           // Mark old match as upgraded and reactivate its requests
           await prisma.match.update({
@@ -580,8 +568,7 @@ export class MatchingOrchestrator {
           await this.reactivateRequestsFromMatch(existing);
         } else {
           console.log(
-            `⏳ New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`
-          );
+            `New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`);
         }
       }
     }
@@ -619,7 +606,7 @@ export class MatchingOrchestrator {
       }
     }
 
-    console.log(`⌛ Expired ${toExpire.length} provisional matches`);
+    console.log(`Expired ${toExpire.length} provisional matches`);
     return toExpire.length;
   }
 
@@ -952,9 +939,9 @@ export class MatchingOrchestrator {
     const [users, classes, subjects] = await Promise.all([
       nodeUserIds.length > 0
         ? prisma.user.findMany({
-            where: { id: { in: nodeUserIds } },
-            select: { id: true, name: true },
-          })
+          where: { id: { in: nodeUserIds } },
+          select: { id: true, name: true },
+        })
         : Promise.resolve([] as { id: string; name: string }[]),
       classIds.size > 0
         ? classRepo.findManyByIds(Array.from(classIds))
@@ -990,8 +977,7 @@ export class MatchingOrchestrator {
 
     const partitionLabel =
       partition.ticketType === "SPECIFIC_CLASS"
-        ? `Subject ${partition.subjectId || ""}`
-        : `Year ${partition.year ?? ""}`;
+        ? `Subject ${partition.subjectId || ""}`: `Year ${partition.year ?? ""}`;
 
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
   }
@@ -1040,7 +1026,7 @@ export class MatchingOrchestrator {
     match: MatchResult
   ): Promise<void> {
     try {
-      console.log(`📧 Sending match notifications for match ${matchId}`);
+      console.log(`Sending match notifications for match ${matchId}`);
 
       // Get detailed user information for all participants
       const userIds = match.participants.map((p: MatchParticipant) => p.userId);
@@ -1088,8 +1074,7 @@ export class MatchingOrchestrator {
         const user = users.find((u: UserRecord) => u.id === participant.userId);
         if (!user) {
           console.log(
-            `⚠️ User ${participant.userId} not found or notifications disabled`
-          );
+            `User ${participant.userId} not found or notifications disabled`);
           continue;
         }
 
@@ -1124,8 +1109,7 @@ export class MatchingOrchestrator {
 
         if (!notificationReserved) {
           console.log(
-            `⏭️ Match notification already handled or currently in progress for match ${matchId} to ${user.email}`
-          );
+            `Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
           continue;
         }
 
@@ -1137,7 +1121,7 @@ export class MatchingOrchestrator {
 
           if (emailSent) {
             await this.markMatchNotificationDeliverySent(matchId, user.id);
-            console.log(`✅ Match notification sent to ${user.email}`);
+            console.log(`Match notification sent to ${user.email}`);
             continue;
           }
 
@@ -1146,7 +1130,7 @@ export class MatchingOrchestrator {
             user.id,
             "Email service returned false"
           );
-          console.log(`❌ Failed to send notification to ${user.email}`);
+          console.log(`Failed to send notification to ${user.email}`);
         } catch (error) {
           await this.markMatchNotificationDeliveryFailed(
             matchId,
@@ -1154,7 +1138,7 @@ export class MatchingOrchestrator {
             this.getErrorMessage(error)
           );
           console.error(
-            `❌ Error sending notification to ${user.email} for match ${matchId}:`,
+            `Error sending notification to ${user.email} for match ${matchId}:`,
             error
           );
         }
@@ -1344,15 +1328,13 @@ export class MatchingOrchestrator {
 
         if (overlapDecision.action === "skip-committed") {
           console.log(
-            `⏭️ Skipping match creation: committed overlap exists for users ${userIds.join(",")}`
-          );
+            `Skipping match creation: committed overlap exists for users ${userIds.join(",")}`);
           continue;
         }
 
         if (overlapDecision.action === "skip-not-improved") {
           console.log(
-            `⏭️ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`
-          );
+            `Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`);
           continue;
         }
 
@@ -1465,10 +1447,9 @@ export class MatchingOrchestrator {
           error.message.includes("race condition detected")
         ) {
           console.log(
-            `⚡ Race condition detected for match - skipping (another machine already processed these requests)`
-          );
+            `Race condition detected for match - skipping (another machine already processed these requests)`);
         } else {
-          console.error(`❌ Error creating match:`, error);
+          console.error(`Error creating match:`, error);
         }
       }
     }
@@ -1520,7 +1501,7 @@ export class MatchingOrchestrator {
    * Reactivate requests from an upgraded/cancelled match
    */
   private async reactivateRequestsFromMatch(match: StoredMatch): Promise<void> {
-    console.log(`🔄 Reactivating requests from upgraded match ${match.id}`);
+    console.log(`Reactivating requests from upgraded match ${match.id}`);
 
     // Reactivate single swap requests
     if (match.singleSwapRequestIds && match.singleSwapRequestIds.length > 0) {
@@ -1533,8 +1514,7 @@ export class MatchingOrchestrator {
         },
       });
       console.log(
-        `✅ Reactivated ${match.singleSwapRequestIds?.length || 0} single swap requests`
-      );
+        `Reactivated ${match.singleSwapRequestIds?.length || 0} single swap requests`);
     }
 
     // Reactivate bundle swap requests
@@ -1548,8 +1528,7 @@ export class MatchingOrchestrator {
         },
       });
       console.log(
-        `✅ Reactivated ${match.bundleSwapRequestIds?.length || 0} bundle swap requests`
-      );
+        `Reactivated ${match.bundleSwapRequestIds?.length || 0} bundle swap requests`);
     }
   }
 
@@ -1558,7 +1537,7 @@ export class MatchingOrchestrator {
     partition: GraphPartition
   ): Promise<Graph<MatchingRequest, CompatibilityEdge>> {
     try {
-      console.log(`🔗 Building graph for partition ${partition.partitionKey}`);
+      console.log(`Building graph for partition ${partition.partitionKey}`);
 
       // Get all active requests in this partition
       let requests: MatchingRequest[];
@@ -1594,18 +1573,17 @@ export class MatchingOrchestrator {
         requests = filteredBundleRequests.map(toMatchingRequest);
       }
 
-      console.log(`📊 Found ${requests.length} active requests in partition`);
+      console.log(`Found ${requests.length} active requests in partition`);
 
       const builtGraph = buildCompatibilityGraph(requests);
 
       console.log(
-        `🔗 Built graph with ${builtGraph.size} nodes and ${builtGraph.edgeCount} edges`
-      );
+        `Built graph with ${builtGraph.size} nodes and ${builtGraph.edgeCount} edges`);
 
       return builtGraph;
     } catch (error) {
       console.error(
-        `❌ Error building graph for partition ${partition.partitionKey}:`,
+        `Error building graph for partition ${partition.partitionKey}:`,
         error
       );
       return buildCompatibilityGraph([]);
@@ -1618,7 +1596,7 @@ export class MatchingOrchestrator {
     context: ProcessingContext
   ): MatchResult | null {
     try {
-      console.log(`🔄 Converting cycle to match: ${cycle.join(" → ")}`);
+      console.log(`Converting cycle to match: ${cycle.join(" → ")}`);
 
       const matchResult = assembleCycleMatch(
         cycle,
@@ -1629,13 +1607,12 @@ export class MatchingOrchestrator {
 
       if (matchResult) {
         console.log(
-          `✅ Created ${matchResult.pattern} match with satisfaction score ${matchResult.satisfactionScore.toFixed(3)}`
-        );
+          `Created ${matchResult.pattern} match with satisfaction score ${matchResult.satisfactionScore.toFixed(3)}`);
       }
 
       return matchResult;
     } catch (error) {
-      console.error(`❌ Error converting cycle to match:`, error);
+      console.error(`Error converting cycle to match:`, error);
       return null;
     }
   }

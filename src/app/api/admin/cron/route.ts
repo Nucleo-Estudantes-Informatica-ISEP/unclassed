@@ -18,9 +18,9 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    console.log('🔍 Fetching fresh admin cron data');
+    console.log('Fetching fresh admin cron data');
     const scheduler = getCronScheduler();
-    
+
     // Get comprehensive cron statistics
     const [cronStats, executionHistory, jobStatus] = await Promise.all([
       scheduler.getCronStats(),
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
         if (!jobId) {
           return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
         }
-        
+
         await scheduler.runJobManually(jobId);
-        console.log(`🚀 Admin manually triggered job: ${jobId}`);
+        console.log(`Admin manually triggered job: ${jobId}`);
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} executado com sucesso`,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
       case "start_scheduler":
         scheduler.start();
-        console.log("🚀 Admin started cron scheduler");
+        console.log("Admin started cron scheduler");
         return NextResponse.json({
           success: true,
           message: "Agendador cron iniciado",
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
       case "stop_scheduler":
         scheduler.stop();
-        console.log("🛑 Admin stopped cron scheduler");
+        console.log("Admin stopped cron scheduler");
         return NextResponse.json({
           success: true,
           message: "Agendador cron parado",
@@ -106,9 +106,9 @@ export async function POST(request: NextRequest) {
         if (!jobId) {
           return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
         }
-        
+
         scheduler.setJobEnabled(jobId, true);
-        console.log(`✅ Admin enabled job: ${jobId}`);
+        console.log(`Admin enabled job: ${jobId}`);
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} enabled`,
@@ -119,9 +119,9 @@ export async function POST(request: NextRequest) {
         if (!jobId) {
           return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
         }
-        
+
         scheduler.setJobEnabled(jobId, false);
-        console.log(`❌ Admin disabled job: ${jobId}`);
+        console.log(`Admin disabled job: ${jobId}`);
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} disabled`,
@@ -135,10 +135,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error controlling cron scheduler:", error);
     return NextResponse.json(
-      { 
-        error: "Falha ao controlar o agendador cron", 
-        details: error instanceof Error ? error.message : String(error)
-      },
+      { error: "Falha ao controlar o agendador cron" },
       { status: 500 }
     );
   }
