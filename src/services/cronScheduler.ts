@@ -143,11 +143,11 @@ export class CronScheduler {
     });
 
     console.log("Cron schedules configured:");
-    console.log(` - Batch Matching: ${env.CRON_BATCH_MATCHING} (lock: 8min)`);
+    console.log(`  - Batch Matching: ${env.CRON_BATCH_MATCHING} (lock: 8min)`);
     console.log(
       `  - Provisional Cleanup: ${env.CRON_PROVISIONAL_CLEANUP} (lock: 3min)`
     );
-    console.log(` - Health Check: ${env.CRON_HEALTH_CHECK} (lock: 2min)`);
+    console.log(`  - Health Check: ${env.CRON_HEALTH_CHECK} (lock: 2min)`);
   }
 
   private scheduleJob(job: ScheduledJob) {
