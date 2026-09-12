@@ -119,10 +119,10 @@ function toMatchingRequest(
 
   return "subjectId" in request
     ? {
-      ...matchingRequest,
-      requestType: "single",
-      subjectId: request.subjectId,
-    }
+        ...matchingRequest,
+        requestType: "single",
+        subjectId: request.subjectId,
+      }
     : { ...matchingRequest, requestType: "bundle" };
 }
 
@@ -977,7 +977,8 @@ export class MatchingOrchestrator {
 
     const partitionLabel =
       partition.ticketType === "SPECIFIC_CLASS"
-        ? `Subject ${partition.subjectId || ""}`: `Year ${partition.year ?? ""}`;
+        ? `Subject ${partition.subjectId || ""}`
+        : `Year ${partition.year ?? ""}`;
 
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
   }

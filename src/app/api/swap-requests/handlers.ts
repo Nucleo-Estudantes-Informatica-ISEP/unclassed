@@ -52,6 +52,14 @@ function mapSwapRequestErrorToHttpStatus(error: SwapRequestError): number {
 function handleRouteError(error: unknown, contextDescription: string) {
   if (error instanceof SwapRequestError) {
     const status = mapSwapRequestErrorToHttpStatus(error);
+    if (status === 500) {
+      console.error(`Unhandled swap request error in ${contextDescription}:`, error);
+      return NextResponse.json(
+        { error: "Erro interno do servidor" },
+        { status: 500 }
+      );
+    }
+
     const body: { error: string; details?: unknown } = {
       error: error.message,
     };
