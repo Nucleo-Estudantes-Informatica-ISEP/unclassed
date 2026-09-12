@@ -119,10 +119,10 @@ function toMatchingRequest(
 
   return "subjectId" in request
     ? {
-        ...matchingRequest,
-        requestType: "single",
-        subjectId: request.subjectId,
-      }
+      ...matchingRequest,
+      requestType: "single",
+      subjectId: request.subjectId,
+    }
     : { ...matchingRequest, requestType: "bundle" };
 }
 
@@ -237,7 +237,7 @@ export class MatchingOrchestrator {
           return await this.createMatches(matches); // Use the calculated isProvisional from matches
         }
 
-        console.log(`⏳ No immediate matches found for ${requestId}`);
+        console.log(`No immediate matches found for ${requestId}`);
         return [];
       } finally {
         // Always unlock the partition
@@ -270,7 +270,7 @@ export class MatchingOrchestrator {
     for (const compatibleRequest of compatibleRequests) {
       // Check if processing time exceeded
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`⏱ Direct matching timeout reached`);
+        console.log(`Direct matching timeout reached`);
         break;
       }
 
@@ -344,7 +344,7 @@ export class MatchingOrchestrator {
           bestMatch = matchCandidate;
           bestSatisfactionScore = satisfactionScore;
           console.log(
-            `⭐ Better match found (${(satisfactionScore * 100).toFixed(1)}% satisfaction)`);
+            `Better match found (${(satisfactionScore * 100).toFixed(1)}% satisfaction)`);
         }
       }
     }
@@ -496,7 +496,7 @@ export class MatchingOrchestrator {
     for (const [nodeId] of graph.vertices()) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`⏱ Batch processing timeout reached`);
+        console.log(`Batch processing timeout reached`);
         break;
       }
 
@@ -556,7 +556,7 @@ export class MatchingOrchestrator {
 
         if (shouldUpgrade) {
           console.log(
-            `⬆ Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
+            `Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
 
           // Mark old match as upgraded and reactivate its requests
           await prisma.match.update({
@@ -568,7 +568,7 @@ export class MatchingOrchestrator {
           await this.reactivateRequestsFromMatch(existing);
         } else {
           console.log(
-            `⏳ New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`);
+            `New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`);
         }
       }
     }
@@ -606,7 +606,7 @@ export class MatchingOrchestrator {
       }
     }
 
-    console.log(`⌛ Expired ${toExpire.length} provisional matches`);
+    console.log(`Expired ${toExpire.length} provisional matches`);
     return toExpire.length;
   }
 
@@ -939,9 +939,9 @@ export class MatchingOrchestrator {
     const [users, classes, subjects] = await Promise.all([
       nodeUserIds.length > 0
         ? prisma.user.findMany({
-            where: { id: { in: nodeUserIds } },
-            select: { id: true, name: true },
-          })
+          where: { id: { in: nodeUserIds } },
+          select: { id: true, name: true },
+        })
         : Promise.resolve([] as { id: string; name: string }[]),
       classIds.size > 0
         ? classRepo.findManyByIds(Array.from(classIds))
@@ -1109,7 +1109,7 @@ export class MatchingOrchestrator {
 
         if (!notificationReserved) {
           console.log(
-            `⏭ Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
+            `Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
           continue;
         }
 
@@ -1328,13 +1328,13 @@ export class MatchingOrchestrator {
 
         if (overlapDecision.action === "skip-committed") {
           console.log(
-            `⏭ Skipping match creation: committed overlap exists for users ${userIds.join(",")}`);
+            `Skipping match creation: committed overlap exists for users ${userIds.join(",")}`);
           continue;
         }
 
         if (overlapDecision.action === "skip-not-improved") {
           console.log(
-            `⏭ Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`);
+            `Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`);
           continue;
         }
 
@@ -1596,7 +1596,7 @@ export class MatchingOrchestrator {
     context: ProcessingContext
   ): MatchResult | null {
     try {
-      console.log(`Converting cycle to match: ${cycle.join("→ ")}`);
+      console.log(`Converting cycle to match: ${cycle.join(" → ")}`);
 
       const matchResult = assembleCycleMatch(
         cycle,

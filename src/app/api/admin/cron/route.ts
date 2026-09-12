@@ -132,7 +132,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
     }
 
-  } catch {
+  } catch (error) {
+    console.error("Error controlling cron scheduler:", error);
     return NextResponse.json(
       { error: "Falha ao controlar o agendador cron" },
       { status: 500 }

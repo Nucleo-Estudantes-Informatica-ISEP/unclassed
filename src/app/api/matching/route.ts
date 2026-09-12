@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(
-      `🔍 Immediate matching requested for ${requestType} request ${requestId}`
+      `Immediate matching requested for ${requestType} request ${requestId}`
     );
 
     const immediateMatches = await triggerImmediateMatching(

@@ -37,11 +37,11 @@ class EmailService {
           },
         });
         console.log(
-          `📧 Email service initialized with ${env.EMAIL_HOST}`
+          `Email service initialized with ${env.EMAIL_HOST}`
         );
       } else {
         console.warn(
-          "⚠️ No email configuration found - emails will not be sent"
+          "No email configuration found - emails will not be sent"
         );
       }
     } catch (error) {

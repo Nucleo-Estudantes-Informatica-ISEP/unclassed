@@ -180,7 +180,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
     if (error instanceof MatchActionError) {
-      return NextResponse.json({ error: 'Ação não permitida para o estado atual do match' }, { status: 409 });
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

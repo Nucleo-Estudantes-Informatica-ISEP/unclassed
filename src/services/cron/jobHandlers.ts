@@ -10,7 +10,7 @@ export class CronJobHandlers {
     const results = await this.matchingOrchestrator.runBatchProcessing();
 
     console.log(
-      `🔄 Batch matching completed: ${results.matchesFound} matches found, ${results.processedPartitions} partitions processed`
+      `Batch matching completed: ${results.matchesFound} matches found, ${results.processedPartitions} partitions processed`
     );
     if (results.errors.length > 0) {
       console.warn("Batch matching errors:", results.errors);
@@ -45,7 +45,7 @@ export class CronJobHandlers {
   async runHealthCheck(): Promise<JobExecutionResult> {
     const stats = await this.matchingOrchestrator.getAdvancedStats();
     console.log(
-      `💓 Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`
+      `Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`
     );
 
     const errors: string[] = [];

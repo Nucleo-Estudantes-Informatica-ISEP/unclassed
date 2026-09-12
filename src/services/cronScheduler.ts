@@ -56,7 +56,7 @@ export class CronScheduler {
     }
 
     console.log(
-      `✅ Cron scheduler started with ${this.enabledJobs().length} active jobs`
+      `Cron scheduler started with ${this.enabledJobs().length} active jobs`
     );
   }
 
@@ -162,14 +162,14 @@ export class CronScheduler {
       if (lease) void this.runJob(job, lease);
       else
         console.log(
-          `🔒 Job '${job.name}' skipped - another instance is running`
+          `Job '${job.name}' skipped - another instance is running`
         );
       job.nextRun = getNextCronRun(job.schedule);
     }, 1_000);
 
     this.intervals.set(job.id, interval);
     console.log(
-      `📅 Scheduled job '${job.name}' - next run: ${job.nextRun.toISOString()}, check interval: 1000ms`
+      `Scheduled job '${job.name}' - next run: ${job.nextRun.toISOString()}, check interval: 1000ms`
     );
   }
 
@@ -207,7 +207,7 @@ export class CronScheduler {
     try {
       const result = await job.handler();
       const duration = Date.now() - startTime;
-      console.log(`Job '${job.name}'completed in ${duration}ms`);
+      console.log(`Job '${job.name}' completed in ${duration}ms`);
 
       if (execution) {
         await this.executions.update(execution.id, {
@@ -219,7 +219,7 @@ export class CronScheduler {
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`Job '${job.name}'failed:`, error);
+      console.error(`Job '${job.name}' failed:`, error);
 
       if (execution) {
         await this.executions.update(execution.id, {
