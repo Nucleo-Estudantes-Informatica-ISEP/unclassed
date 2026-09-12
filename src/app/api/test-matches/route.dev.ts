@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Class, SingleSwapRequest, Subject, User } from "@prisma/client";
+import type { Class, Subject, User } from "@prisma/client";
+import { SingleSwapRequestDto } from "@/services/swapRequestDto";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import prisma from "@/lib/prisma";
+import * as userRepo from "@/application/repositories/userRepository";
+import * as matchRepo from "@/application/repositories/matchRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 
@@ -21,9 +25,9 @@ export async function POST(request: NextRequest) {
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
 
-    await prisma.match.deleteMany();
-    await prisma.singleSwapRequest.deleteMany();
-    await prisma.bundleSwapRequest.deleteMany();
+    await matchRepo.deleteMany({});
+    await singleSwapRequestRepo.deleteMany();
+    await bundleSwapRequestRepo.deleteMany();
 
     const swapRequests = await createSampleSwapRequests(
       users,
@@ -57,7 +61,7 @@ async function createSampleUsers(): Promise<User[]> {
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
-        prisma.user.upsert({
+        userRepo.upsert({
           where: { email: `test-match-${index + 1}@isep.ipp.pt` },
           update: {},
           create: {
@@ -93,22 +97,17 @@ async function createSampleSwapRequests(
   users: User[],
   classes: Class[],
   subject: Subject
-): Promise<SingleSwapRequest[]> {
+): Promise<SingleSwapRequestDto[]> {
   return Promise.all(
     users.map((user, index) => {
       const currentClass = classes[index];
       const preferredClass = classes[(index + 1) % classes.length];
-      return prisma.singleSwapRequest.create({
-        data: {
-          userId: user.id,
-          subjectId: subject.id,
-          currentClassId: currentClass.id,
-          preferredClassIds: [preferredClass.id],
-          ticketType: "SPECIFIC_CLASS",
-          status: "ACTIVE",
-          priority: 1,
-          graphPartition: `subject-${subject.id}`,
-        },
+      return singleSwapRequestRepo.create({
+        userId: user.id,
+        subjectId: subject.id,
+        currentClassId: currentClass.id,
+        preferredClassIds: [preferredClass.id],
+        preferenceOrderMatters: false,
       });
     })
   );
@@ -117,7 +116,7 @@ async function createSampleSwapRequests(
 async function createSampleMatches(
   users: User[],
   classes: Class[],
-  requests: SingleSwapRequest[]
+  requests: SingleSwapRequestDto[]
 ) {
   const participants = users.map((user, index) => ({
     userId: user.id,
@@ -131,7 +130,7 @@ async function createSampleMatches(
   const graphPartition = `subject-${requests[0].subjectId}`;
 
   return Promise.all([
-    prisma.match.create({
+    matchRepo.create({
       data: {
         matchType: "SINGLE",
         swapPattern: "DIRECT",
@@ -144,7 +143,7 @@ async function createSampleMatches(
         bundleSwapRequestIds: [],
       },
     }),
-    prisma.match.create({
+    matchRepo.create({
       data: {
         matchType: "SINGLE",
         swapPattern: "THREE_WAY",
@@ -159,7 +158,7 @@ async function createSampleMatches(
         bundleSwapRequestIds: [],
       },
     }),
-    prisma.match.create({
+    matchRepo.create({
       data: {
         matchType: "SINGLE",
         swapPattern: "DIRECT",

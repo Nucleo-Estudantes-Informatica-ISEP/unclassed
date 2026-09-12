@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 const userPreferenceSelect = {
@@ -9,8 +10,8 @@ const userPreferenceSelect = {
   email: true,
 } as const;
 
-export async function findFirst(args?: Parameters<typeof prisma.user.findFirst>[0]) {
-  return prisma.user.findFirst(args);
+export async function findFirst(args?: Parameters<typeof prisma.user.findFirst>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).user.findFirst(args);
 }
 
 export async function findMany(args?: Parameters<typeof prisma.user.findMany>[0]) {
@@ -79,12 +80,12 @@ export async function upsert(args: Parameters<typeof prisma.user.upsert>[0]) {
   return prisma.user.upsert(args);
 }
 
-export async function create(args: Parameters<typeof prisma.user.create>[0]) {
-  return prisma.user.create(args);
+export async function create(args: Parameters<typeof prisma.user.create>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).user.create(args);
 }
 
-export async function update(args: Parameters<typeof prisma.user.update>[0]) {
-  return prisma.user.update(args);
+export async function update(args: Parameters<typeof prisma.user.update>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).user.update(args);
 }
 
 export async function updateMany(args: Parameters<typeof prisma.user.updateMany>[0]) {

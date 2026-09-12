@@ -3,7 +3,13 @@ import * as classRepo from "@/application/repositories/classRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 
 import { env } from "@/lib/env";
-import prisma from "@/lib/prisma";
+import * as matchRepo from "@/application/repositories/matchRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import * as userRepo from "@/application/repositories/userRepository";
+import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
+import * as txRepo from "@/application/repositories/transactionRepository";
 import {
   emailService,
   type MatchNotificationData,
@@ -559,7 +565,7 @@ export class MatchingOrchestrator {
             `Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
 
           // Mark old match as upgraded and reactivate its requests
-          await prisma.match.update({
+          await matchRepo.update({
             where: { id: existing.id },
             data: { status: "UPGRADED" },
           });
@@ -579,7 +585,7 @@ export class MatchingOrchestrator {
    */
   async expireProvisionalMatches(): Promise<number> {
     const now = new Date();
-    const toExpire = (await prisma.match.findMany({
+    const matches = (await matchRepo.findMany({
       where: {
         isProvisional: true,
         status: { in: ["PROPOSED", "PROVISIONAL"] },
@@ -587,27 +593,26 @@ export class MatchingOrchestrator {
       },
     })) as unknown as StoredMatch[];
 
-    if (toExpire.length === 0) return 0;
+    if (matches.length === 0) return 0;
 
-    await prisma.match.updateMany({
-      where: { id: { in: toExpire.map((m) => m.id) } },
+    await matchRepo.updateMany({
+      where: { id: { in: matches.map((m) => m.id) } },
       data: { status: "REJECTED", isProvisional: false },
     });
 
-    // Reactivate all requests involved in the expired provisional matches
-    for (const m of toExpire) {
+    for (const m of matches) {
       try {
         await this.reactivateRequestsFromMatch(m);
       } catch (e) {
-        console.warn(
-          `Failed to reactivate requests for expired match ${m.id}:`,
+        console.error(
+          `Failed to reactivate requests for match ${m.id}:`,
           e
         );
       }
     }
 
-    console.log(`Expired ${toExpire.length} provisional matches`);
-    return toExpire.length;
+    console.log(`Expired ${matches.length} provisional matches`);
+    return matches.length;
   }
 
   // ===== GRAPH MANAGEMENT =====
@@ -656,12 +661,12 @@ export class MatchingOrchestrator {
     }
 
     // Get or create partition
-    let partition = await prisma.graphPartition.findUnique({
+    let partition = await graphPartitionRepo.findUnique({
       where: { partitionKey },
     });
 
     if (!partition) {
-      partition = await prisma.graphPartition.create({
+      partition = await graphPartitionRepo.create({
         data: {
           partitionKey,
           ticketType,
@@ -686,7 +691,7 @@ export class MatchingOrchestrator {
 
     // Update request with partition info
     if (requestType === "single") {
-      await prisma.singleSwapRequest.update({
+      await singleSwapRequestRepo.update({
         where: { id: requestId },
         data: {
           graphPartition: partition.partitionKey,
@@ -694,7 +699,7 @@ export class MatchingOrchestrator {
         },
       });
     } else {
-      await prisma.bundleSwapRequest.update({
+      await bundleSwapRequestRepo.update({
         where: { id: requestId },
         data: {
           graphPartition: partition.partitionKey,
@@ -713,7 +718,7 @@ export class MatchingOrchestrator {
     requestId: string
   ): Promise<MatchingRequest | null> {
     // Try single swap request first
-    const singleRequest = await prisma.singleSwapRequest.findUnique({
+    const singleRequest = await singleSwapRequestRepo.findUnique({
       where: { id: requestId },
       include: { subject: true },
     });
@@ -725,7 +730,7 @@ export class MatchingOrchestrator {
     }
 
     // Try bundle swap request
-    const bundleRequest = await prisma.bundleSwapRequest.findUnique({
+    const bundleRequest = await bundleSwapRequestRepo.findUnique({
       where: { id: requestId },
     });
 
@@ -744,7 +749,7 @@ export class MatchingOrchestrator {
   ): Promise<MatchingRequest[]> {
     if (request.requestType === "single") {
       const sr = request as MatchingRequest & { subjectId: string };
-      const requests = (await prisma.singleSwapRequest.findMany({
+      const requests = (await singleSwapRequestRepo.findMany({
         where: {
           status: "ACTIVE",
           graphPartition: context.partition.partitionKey,
@@ -759,7 +764,7 @@ export class MatchingOrchestrator {
       return filtered.map(toMatchingRequest);
     }
 
-    const requests = (await prisma.bundleSwapRequest.findMany({
+    const requests = (await bundleSwapRequestRepo.findMany({
       where: {
         status: "ACTIVE",
         graphPartition: context.partition.partitionKey,
@@ -788,7 +793,7 @@ export class MatchingOrchestrator {
   ): Promise<boolean> {
     // Attempt to acquire lock if free or stale
     const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
-    const res = await prisma.graphPartition.updateMany({
+    const res = await graphPartitionRepo.updateMany({
       where: {
         id: partitionId,
         OR: [
@@ -813,7 +818,7 @@ export class MatchingOrchestrator {
     processId?: string
   ): Promise<void> {
     // Release lock only if held by this process (if provided)
-    await prisma.graphPartition.updateMany({
+    await graphPartitionRepo.updateMany({
       where: processId
         ? { id: partitionId, lockedBy: processId }
         : { id: partitionId },
@@ -827,7 +832,7 @@ export class MatchingOrchestrator {
 
   private async getActivePartitions(): Promise<GraphPartition[]> {
     const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
-    return await prisma.graphPartition.findMany({
+    return await graphPartitionRepo.findMany({
       where: {
         activeRequests: { gt: 0 },
         OR: [
@@ -874,7 +879,7 @@ export class MatchingOrchestrator {
     }>;
   }> {
     // Find partition
-    const partition = await prisma.graphPartition.findUnique({
+    const partition = await graphPartitionRepo.findUnique({
       where: { partitionKey },
     });
 
@@ -886,7 +891,7 @@ export class MatchingOrchestrator {
     let requests: MatchingRequest[] = [];
 
     if (partition.ticketType === "SPECIFIC_CLASS") {
-      const singleRequests = (await prisma.singleSwapRequest.findMany({
+      const singleRequests = (await singleSwapRequestRepo.findMany({
         where: {
           graphPartition: partition.partitionKey,
           status: "ACTIVE",
@@ -898,8 +903,20 @@ export class MatchingOrchestrator {
         await this.filterUsersWithAcceptedMatches(singleRequests);
 
       requests = filtered.map(toMatchingRequest);
+      // Combine with bundle requests
+      const bundleRequests = (await bundleSwapRequestRepo.findMany({
+        where: {
+          graphPartition: partition.partitionKey,
+          status: "ACTIVE",
+        },
+      })) as unknown as BundleSwapRequestRecord[];
+
+      const filteredBundle =
+        await this.filterUsersWithAcceptedMatches(bundleRequests);
+
+      requests = [...requests, ...filteredBundle.map(toMatchingRequest)];
     } else {
-      const bundleRequests = (await prisma.bundleSwapRequest.findMany({
+      const bundleRequests = (await bundleSwapRequestRepo.findMany({
         where: {
           graphPartition: partition.partitionKey,
           status: "ACTIVE",
@@ -938,10 +955,10 @@ export class MatchingOrchestrator {
 
     const [users, classes, subjects] = await Promise.all([
       nodeUserIds.length > 0
-        ? prisma.user.findMany({
-          where: { id: { in: nodeUserIds } },
-          select: { id: true, name: true },
-        })
+        ? userRepo.findMany({
+            where: { id: { in: nodeUserIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([] as { id: string; name: string }[]),
       classIds.size > 0
         ? classRepo.findManyByIds(Array.from(classIds))
@@ -988,13 +1005,13 @@ export class MatchingOrchestrator {
   ): Promise<void> {
     // Count active requests in this partition
     const [singleCount, bundleCount] = await Promise.all([
-      prisma.singleSwapRequest.count({
+      singleSwapRequestRepo.count({
         where: {
           graphPartition: partitionKey,
           status: "ACTIVE",
         },
       }),
-      prisma.bundleSwapRequest.count({
+      bundleSwapRequestRepo.count({
         where: {
           graphPartition: partitionKey,
           status: "ACTIVE",
@@ -1002,7 +1019,7 @@ export class MatchingOrchestrator {
       }),
     ]);
 
-    await prisma.graphPartition.update({
+    await graphPartitionRepo.update({
       where: { partitionKey },
       data: { activeRequests: singleCount + bundleCount },
     });
@@ -1010,15 +1027,11 @@ export class MatchingOrchestrator {
 
   private async updatePartitionStats(
     partitionId: string,
-    stats: {
-      lastProcessed: Date;
-      avgProcessingTime: number;
-      successRate: number;
-    }
+    data: Prisma.GraphPartitionUpdateInput
   ): Promise<void> {
-    await prisma.graphPartition.update({
+    await graphPartitionRepo.update({
       where: { id: partitionId },
-      data: stats,
+      data,
     });
   }
 
@@ -1031,7 +1044,7 @@ export class MatchingOrchestrator {
 
       // Get detailed user information for all participants
       const userIds = match.participants.map((p: MatchParticipant) => p.userId);
-      const users = (await prisma.user.findMany({
+      const users = (await userRepo.findMany({
         where: {
           id: { in: userIds },
           emailVerified: true,
@@ -1041,11 +1054,12 @@ export class MatchingOrchestrator {
 
       // Get subject information if it's a single swap match
       let subjects: string[] = [];
-      if (match.singleSwapRequestIds.length > 0) {
-        const subjectData = await prisma.singleSwapRequest.findMany({
-          where: { id: { in: match.singleSwapRequestIds } },
+      const singleSwapRequestIds = match.singleSwapRequestIds || [];
+      if (singleSwapRequestIds.length > 0) {
+        const subjectData = await singleSwapRequestRepo.findMany({
+          where: { id: { in: singleSwapRequestIds } },
           include: { subject: true },
-        });
+        }) as unknown as Array<{ subject: { name: string } }>;
         subjects = Array.from(
           new Set(
             subjectData.map(
@@ -1095,7 +1109,8 @@ export class MatchingOrchestrator {
           subjects,
           fromClass:
             classMap.get(participant.fromClass) || participant.fromClass,
-          toClass: classMap.get(participant.toClass) || participant.toClass,
+          toClass:
+            classMap.get(participant.toClass) || participant.toClass,
           otherParticipants,
           matchId,
           dashboardUrl: baseUrl,
@@ -1160,7 +1175,7 @@ export class MatchingOrchestrator {
     );
 
     try {
-      await prisma.matchNotificationDelivery.create({
+      await matchNotificationDeliveryRepo.create({
         data: {
           matchId,
           userId,
@@ -1176,7 +1191,7 @@ export class MatchingOrchestrator {
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         const existingDelivery =
-          await prisma.matchNotificationDelivery.findUnique({
+          await matchNotificationDeliveryRepo.findUnique({
             where: {
               matchId_userId_notificationType: {
                 matchId,
@@ -1203,7 +1218,7 @@ export class MatchingOrchestrator {
         }
 
         const reclaimedReservation =
-          await prisma.matchNotificationDelivery.updateMany({
+          await matchNotificationDeliveryRepo.updateMany({
             where: {
               matchId,
               userId,
@@ -1237,7 +1252,7 @@ export class MatchingOrchestrator {
     userId: string
   ): Promise<void> {
     try {
-      await prisma.matchNotificationDelivery.updateMany({
+      await matchNotificationDeliveryRepo.updateMany({
         where: {
           matchId,
           userId,
@@ -1264,7 +1279,7 @@ export class MatchingOrchestrator {
     reason: string
   ): Promise<void> {
     try {
-      await prisma.matchNotificationDelivery.updateMany({
+      await matchNotificationDeliveryRepo.updateMany({
         where: {
           matchId,
           userId,
@@ -1341,7 +1356,9 @@ export class MatchingOrchestrator {
 
         for (const existing of overlapDecision.supersede) {
           try {
-            await prisma.match.update({
+            // Wait a moment for any active transactions to complete
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            await matchRepo.update({
               where: { id: existing.id },
               data: { status: "UPGRADED" },
             });
@@ -1358,8 +1375,8 @@ export class MatchingOrchestrator {
           ? new Date(Date.now() + 6 * 60 * 60 * 1000) // 6 hours
           : undefined;
 
-        // Use atomic transaction to prevent race conditions between multiple machines
-        const result = await prisma.$transaction(async (tx) => {
+        // We use an explicit transaction here for atomicity
+        const result = await txRepo.executeInTransaction(async (tx) => {
           // Final check that requests are still ACTIVE (within transaction lock)
           if (match.singleSwapRequestIds.length > 0) {
             const singles = await tx.singleSwapRequest.findMany({
@@ -1483,7 +1500,7 @@ export class MatchingOrchestrator {
     userIds: string[]
   ): Promise<StoredMatch[]> {
     // For MongoDB with Prisma, we need to use a different approach to query JSON arrays
-    const matches = (await prisma.match.findMany({
+    const matches = (await matchRepo.findMany({
       where: {
         status: { in: ["PROPOSED", "ACCEPTED", "PROVISIONAL"] },
       },
@@ -1505,9 +1522,10 @@ export class MatchingOrchestrator {
     console.log(`Reactivating requests from upgraded match ${match.id}`);
 
     // Reactivate single swap requests
-    if (match.singleSwapRequestIds && match.singleSwapRequestIds.length > 0) {
-      await prisma.singleSwapRequest.updateMany({
-        where: { id: { in: match.singleSwapRequestIds } },
+    const singleSwapIds = match.singleSwapRequestIds || [];
+    if (singleSwapIds.length > 0) {
+      await singleSwapRequestRepo.updateMany({
+        where: { id: { in: singleSwapIds } },
         data: {
           status: "ACTIVE",
           provisionalMatchId: null,
@@ -1519,9 +1537,10 @@ export class MatchingOrchestrator {
     }
 
     // Reactivate bundle swap requests
-    if (match.bundleSwapRequestIds && match.bundleSwapRequestIds.length > 0) {
-      await prisma.bundleSwapRequest.updateMany({
-        where: { id: { in: match.bundleSwapRequestIds } },
+    const bundleSwapIds = match.bundleSwapRequestIds || [];
+    if (bundleSwapIds.length > 0) {
+      await bundleSwapRequestRepo.updateMany({
+        where: { id: { in: bundleSwapIds } },
         data: {
           status: "ACTIVE",
           provisionalMatchId: null,
@@ -1535,17 +1554,26 @@ export class MatchingOrchestrator {
 
   // Graph building and cycle detection methods
   private async buildPartitionGraph(
-    partition: GraphPartition
+    partitionStub: GraphPartition
   ): Promise<Graph<MatchingRequest, CompatibilityEdge>> {
     try {
+      const partition = await graphPartitionRepo.findUnique({
+        where: { id: partitionStub.id },
+      });
+
+      if (!partition) {
+        console.error(`Partition ${partitionStub.id} not found`);
+        return buildCompatibilityGraph([]);
+      }
+
       console.log(`Building graph for partition ${partition.partitionKey}`);
 
       // Get all active requests in this partition
       let requests: MatchingRequest[];
 
       if (partition.ticketType === "SPECIFIC_CLASS") {
-        // Single swap requests for specific subject
-        const singleRequests = (await prisma.singleSwapRequest.findMany({
+        // Get all active requests in this partition
+        const singleRequests = (await singleSwapRequestRepo.findMany({
           where: {
             graphPartition: partition.partitionKey,
             status: "ACTIVE",
@@ -1560,7 +1588,7 @@ export class MatchingOrchestrator {
         requests = filteredSingleRequests.map(toMatchingRequest);
       } else {
         // Bundle swap requests for year-based swaps
-        const bundleRequests = (await prisma.bundleSwapRequest.findMany({
+        const bundleRequests = (await bundleSwapRequestRepo.findMany({
           where: {
             graphPartition: partition.partitionKey,
             status: "ACTIVE",
@@ -1584,7 +1612,7 @@ export class MatchingOrchestrator {
       return builtGraph;
     } catch (error) {
       console.error(
-        `Error building graph for partition ${partition.partitionKey}:`,
+        `Error building graph for partition ${partitionStub.partitionKey}:`,
         error
       );
       return buildCompatibilityGraph([]);
@@ -1628,7 +1656,7 @@ export class MatchingOrchestrator {
     if (requests.length === 0) return [];
 
     // Get all current matches where users have accepted (not just provisional)
-    const acceptedMatches = (await prisma.match.findMany({
+    const acceptedMatches = (await matchRepo.findMany({
       where: {
         status: { in: ["PROPOSED", "ACCEPTED"] },
         isProvisional: false, // Only exclude users with permanent matches
@@ -1658,9 +1686,9 @@ export class MatchingOrchestrator {
    * Get comprehensive matching statistics
    */
   async getAdvancedStats(): Promise<AdvancedStats> {
-    const [partitions, matches, totalActiveRequests] = await Promise.all([
-      prisma.graphPartition.findMany(),
-      prisma.match.findMany({
+    const [partitions, provisionalMatches, totalActiveRequests] = await Promise.all([
+      graphPartitionRepo.findMany(),
+      matchRepo.findMany({
         where: {
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
@@ -1668,7 +1696,7 @@ export class MatchingOrchestrator {
       this.countActiveRequests(),
     ]);
 
-    const m = matches as unknown as StoredMatch[];
+    const m = provisionalMatches as unknown as StoredMatch[];
     const totalMatches = m.length || 1;
 
     return {
@@ -1701,10 +1729,10 @@ export class MatchingOrchestrator {
   }
 
   async countActiveRequests(): Promise<number> {
-    const [single, bundle] = await Promise.all([
-      prisma.singleSwapRequest.count({ where: { status: "ACTIVE" } }),
-      prisma.bundleSwapRequest.count({ where: { status: "ACTIVE" } }),
+    const [totalSingle, totalBundle] = await Promise.all([
+      singleSwapRequestRepo.count({ where: { status: "ACTIVE" } }),
+      bundleSwapRequestRepo.count({ where: { status: "ACTIVE" } }),
     ]);
-    return single + bundle;
+    return totalSingle + totalBundle;
   }
 }

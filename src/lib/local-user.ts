@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import type { Prisma } from "@prisma/client";
 
-import prisma from "@/lib/prisma";
+import * as txRepo from "@/application/repositories/transactionRepository";
+import * as userRepo from "@/application/repositories/userRepository";
+import * as userIdentityRepo from "@/application/repositories/userIdentityRepository";
 
 const AUTH_PROVIDER = "zitadel";
 const OIDC_PASSWORD_PREFIX = "__OIDC_MANAGED__";
@@ -41,7 +43,7 @@ async function ensureNoEmailConflict(
   userId: string,
   email: string
 ) {
-  const conflictingUser = await tx.user.findFirst({
+  const conflictingUser = await userRepo.findFirst({
     where: {
       id: {
         not: userId,
@@ -54,7 +56,7 @@ async function ensureNoEmailConflict(
     select: {
       id: true,
     },
-  });
+  }, tx);
 
   if (conflictingUser) {
     throw new Error(
@@ -83,8 +85,8 @@ export async function syncLocalUserFromOidc({
     throw new Error("OIDC login requires a verified email address.");
   }
 
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existingIdentity = await tx.userIdentity.findUnique({
+  return txRepo.executeInTransaction(async (tx: Prisma.TransactionClient) => {
+    const existingIdentity = await userIdentityRepo.findUnique({
       where: {
         provider_providerSubject: {
           provider: AUTH_PROVIDER,
@@ -94,12 +96,12 @@ export async function syncLocalUserFromOidc({
       include: {
         user: true,
       },
-    });
+    }, tx);
 
     if (existingIdentity) {
       await ensureNoEmailConflict(tx, existingIdentity.userId, normalizedEmail);
 
-      return tx.user.update({
+      return userRepo.update({
         where: { id: existingIdentity.userId },
         data: {
           email: normalizedEmail,
@@ -110,31 +112,31 @@ export async function syncLocalUserFromOidc({
           verificationToken: null,
           verificationTokenExpiry: null,
         },
-      });
+      }, tx);
     }
 
     // First AuthNei/ZITADEL login should attach to an existing local account
     // when the email already exists in Unclassed, even if the IdP account was
     // created later.
-    const existingUser = await tx.user.findFirst({
+    const existingUser = await userRepo.findFirst({
       where: {
         email: {
           equals: normalizedEmail,
           mode: "insensitive",
         },
       },
-    });
+    }, tx);
 
     if (existingUser) {
-      await tx.userIdentity.create({
+      await userIdentityRepo.create({
         data: {
           provider: AUTH_PROVIDER,
           providerSubject: sub,
           userId: existingUser.id,
         },
-      });
+      }, tx);
 
-      return tx.user.update({
+      return userRepo.update({
         where: { id: existingUser.id },
         data: {
           email: normalizedEmail,
@@ -145,10 +147,10 @@ export async function syncLocalUserFromOidc({
           verificationToken: null,
           verificationTokenExpiry: null,
         },
-      });
+      }, tx);
     }
 
-    return tx.user.create({
+    return userRepo.create({
       data: {
         email: normalizedEmail,
         name: normalizedName,
@@ -163,6 +165,7 @@ export async function syncLocalUserFromOidc({
           },
         },
       },
-    });
+    }, tx);
   });
 }
+

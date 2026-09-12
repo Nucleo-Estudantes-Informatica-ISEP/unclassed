@@ -14,6 +14,35 @@ const config = [
     },
   },
   {
+    ignores: [
+      "src/application/repositories/**",
+      "src/lib/prisma.ts",
+      "src/services/cron/**",
+      "prisma/**",
+      "scripts/**"
+    ],
+    rules: {
+      "no-restricted-imports": "off",
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@prisma/client",
+              message: "Prisma client must only be imported within application/repositories/",
+              allowTypeImports: true,
+            },
+            {
+              name: "@/lib/prisma",
+              message: "Prisma client must only be imported within application/repositories/",
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-empty-function": "off",

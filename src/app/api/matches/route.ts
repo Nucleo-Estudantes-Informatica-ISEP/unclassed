@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import * as classRepo from "@/application/repositories/classRepository";
@@ -46,12 +46,12 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 function sanitizeUserForMatch(
   user:
     | {
-        id: string;
-        name: string;
-        email: string;
-        phone: string | null;
-        sharePhoneOnMatch: boolean | null;
-      }
+      id: string;
+      name: string;
+      email: string;
+      phone: string | null;
+      sharePhoneOnMatch: boolean | null;
+    }
     | undefined,
   sessionUserId: string
 ) {

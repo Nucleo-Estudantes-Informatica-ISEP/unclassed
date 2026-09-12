@@ -47,6 +47,10 @@ export async function findById(id: string, include?: BundleSwapRequestInclude) {
   });
 }
 
+export async function findUnique(args: BundleSwapRequestFindUniqueArgs) {
+  return prisma.bundleSwapRequest.findUnique(args);
+}
+
 export async function findFirst(
   input: BundleSwapRequestWhereInput | { where: BundleSwapRequestWhereInput } | undefined
 ) {
@@ -138,4 +142,16 @@ export async function remove(id: string): Promise<void> {
   await prisma.bundleSwapRequest.delete({
     where: { id }
   });
+}
+
+export async function deleteMany(args?: Parameters<typeof prisma.bundleSwapRequest.deleteMany>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.deleteMany(args || {});
+}
+
+export async function count(args: Parameters<typeof prisma.bundleSwapRequest.count>[0]) {
+  return prisma.bundleSwapRequest.count(args);
+}
+
+export async function updateMany(args: Parameters<typeof prisma.bundleSwapRequest.updateMany>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.updateMany(args);
 }

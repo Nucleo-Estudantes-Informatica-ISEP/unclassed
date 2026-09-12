@@ -21,6 +21,8 @@ type BundleSwapRequestRecord = BundleSwapRequest & {
   currentClass?: PublicClass;
 };
 
+export type SingleSwapRequestDto = ReturnType<typeof toSingleSwapRequestDto>;
+
 export function toSingleSwapRequestDto(
   request: SingleSwapRequestRecord,
   preferredClasses: PublicClass[]

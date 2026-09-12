@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import * as subjectRepo from "@/application/repositories/subjectRepository";

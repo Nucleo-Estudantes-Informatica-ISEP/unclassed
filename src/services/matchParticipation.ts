@@ -1,7 +1,7 @@
-import prisma from "@/lib/prisma";
+import * as matchRepo from "@/application/repositories/matchRepository";
 
 export async function hasBlockingAcceptedMatch(userId: string) {
-  const acceptedMatches = await prisma.match.aggregateRaw({
+  const acceptedMatches = await matchRepo.aggregateRaw({
     pipeline: [
       {
         $match: {
