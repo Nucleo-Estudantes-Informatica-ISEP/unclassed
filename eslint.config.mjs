@@ -17,7 +17,6 @@ const config = [
     ignores: [
       "src/application/repositories/**",
       "src/lib/prisma.ts",
-      "src/services/cron/**",
       "prisma/**",
       "scripts/**"
     ],
