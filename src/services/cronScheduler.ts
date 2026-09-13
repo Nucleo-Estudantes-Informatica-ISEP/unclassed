@@ -1,4 +1,4 @@
-import type { CronExecution } from "@prisma/client";
+import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 import { CronExpressionParser } from "cron-parser";
 
 import type { CronStats, LockLease, ScheduledJob } from "./cron/types";
@@ -214,7 +214,12 @@ export class CronScheduler {
           completedAt: new Date(),
           duration,
           status: "COMPLETED",
-          ...(result ?? {}),
+          processedPartitions: result?.processedPartitions,
+          matchesFound: result?.matchesFound,
+          expiredMatches: result?.expiredMatches,
+          totalActiveRequests: result?.totalActiveRequests,
+          metadata: result?.metadata,
+          errors: result?.errors?.length ? result.errors : [],
         });
       }
     } catch (error) {

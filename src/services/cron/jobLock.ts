@@ -1,7 +1,5 @@
-import { Prisma } from "@prisma/client";
-
 import type { LockLease } from "./types";
-import prisma from "@/lib/prisma";
+import * as cronLockRepo from "@/application/repositories/cronLockRepository";
 
 export function getLeaseHeartbeatInterval(timeoutMs: number): number {
   return Math.max(1_000, Math.floor(timeoutMs / 3));
@@ -9,7 +7,6 @@ export function getLeaseHeartbeatInterval(timeoutMs: number): number {
 
 export class JobLock {
   constructor(
-    private readonly database = prisma,
     private readonly defaultTimeout = 10 * 60 * 1_000
   ) {}
 
@@ -22,7 +19,7 @@ export class JobLock {
     const expiresAt = new Date(now.getTime() + effectiveTimeout);
 
     try {
-      const reclaimed = await this.database.cronLock.updateMany({
+      const reclaimed = await cronLockRepo.updateMany({
         where: { jobId, expiresAt: { lte: now } },
         data: { expiresAt, createdAt: now },
       });
@@ -30,17 +27,14 @@ export class JobLock {
         return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
       }
 
-      await this.database.cronLock.create({
+      await cronLockRepo.create({
         data: { jobId, expiresAt, createdAt: now },
       });
       return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (cronLockRepo.isUniqueConstraintError(error)) {
         try {
-          const reclaimed = await this.database.cronLock.updateMany({
+          const reclaimed = await cronLockRepo.updateMany({
             where: { jobId, expiresAt: { lte: new Date() } },
             data: { expiresAt, createdAt: now },
           });
@@ -48,7 +42,7 @@ export class JobLock {
             return { jobId, acquiredAt: now, timeoutMs: effectiveTimeout };
           }
 
-          const lockCount = await this.database.cronLock.count({
+          const lockCount = await cronLockRepo.count({
             where: { jobId },
           });
           if (lockCount > 1) {
@@ -72,7 +66,7 @@ export class JobLock {
 
   async renew(lease: LockLease): Promise<boolean> {
     const now = new Date();
-    const renewed = await this.database.cronLock.updateMany({
+    const renewed = await cronLockRepo.updateMany({
       where: {
         jobId: lease.jobId,
         createdAt: lease.acquiredAt,
@@ -85,7 +79,7 @@ export class JobLock {
 
   async release(lease: LockLease): Promise<void> {
     try {
-      await this.database.cronLock.deleteMany({
+      await cronLockRepo.deleteMany({
         where: { jobId: lease.jobId, createdAt: lease.acquiredAt },
       });
     } catch {

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test, vi } from "vitest";
 
 import { env } from "@/lib/env";
 
 import { JobLock } from "./cron/jobLock";
+import * as cronLockRepo from "@/application/repositories/cronLockRepository";
 import { JobRegistry } from "./cron/jobRegistry";
 import {
   CronScheduler,
@@ -20,18 +21,15 @@ test("renews cron leases well before their expiry", () => {
 
 test("job lock releases only the acquired lease token", async () => {
   let releasedWhere: unknown;
-  const database = {
-    cronLock: {
-      updateMany: async () => ({ count: 0 }),
-      create: async () => ({}),
-      count: async () => 1,
-      deleteMany: async ({ where }: { where: unknown }) => {
-        releasedWhere = where;
-        return { count: 1 };
-      },
-    },
-  } as unknown as ConstructorParameters<typeof JobLock>[0];
-  const lock = new JobLock(database);
+  vi.spyOn(cronLockRepo, "updateMany").mockResolvedValue({ count: 0 } as never);
+  vi.spyOn(cronLockRepo, "create").mockResolvedValue({} as never);
+  vi.spyOn(cronLockRepo, "count").mockResolvedValue(1 as never);
+  vi.spyOn(cronLockRepo, "deleteMany").mockImplementation(async (args: Parameters<typeof cronLockRepo.deleteMany>[0]) => {
+    releasedWhere = args?.where;
+    return { count: 1 } as never;
+  });
+
+  const lock = new JobLock();
 
   const lease = await lock.acquire("batch-matching", 60_000);
   assert.ok(lease);
@@ -41,32 +39,33 @@ test("job lock releases only the acquired lease token", async () => {
     jobId: "batch-matching",
     createdAt: lease.acquiredAt,
   });
+
+  vi.restoreAllMocks();
 });
 
 test("job lock treats an explicit zero timeout as the default", async () => {
-  let createdData: { expiresAt: Date; createdAt: Date } | undefined;
-  const database = {
-    cronLock: {
-      updateMany: async () => ({ count: 0 }),
-      create: async ({ data }: { data: typeof createdData }) => {
-        createdData = data;
-        return {};
-      },
-      count: async () => 1,
-      deleteMany: async () => ({ count: 1 }),
-    },
-  } as unknown as ConstructorParameters<typeof JobLock>[0];
+  let createdData: Parameters<typeof cronLockRepo.create>[0]["data"] | undefined;
+  vi.spyOn(cronLockRepo, "updateMany").mockResolvedValue({ count: 0 } as never);
+  vi.spyOn(cronLockRepo, "create").mockImplementation(async (args: Parameters<typeof cronLockRepo.create>[0]) => {
+    createdData = args.data;
+    return {} as never;
+  });
+  vi.spyOn(cronLockRepo, "count").mockResolvedValue(1 as never);
+  vi.spyOn(cronLockRepo, "deleteMany").mockResolvedValue({ count: 1 } as never);
+
   const defaultTimeout = 60_000;
-  const lock = new JobLock(database, defaultTimeout);
+  const lock = new JobLock(defaultTimeout);
 
   const lease = await lock.acquire("batch-matching", 0);
 
   assert.equal(lease?.timeoutMs, defaultTimeout);
   assert.ok(createdData);
   assert.equal(
-    createdData.expiresAt.getTime(),
-    createdData.createdAt.getTime() + defaultTimeout
+    new Date(createdData?.expiresAt as string | Date).getTime(),
+    new Date(createdData?.createdAt as string | Date).getTime() + defaultTimeout
   );
+
+  vi.restoreAllMocks();
 });
 
 test("job registry owns add, enable, and status state", () => {

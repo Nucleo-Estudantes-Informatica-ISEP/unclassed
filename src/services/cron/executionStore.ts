@@ -1,14 +1,14 @@
-import type { CronExecution, Prisma } from "@prisma/client";
+import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 
 import type { CronStats, ScheduledJob } from "./types";
-import prisma from "@/lib/prisma";
+import * as cronExecutionRepo from "@/application/repositories/cronExecutionRepository";
 
 export class CronExecutionStore {
-  constructor(private readonly database = prisma) {}
+  constructor() {}
 
   async create(job: ScheduledJob): Promise<CronExecution | null> {
     try {
-      return await this.database.cronExecution.create({
+      return await cronExecutionRepo.create({
         data: {
           jobId: job.id,
           jobName: job.name,
@@ -22,9 +22,9 @@ export class CronExecutionStore {
     }
   }
 
-  async update(id: string, data: Prisma.CronExecutionUpdateInput) {
+  async update(id: string, data: Parameters<typeof cronExecutionRepo.update>[0]["data"]) {
     try {
-      await this.database.cronExecution.update({ where: { id }, data });
+      await cronExecutionRepo.update({ where: { id }, data });
     } catch (error) {
       console.warn("Failed to update cron execution record:", error);
     }
@@ -32,7 +32,7 @@ export class CronExecutionStore {
 
   async history(limit = 50): Promise<CronExecution[]> {
     try {
-      return await this.database.cronExecution.findMany({
+      return await cronExecutionRepo.findMany({
         orderBy: { startedAt: "desc" },
         take: limit,
       });
@@ -61,16 +61,16 @@ export class CronExecutionStore {
       const now = new Date();
       const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1_000);
       const [recent, last24h, last] = await Promise.all([
-        this.database.cronExecution.findMany({
+        cronExecutionRepo.findMany({
           where: {
             startedAt: { gte: new Date(now.getTime() - 60 * 60 * 1_000) },
           },
           orderBy: { startedAt: "desc" },
         }),
-        this.database.cronExecution.findMany({
+        cronExecutionRepo.findMany({
           where: { startedAt: { gte: last24Hours } },
         }),
-        this.database.cronExecution.findFirst({
+        cronExecutionRepo.findFirst({
           where: { status: "COMPLETED" },
           orderBy: { completedAt: "desc" },
         }),

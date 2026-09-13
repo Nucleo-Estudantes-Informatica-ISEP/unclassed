@@ -23,3 +23,4 @@ export async function findByNames(names: string[]) {
   if (!names || names.length === 0) return [];
   return prisma.class.findMany({ where: { name: { in: names } } });
 }
+export type { Class } from "@prisma/client";

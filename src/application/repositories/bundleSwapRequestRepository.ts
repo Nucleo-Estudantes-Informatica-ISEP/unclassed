@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { RequestStatus } from "@prisma/client";
+import { Prisma, RequestStatus } from "@prisma/client";
 import * as classRepo from "./classRepository";
 import { toBundleSwapRequestDto } from "@/services/swapRequestDto";
 
@@ -36,8 +36,8 @@ type BundleSwapRequestUpdateArgs = Parameters<typeof prisma.bundleSwapRequest.up
 type BundleSwapRequestWhereInput = NonNullable<BundleSwapRequestFindFirstArgs>["where"];
 type BundleSwapRequestInclude = NonNullable<BundleSwapRequestFindUniqueArgs>["include"];
 
-export async function findMany(args: BundleSwapRequestFindManyArgs) {
-  return prisma.bundleSwapRequest.findMany(args);
+export async function findMany(args: BundleSwapRequestFindManyArgs, tx?: Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.findMany(args);
 }
 
 export async function findById(id: string, include?: BundleSwapRequestInclude) {
@@ -45,6 +45,10 @@ export async function findById(id: string, include?: BundleSwapRequestInclude) {
     where: { id },
     ...(include ? { include } : {}),
   });
+}
+
+export async function findUnique(args: BundleSwapRequestFindUniqueArgs) {
+  return prisma.bundleSwapRequest.findUnique(args);
 }
 
 export async function findFirst(
@@ -139,3 +143,16 @@ export async function remove(id: string): Promise<void> {
     where: { id }
   });
 }
+
+export async function deleteMany(args?: Parameters<typeof prisma.bundleSwapRequest.deleteMany>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.deleteMany(args || {});
+}
+
+export async function count(args: Parameters<typeof prisma.bundleSwapRequest.count>[0]) {
+  return prisma.bundleSwapRequest.count(args);
+}
+
+export async function updateMany(args: Parameters<typeof prisma.bundleSwapRequest.updateMany>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.updateMany(args);
+}
+export type { BundleSwapRequest } from "@prisma/client";

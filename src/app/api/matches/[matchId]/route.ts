@@ -5,11 +5,17 @@
  * and manages graph cleanup accordingly.
  */
 
-import type { Prisma } from "@prisma/client";
+
 import { NextRequest, NextResponse } from 'next/server';
 
 import { authorizeRequest } from '@/lib/apiAccess';
-import prisma from '@/lib/prisma';
+import * as matchRepo from "@/application/repositories/matchRepository";
+import type { JsonValue } from "@/application/repositories/matchRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import * as userRepo from "@/application/repositories/userRepository";
+
 import { emailService } from '@/services/emailService';
 import {
   assertMatchActionAllowed,
@@ -57,8 +63,8 @@ function coerceParticipants(value: unknown): MatchParticipant[] {
 
 function toParticipantsJson(
   participants: MatchParticipant[]
-): Prisma.InputJsonValue[] {
-  return participants as unknown as Prisma.InputJsonValue[];
+): JsonValue[] {
+  return participants as unknown as JsonValue[];
 }
 
 /**
@@ -77,7 +83,7 @@ export async function GET(
     }
     const { session } = authResult;
 
-    const match = (await prisma.match.findUnique({
+    const match = (await matchRepo.findUnique({
       where: { id: matchId }
     })) as MatchRecord | null;
 
@@ -124,7 +130,7 @@ export async function PATCH(
 
     const { action } = matchActionSchema.parse(await request.json());
 
-    const match = (await prisma.match.findUnique({
+    const match = (await matchRepo.findUnique({
       where: { id: matchId }
     })) as MatchRecord | null;
 
@@ -294,14 +300,14 @@ async function handleMatchComplete(match: MatchRecord, userId: string) {
 
     // Update request status to completed (not just matched)
     if (match.singleSwapRequestIds.length > 0) {
-      await prisma.singleSwapRequest.updateMany({
+      await singleSwapRequestRepo.updateMany({
         where: { id: { in: match.singleSwapRequestIds } },
         data: { status: 'COMPLETED' }
       });
     }
 
     if (match.bundleSwapRequestIds.length > 0) {
-      await prisma.bundleSwapRequest.updateMany({
+      await bundleSwapRequestRepo.updateMany({
         where: { id: { in: match.bundleSwapRequestIds } },
         data: { status: 'COMPLETED' }
       });
@@ -351,9 +357,9 @@ async function handleMatchRevoke(match: MatchRecord, userId: string) {
 
 async function updateMatchAtomically(
   match: MatchRecord,
-  data: Prisma.MatchUpdateManyMutationInput
+  data: Parameters<typeof matchRepo.updateMany>[0]["data"]
 ) {
-  const result = await prisma.match.updateMany({
+  const result = await matchRepo.updateMany({
     where: { id: match.id, updatedAt: new Date(match.updatedAt) },
     data,
   });
@@ -364,7 +370,7 @@ async function updateMatchAtomically(
     );
   }
 
-  return prisma.match.findUniqueOrThrow({ where: { id: match.id } });
+  return matchRepo.findUniqueOrThrow({ where: { id: match.id } });
 }
 
 // =============================================================================
@@ -379,7 +385,7 @@ async function reactivateRequestsFromMatch(match: MatchRecord) {
 
   // Reactivate single swap requests
   if (match.singleSwapRequestIds.length > 0) {
-    await prisma.singleSwapRequest.updateMany({
+    await singleSwapRequestRepo.updateMany({
       where: { id: { in: match.singleSwapRequestIds } },
       data: {
         status: 'ACTIVE',
@@ -394,7 +400,7 @@ async function reactivateRequestsFromMatch(match: MatchRecord) {
 
   // Reactivate bundle swap requests  
   if (match.bundleSwapRequestIds.length > 0) {
-    await prisma.bundleSwapRequest.updateMany({
+    await bundleSwapRequestRepo.updateMany({
       where: { id: { in: match.bundleSwapRequestIds } },
       data: {
         status: 'ACTIVE',
@@ -417,7 +423,7 @@ async function removeRequestsFromGraph(match: MatchRecord) {
   // Delete single swap requests (they're completed)
   if (match.singleSwapRequestIds.length > 0) {
     // Don't delete, just mark as completed - keep for history
-    await prisma.singleSwapRequest.updateMany({
+    await singleSwapRequestRepo.updateMany({
       where: { id: { in: match.singleSwapRequestIds } },
       data: { status: 'COMPLETED' }
     });
@@ -426,7 +432,7 @@ async function removeRequestsFromGraph(match: MatchRecord) {
   // Delete bundle swap requests (they're completed)
   if (match.bundleSwapRequestIds.length > 0) {
     // Don't delete, just mark as completed - keep for history
-    await prisma.bundleSwapRequest.updateMany({
+    await bundleSwapRequestRepo.updateMany({
       where: { id: { in: match.bundleSwapRequestIds } },
       data: { status: 'COMPLETED' }
     });
@@ -453,13 +459,13 @@ async function updateGraphPartitionsFromMatch(match: MatchRecord) {
  */
 async function updatePartitionRequestCount(partitionKey: string) {
   const [singleCount, bundleCount] = await Promise.all([
-    prisma.singleSwapRequest.count({
+    singleSwapRequestRepo.count({
       where: {
         graphPartition: partitionKey,
         status: 'ACTIVE'
       }
     }),
-    prisma.bundleSwapRequest.count({
+    bundleSwapRequestRepo.count({
       where: {
         graphPartition: partitionKey,
         status: 'ACTIVE'
@@ -467,7 +473,7 @@ async function updatePartitionRequestCount(partitionKey: string) {
     })
   ]);
 
-  await prisma.graphPartition.update({
+  await graphPartitionRepo.update({
     where: { partitionKey },
     data: { activeRequests: singleCount + bundleCount }
   });
@@ -500,7 +506,7 @@ async function notifyMatchStatusUpdate(match: MatchRecord, action: string, userI
   try {
     // Get all participant user details
     const participantIds = coerceParticipants(match.participants).map((p) => p.userId);
-    const users = await prisma.user.findMany({
+    const users = await userRepo.findMany({
       where: {
         id: { in: participantIds },
         emailVerified: true,

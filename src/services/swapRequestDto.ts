@@ -1,25 +1,25 @@
-import type {
-  BundleSwapRequest,
-  Class,
-  SingleSwapRequest,
-  Subject,
-  User,
-} from "@prisma/client";
+import type { BundleSwapRequest } from "@/application/repositories/bundleSwapRequestRepository";
+import type { Class } from "@/application/repositories/classRepository";
+import type { SingleSwapRequest } from "@/application/repositories/singleSwapRequestRepository";
+import type { Subject } from "@/application/repositories/subjectRepository";
+import type { User } from "@/application/repositories/userRepository";
 
 type PublicUser = Pick<User, "id" | "name" | "email">;
 type PublicClass = Pick<Class, "id" | "name" | "year">;
 type PublicSubject = Pick<Subject, "id" | "code" | "name" | "year">;
 
 type SingleSwapRequestRecord = SingleSwapRequest & {
-  user?: PublicUser;
-  subject?: PublicSubject;
-  currentClass?: PublicClass;
+  user?: PublicUser | null;
+  subject?: PublicSubject | null;
+  currentClass?: PublicClass | null;
 };
 
 type BundleSwapRequestRecord = BundleSwapRequest & {
-  user?: PublicUser;
-  currentClass?: PublicClass;
+  user?: PublicUser | null;
+  currentClass?: PublicClass | null;
 };
+
+export type SingleSwapRequestDto = ReturnType<typeof toSingleSwapRequestDto>;
 
 export function toSingleSwapRequestDto(
   request: SingleSwapRequestRecord,
