@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import * as classRepo from "@/application/repositories/classRepository";
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: Prisma.MatchWhereInput = {};
+    const where: NonNullable<Parameters<typeof matchRepository.findMany>[0]>["where"] = {};
 
     if (
       status &&

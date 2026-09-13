@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { RequestStatus } from "@prisma/client";
+import { Prisma, RequestStatus } from "@prisma/client";
 import * as classRepo from "./classRepository";
 import { toSingleSwapRequestDto } from "@/services/swapRequestDto";
 
@@ -46,8 +46,8 @@ type FindUniqueArgs =
 
 type Include = NonNullable<FindUniqueArgs>["include"];
 
-export async function findMany(args: FindManyArgs) {
-  return prisma.singleSwapRequest.findMany(args);
+export async function findMany(args: FindManyArgs, tx?: Prisma.TransactionClient) {
+  return (tx || prisma).singleSwapRequest.findMany(args);
 }
 
 export async function findById(id: string, include?: Include) {
@@ -158,6 +158,7 @@ export async function count(args: Parameters<typeof prisma.singleSwapRequest.cou
   return prisma.singleSwapRequest.count(args);
 }
 
-export async function updateMany(args: Parameters<typeof prisma.singleSwapRequest.updateMany>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+export async function updateMany(args: Parameters<typeof prisma.singleSwapRequest.updateMany>[0], tx?: Prisma.TransactionClient) {
   return (tx || prisma).singleSwapRequest.updateMany(args);
 }
+export type { SingleSwapRequest, RequestStatus } from "@prisma/client";

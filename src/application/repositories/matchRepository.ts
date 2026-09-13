@@ -1,5 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, Match } from "@prisma/client";
 import prisma from "@/lib/prisma";
+
+export type { Match };
+export type JsonValue = Prisma.InputJsonValue;
 
 export async function findMany(args: Parameters<typeof prisma.match.findMany>[0] = {}, tx?: Prisma.TransactionClient) {
   return (tx || prisma).match.findMany(args);

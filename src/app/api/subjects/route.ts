@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const semester = searchParams.get("semester");
 
     // Build where clause
-    const where: Prisma.SubjectWhereInput = {};
+    const where: { year?: number; semester?: number } = {};
     
     if (year) {
       where.year = parseInt(year);

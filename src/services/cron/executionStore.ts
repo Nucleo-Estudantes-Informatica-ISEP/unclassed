@@ -1,4 +1,4 @@
-import type { CronExecution, Prisma } from "@prisma/client";
+import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 
 import type { CronStats, ScheduledJob } from "./types";
 import * as cronExecutionRepo from "@/application/repositories/cronExecutionRepository";
@@ -22,7 +22,7 @@ export class CronExecutionStore {
     }
   }
 
-  async update(id: string, data: Prisma.CronExecutionUpdateInput) {
+  async update(id: string, data: Parameters<typeof cronExecutionRepo.update>[0]["data"]) {
     try {
       await cronExecutionRepo.update({ where: { id }, data });
     } catch (error) {

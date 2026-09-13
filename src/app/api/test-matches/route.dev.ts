@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Class, Subject, User } from "@prisma/client";
+import type { Class } from "@/application/repositories/classRepository";
+import type { Subject } from "@/application/repositories/subjectRepository";
+import type { User } from "@/application/repositories/userRepository";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
 
 import { authorizeRequest } from "@/lib/apiAccess";

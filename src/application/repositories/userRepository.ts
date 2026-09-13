@@ -96,3 +96,4 @@ export async function deleteMany(args: Parameters<typeof prisma.user.deleteMany>
   return prisma.user.deleteMany(args);
 }
 
+export type { User } from "@prisma/client";

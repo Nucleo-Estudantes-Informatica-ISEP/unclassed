@@ -29,12 +29,12 @@ const config = [
             {
               name: "@prisma/client",
               message: "Prisma client must only be imported within application/repositories/",
-              allowTypeImports: true,
+              allowTypeImports: false,
             },
             {
               name: "@/lib/prisma",
               message: "Prisma client must only be imported within application/repositories/",
-              allowTypeImports: true,
+              allowTypeImports: false,
             },
           ],
         },

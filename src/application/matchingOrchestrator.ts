@@ -1,6 +1,6 @@
-import type { Prisma } from "@prisma/client";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import type { JsonValue } from "@/application/repositories/matchRepository";
 
 import { env } from "@/lib/env";
 import * as matchRepo from "@/application/repositories/matchRepository";
@@ -1027,7 +1027,7 @@ export class MatchingOrchestrator {
 
   private async updatePartitionStats(
     partitionId: string,
-    data: Prisma.GraphPartitionUpdateInput
+    data: { activeRequests?: number; lastProcessed?: Date; avgProcessingTime?: number; successRate?: number }
   ): Promise<void> {
     await graphPartitionRepo.update({
       where: { id: partitionId },
@@ -1356,8 +1356,6 @@ export class MatchingOrchestrator {
 
         for (const existing of overlapDecision.supersede) {
           try {
-            // Wait a moment for any active transactions to complete
-            await new Promise((resolve) => setTimeout(resolve, 500));
             await matchRepo.update({
               where: { id: existing.id },
               data: { status: "UPGRADED" },
@@ -1379,10 +1377,10 @@ export class MatchingOrchestrator {
         const result = await txRepo.executeInTransaction(async (tx) => {
           // Final check that requests are still ACTIVE (within transaction lock)
           if (match.singleSwapRequestIds.length > 0) {
-            const singles = await tx.singleSwapRequest.findMany({
+            const singles = await singleSwapRequestRepo.findMany({
               where: { id: { in: match.singleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
-            });
+            }, tx);
             const allActive = areAllRequestsAvailable(
               match.singleSwapRequestIds,
               singles
@@ -1395,10 +1393,10 @@ export class MatchingOrchestrator {
           }
 
           if (match.bundleSwapRequestIds.length > 0) {
-            const bundles = await tx.bundleSwapRequest.findMany({
+            const bundles = await bundleSwapRequestRepo.findMany({
               where: { id: { in: match.bundleSwapRequestIds } },
               select: { id: true, status: true, provisionalMatchId: true },
-            });
+            }, tx);
             const allActive = areAllRequestsAvailable(
               match.bundleSwapRequestIds,
               bundles
@@ -1411,7 +1409,7 @@ export class MatchingOrchestrator {
           }
 
           // Create the match atomically
-          const createdMatch = await tx.match.create({
+          const createdMatch = await matchRepo.create({
             data: {
               matchType:
                 match.singleSwapRequestIds.length > 0 ? "SINGLE" : "BUNDLE",
@@ -1422,34 +1420,33 @@ export class MatchingOrchestrator {
               satisfactionScore: match.satisfactionScore,
               processingTime: match.processingTime,
               graphPartition: match.graphPartition,
-              participants:
-                match.participants as unknown as Prisma.InputJsonValue[],
+              participants: match.participants as unknown as JsonValue[],
               singleSwapRequestIds: match.singleSwapRequestIds,
               bundleSwapRequestIds: match.bundleSwapRequestIds,
             },
-          });
+          }, tx);
 
           // Update request statuses atomically in same transaction
           if (match.singleSwapRequestIds.length > 0) {
-            await tx.singleSwapRequest.updateMany({
+            await singleSwapRequestRepo.updateMany({
               where: { id: { in: match.singleSwapRequestIds } },
               data: {
                 status: "MATCHED", // Lock request while match is proposed (provisional or not)
                 provisionalMatchId: createdMatch.id,
                 provisionalUntil,
               },
-            });
+            }, tx);
           }
 
           if (match.bundleSwapRequestIds.length > 0) {
-            await tx.bundleSwapRequest.updateMany({
+            await bundleSwapRequestRepo.updateMany({
               where: { id: { in: match.bundleSwapRequestIds } },
               data: {
                 status: "MATCHED", // Lock request while match is proposed (provisional or not)
                 provisionalMatchId: createdMatch.id,
                 provisionalUntil,
               },
-            });
+            }, tx);
           }
 
           return { createdMatch, match };

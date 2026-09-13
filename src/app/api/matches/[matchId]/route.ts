@@ -5,11 +5,12 @@
  * and manages graph cleanup accordingly.
  */
 
-import type { Prisma } from "@prisma/client";
+
 import { NextRequest, NextResponse } from 'next/server';
 
 import { authorizeRequest } from '@/lib/apiAccess';
 import * as matchRepo from "@/application/repositories/matchRepository";
+import type { JsonValue } from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
@@ -62,8 +63,8 @@ function coerceParticipants(value: unknown): MatchParticipant[] {
 
 function toParticipantsJson(
   participants: MatchParticipant[]
-): Prisma.InputJsonValue[] {
-  return participants as unknown as Prisma.InputJsonValue[];
+): JsonValue[] {
+  return participants as unknown as JsonValue[];
 }
 
 /**
@@ -356,7 +357,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string) {
 
 async function updateMatchAtomically(
   match: MatchRecord,
-  data: Prisma.MatchUpdateManyMutationInput
+  data: Parameters<typeof matchRepo.updateMany>[0]["data"]
 ) {
   const result = await matchRepo.updateMany({
     where: { id: match.id, updatedAt: new Date(match.updatedAt) },

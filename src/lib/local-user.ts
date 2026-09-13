@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { Prisma } from "@prisma/client";
+
 
 import * as txRepo from "@/application/repositories/transactionRepository";
 import * as userRepo from "@/application/repositories/userRepository";
@@ -39,7 +39,7 @@ function buildManagedPassword(sub: string) {
 }
 
 async function ensureNoEmailConflict(
-  tx: Prisma.TransactionClient,
+  tx: txRepo.Transaction,
   userId: string,
   email: string
 ) {
@@ -85,7 +85,7 @@ export async function syncLocalUserFromOidc({
     throw new Error("OIDC login requires a verified email address.");
   }
 
-  return txRepo.executeInTransaction(async (tx: Prisma.TransactionClient) => {
+  return txRepo.executeInTransaction(async (tx) => {
     const existingIdentity = await userIdentityRepo.findUnique({
       where: {
         provider_providerSubject: {
