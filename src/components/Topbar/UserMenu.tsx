@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,15 +41,7 @@ export default function UserMenu({ user }: UserMenuProps) {
     setShowMenu(false);
 
     try {
-      const response = await fetch("/api/logout-url", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Falha no logout");
-      }
-
-      const data = (await response.json()) as { redirectTo?: string };
+      const data = await httpClient.get<{ redirectTo?: string }>("/api/logout-url", { cache: "no-store" });
       const redirectTo = data.redirectTo || "/";
 
       await signOut({ redirect: false });

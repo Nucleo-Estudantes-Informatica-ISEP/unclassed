@@ -32,7 +32,7 @@ type AuthorizationFailure = {
   response: NextResponse;
 };
 
-type AuthorizationOptions = {
+export type AuthorizationOptions = {
   requireAuth?: boolean;
   requireAdmin?: boolean;
   allowCronSecret?: boolean;

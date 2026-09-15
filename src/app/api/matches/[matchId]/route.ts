@@ -1,28 +1,26 @@
 /**
  * Match Management API
- * 
+ *
  * Handles user actions on matches (accept, reject, complete)
  * and manages graph cleanup accordingly.
  */
 
+import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { NextRequest, NextResponse } from 'next/server';
-
-import { authorizeRequest } from '@/lib/apiAccess';
+import { defineHandler } from "@/lib/defineHandler";
+import { emailService } from "@/services/emailService";
+import {
+  assertMatchActionAllowed,
+  MatchActionError,
+  matchActions,
+} from "@/services/matchActionRules";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import type { JsonValue } from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import * as userRepo from "@/application/repositories/userRepository";
-
-import { emailService } from '@/services/emailService';
-import {
-  assertMatchActionAllowed,
-  matchActions,
-  MatchActionError,
-} from '@/services/matchActionRules';
-import { z } from 'zod';
 
 interface MatchParticipant {
   userId: string;
@@ -52,18 +50,12 @@ interface MatchRecord {
 
 const matchActionSchema = z.object({ action: z.enum(matchActions) });
 
-type MatchRouteContext = {
-  params: Promise<{ matchId: string }>;
-};
-
 function coerceParticipants(value: unknown): MatchParticipant[] {
   if (!Array.isArray(value)) return [];
   return value as MatchParticipant[];
 }
 
-function toParticipantsJson(
-  participants: MatchParticipant[]
-): JsonValue[] {
+function toParticipantsJson(participants: MatchParticipant[]): JsonValue[] {
   return participants as unknown as JsonValue[];
 }
 
@@ -71,129 +63,101 @@ function toParticipantsJson(
  * GET /api/matches/[matchId]
  * Get match details
  */
-export async function GET(
-  request: NextRequest,
-  { params }: MatchRouteContext
-) {
-  try {
-    const { matchId } = await params;
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
+export const GET = defineHandler({
+  auth: {},
 
+  handler: async (context) => {
+    const { params } = context;
+    const matchId = params.matchId as string;
+    const { session } = context;
     const match = (await matchRepo.findUnique({
-      where: { id: matchId }
+      where: { id: matchId },
     })) as MatchRecord | null;
-
     if (!match) {
-      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Match não encontrado" },
+        { status: 404 }
+      );
     }
-
-    // Check if user is participant
     const participants = coerceParticipants(match.participants);
     const isParticipant = participants.some((p) => p.userId === session.id);
-
-    if (!isParticipant && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    if (!isParticipant && session.role !== "ADMIN") {
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
-
     return NextResponse.json(match);
-
-  } catch (error) {
-    console.error('Error fetching match:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
-  }
-}
+  },
+});
 
 /**
  * PATCH /api/matches/[matchId]
  * User actions: accept, reject, complete
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: MatchRouteContext
-) {
-  try {
-    const { matchId } = await params;
-    const authResult = await authorizeRequest(request, {
-      enforceSameOriginForSessionWrites: true,
-    });
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
-
-    const { action } = matchActionSchema.parse(await request.json());
-
-    const match = (await matchRepo.findUnique({
-      where: { id: matchId }
-    })) as MatchRecord | null;
-
-    if (!match) {
-      return NextResponse.json({ error: 'Match não encontrado' }, { status: 404 });
-    }
-
-    // Check if user is participant
-    const participants = coerceParticipants(match.participants);
-    const userParticipation = participants.find((p) => p.userId === session.id);
-
-    if (!userParticipation) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-    }
-
-    assertMatchActionAllowed(
-      { ...match, participants },
-      session.id,
-      action
-    );
-
-    let updatedMatch;
-    switch (action) {
-      case 'accept':
-        updatedMatch = await handleMatchAccept(match, session.id);
-        break;
-
-      case 'reject':
-        updatedMatch = await handleMatchReject(match, session.id);
-        break;
-
-      case 'complete':
-        updatedMatch = await handleMatchComplete(match, session.id);
-        break;
-
-      case 'revoke':
-        updatedMatch = await handleMatchRevoke(match, session.id);
-        break;
-
-      default:
-        return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      match: updatedMatch,
-      message: getActionMessage(action)
-    });
-
-  } catch (error) {
-    console.error('Error updating match:', error);
+export const PATCH = defineHandler({
+  schema: matchActionSchema,
+  auth: {
+    enforceSameOriginForSessionWrites: true,
+  },
+  onError: (error) => {
+    console.error("Error updating match:", error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
+      return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
     }
     if (error instanceof MatchActionError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
-  }
-}
+  },
+  handler: async (context) => {
+    const { params } = context;
+    const matchId = params.matchId as string;
+    const { session } = context;
+    const { action } = context.body;
+    const match = (await matchRepo.findUnique({
+      where: { id: matchId },
+    })) as MatchRecord | null;
+    if (!match) {
+      return NextResponse.json(
+        { error: "Match não encontrado" },
+        { status: 404 }
+      );
+    }
+    const participants = coerceParticipants(match.participants);
+    const userParticipation = participants.find((p) => p.userId === session.id);
+    if (!userParticipation) {
+      return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+    }
+    assertMatchActionAllowed({ ...match, participants }, session.id, action);
+    let updatedMatch;
+    switch (action) {
+      case "accept":
+        updatedMatch = await handleMatchAccept(match, session.id);
+        break;
+
+      case "reject":
+        updatedMatch = await handleMatchReject(match, session.id);
+        break;
+
+      case "complete":
+        updatedMatch = await handleMatchComplete(match, session.id);
+        break;
+
+      case "revoke":
+        updatedMatch = await handleMatchRevoke(match, session.id);
+        break;
+
+      default:
+        return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
+    }
+    return NextResponse.json({
+      success: true,
+      match: updatedMatch,
+      message: getActionMessage(action),
+    });
+  },
+});
 
 // =============================================================================
 // MATCH ACTION HANDLERS

@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useState } from "react";
 import { Button } from "@/lib/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/lib/components/ui/card";
@@ -40,21 +41,7 @@ export function MatchCard({ match, currentUserId, showActions = true }: MatchCar
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/matches/${match.id}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Falha ao atualizar match");
-      }
-
-      const result = await response.json();
+      const result = await httpClient.patch<{ message: string }>(`/api/matches/${match.id}`, { action }, { credentials: "include" });
 
       toast.success(result.message);
       router.refresh();
