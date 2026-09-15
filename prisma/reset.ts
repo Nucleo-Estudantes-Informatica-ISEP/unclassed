@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function resetData() {
-  console.log("🗑️  Resetting database data...");
+  console.log("Resetting database data...");
 
   try {
     // Delete all matches first (due to foreign key constraints)
@@ -21,12 +21,12 @@ async function resetData() {
     console.log("Deleting all users...");
     await prisma.user.deleteMany({});
     
-    console.log("✅ Database reset complete!");
-    console.log("📚 Subjects and classes have been preserved");
-    console.log("🎯 You can now create your own test data");
+    console.log("Database reset complete!");
+    console.log("Subjects and classes have been preserved");
+    console.log("You can now create your own test data");
     
   } catch (error) {
-    console.error("❌ Error during reset:", error);
+    console.error("Error during reset:", error);
     throw error;
   }
 }

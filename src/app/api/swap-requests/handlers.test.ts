@@ -8,6 +8,7 @@ vi.mock("@/lib/apiAccess", () => ({
 import * as apiAccess from "@/lib/apiAccess";
 import * as SwapRequestService from "@/application/services/swapRequestService";
 import {
+  SwapRequestError,
   SwapRequestForbiddenError,
   SwapRequestNotFoundError,
 } from "@/application/services/swapRequestService";
@@ -253,6 +254,29 @@ describe("swap-requests HTTP handlers", () => {
       expect(res.status).toBe(404);
       const json = await res.json();
       expect(json.error).toBe("Pedido de permuta não encontrado");
+    });
+
+    it("returns 500 without leaking internal message when an unmapped SwapRequestError is thrown", async () => {
+      vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
+        ok: true,
+        session: { id: "user-1", role: "USER" },
+      } as never);
+
+      vi.spyOn(SwapRequestService, "getSwapRequestById").mockRejectedValueOnce(
+        new SwapRequestError("Sensitive internal database query failure")
+      );
+
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1");
+      const res = await handleGetSwapRequestById(req, context, "single");
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.error).toBe("Erro interno do servidor");
+      expect(json.error).not.toContain("Sensitive");
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
     });
   });
 

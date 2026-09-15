@@ -1,4 +1,4 @@
-import type { CronExecution, Prisma } from "@prisma/client";
+import type { CronExecution, JsonValue } from "@/application/repositories/cronExecutionRepository";
 
 export interface JobExecutionResult {
   processedPartitions: number;
@@ -6,7 +6,7 @@ export interface JobExecutionResult {
   expiredMatches: number;
   totalActiveRequests: number;
   errors: string[];
-  metadata?: Prisma.InputJsonValue;
+  metadata?: JsonValue;
 }
 
 export interface ScheduledJob {

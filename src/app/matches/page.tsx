@@ -1,7 +1,9 @@
 import getServerSession from "@/services/getServerSession";
 import { redirect } from "next/navigation";
-import prisma from "@/lib/prisma";
+import * as matchRepo from "@/application/repositories/matchRepository";
 import * as classRepo from "@/application/repositories/classRepository";
+import * as userRepo from "@/application/repositories/userRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import { CheckCircle2, History, Zap, Search } from "lucide-react";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -77,7 +79,7 @@ export default async function MatchesPage() {
   }
 
   // Get user's matches with enriched participant data
-  const allMatches = await prisma.match.findMany({
+  const allMatches = await matchRepo.findMany({
     where: {
       status: {
         not: "REJECTED", // Don't show rejected matches
@@ -103,7 +105,7 @@ export default async function MatchesPage() {
 
       // Get user information for participants
       const userIds = participants.map((p) => p.userId);
-      const users = await prisma.user.findMany({
+      const users = await userRepo.findMany({
         where: { id: { in: userIds } },
         select: {
           id: true,
@@ -124,10 +126,18 @@ export default async function MatchesPage() {
       // Get subject information for single swaps
       let subject = null;
       if (match.matchType === "SINGLE" && match.singleSwapRequestIds.length > 0) {
-        const swapRequest = await prisma.singleSwapRequest.findFirst({
-          where: { id: { in: match.singleSwapRequestIds } },
-          include: { subject: true },
-        });
+        const swapRequest = (await singleSwapRequestRepo.findById(
+          match.singleSwapRequestIds[0],
+          { subject: true }
+        )) as unknown as {
+          subject: {
+            id: string;
+            code: string;
+            name: string;
+            year: number;
+            semester: number;
+          };
+        } | null;
         subject = swapRequest?.subject;
       }
 

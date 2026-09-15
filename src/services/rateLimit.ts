@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { Prisma } from "@prisma/client";
 
-import prisma from "@/lib/prisma";
+import * as rateLimitRepo from "@/application/repositories/rateLimitRepository";
 
+// Configuration for different rate limit types
 export const RATE_LIMIT_POLICIES = {
   matching: { maxRequests: 10, windowMs: 60_000 },
   batch: { maxRequests: 2, windowMs: 60_000 },
@@ -113,7 +113,7 @@ export class PrismaRateLimitStore implements RateLimitStore {
     await this.cleanupExpiredBuckets();
 
     try {
-      const bucket = await prisma.rateLimitBucket.upsert({
+      const bucket = await rateLimitRepo.upsert({
         where: { key },
         create: { key, count: 1, expiresAt },
         update: { count: { increment: 1 } },
@@ -121,11 +121,8 @@ export class PrismaRateLimitStore implements RateLimitStore {
       });
       return bucket.count;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const bucket = await prisma.rateLimitBucket.update({
+      if (rateLimitRepo.isUniqueConstraintError(error)) {
+        const bucket = await rateLimitRepo.update({
           where: { key },
           data: { count: { increment: 1 } },
           select: { count: true },
@@ -144,7 +141,7 @@ export class PrismaRateLimitStore implements RateLimitStore {
     }
 
     this.nextCleanupAt = now + 60 * 60 * 1_000;
-    await prisma.rateLimitBucket.deleteMany({
+    await rateLimitRepo.deleteMany({
       where: { expiresAt: { lte: new Date(now) } },
     });
   }
