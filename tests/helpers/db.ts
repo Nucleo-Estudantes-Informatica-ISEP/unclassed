@@ -56,7 +56,7 @@ export async function clearTestDatabase(): Promise<void> {
   await userRepo.deleteMany({});
   await classRepo.deleteMany({});
   await subjectRepo.deleteMany({});
-  await graphPartitionRepo.updateMany({ where: {}, data: {} }); // or clear if needed
+  await graphPartitionRepo.deleteMany({});
 }
 
 let counter = 0;
