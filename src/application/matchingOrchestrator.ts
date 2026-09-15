@@ -847,6 +847,37 @@ export class MatchingOrchestrator {
     });
   }
 
+  private async loadActiveSingleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await singleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+      include: { subject: true },
+    })) as unknown as SingleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
+  }
+
+  private async loadActiveBundleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await bundleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+    })) as unknown as BundleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
+  }
+
   /**
    * Public: Return a snapshot of the graph for a given partitionKey
    * Includes nodes (requests) and directed edges (preferences) with weights/satisfaction
@@ -888,45 +919,19 @@ export class MatchingOrchestrator {
     }
 
     // Build the list of active requests (nodes) mirroring buildPartitionGraph
-    let requests: MatchingRequest[] = [];
+    let requests: MatchingRequest[];
 
     if (partition.ticketType === "SPECIFIC_CLASS") {
-      const singleRequests = (await singleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-        include: { subject: true },
-      })) as unknown as SingleSwapRequestRecord[];
+      const singleRequests = await this.loadActiveSingleRequests(
+        partition.partitionKey
+      );
+      const bundleRequests = await this.loadActiveBundleRequests(
+        partition.partitionKey
+      );
 
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(singleRequests);
-
-      requests = filtered.map(toMatchingRequest);
-      // Combine with bundle requests
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filteredBundle =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = [...requests, ...filteredBundle.map(toMatchingRequest)];
+      requests = [...singleRequests, ...bundleRequests];
     } else {
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = filtered.map(toMatchingRequest);
+      requests = await this.loadActiveBundleRequests(partition.partitionKey);
     }
 
     const graph = buildCompatibilityGraph(requests);
@@ -1565,39 +1570,10 @@ export class MatchingOrchestrator {
 
       console.log(`Building graph for partition ${partition.partitionKey}`);
 
-      // Get all active requests in this partition
-      let requests: MatchingRequest[];
-
-      if (partition.ticketType === "SPECIFIC_CLASS") {
-        // Get all active requests in this partition
-        const singleRequests = (await singleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-          include: { subject: true },
-        })) as unknown as SingleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredSingleRequests =
-          await this.filterUsersWithAcceptedMatches(singleRequests);
-
-        requests = filteredSingleRequests.map(toMatchingRequest);
-      } else {
-        // Bundle swap requests for year-based swaps
-        const bundleRequests = (await bundleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-        })) as unknown as BundleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredBundleRequests =
-          await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-        requests = filteredBundleRequests.map(toMatchingRequest);
-      }
+      const requests =
+        partition.ticketType === "SPECIFIC_CLASS"
+          ? await this.loadActiveSingleRequests(partition.partitionKey)
+          : await this.loadActiveBundleRequests(partition.partitionKey);
 
       console.log(`Found ${requests.length} active requests in partition`);
 
