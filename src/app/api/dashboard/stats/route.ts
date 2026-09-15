@@ -1,28 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
-import * as classRepo from "@/application/repositories/classRepository";
-import * as singleSwapRequestRepository from "@/application/repositories/singleSwapRequestRepository";
+import { defineHandler } from "@/lib/defineHandler";
 import * as bundleSwapRequestRepository from "@/application/repositories/bundleSwapRequestRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepository from "@/application/repositories/matchRepository";
+import * as singleSwapRequestRepository from "@/application/repositories/singleSwapRequestRepository";
 
 /**
  * GET /api/dashboard/stats
  * Returns actionable stats for dashboard charts
  */
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request, { rateLimit: "stats" });
+export const GET = defineHandler({
+  auth: { rateLimit: "stats" },
 
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-
-    // Get all classes
+  handler: async () => {
     const classes = await classRepo.findClasses();
     const classMap = new Map(classes.map((c) => [c.id, c.name]));
-
-    // Get all active requests
     const [activeSingle, activeBundle, matches] = await Promise.all([
       singleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
       bundleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
@@ -35,10 +28,7 @@ export async function GET(request: NextRequest) {
         take: 20,
       }),
     ]);
-
     const allActive = [...activeSingle, ...activeBundle];
-
-    // Popular classes to swap INTO
     const intoCounts: Record<string, number> = {};
     for (const req of allActive) {
       for (const classId of req.preferredClassIds) {
@@ -49,8 +39,6 @@ export async function GET(request: NextRequest) {
       .map(([id, count]) => ({ id, name: classMap.get(id) || id, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-
-    // Popular classes to LEAVE
     const leaveCounts: Record<string, number> = {};
     for (const req of allActive) {
       leaveCounts[req.currentClassId] =
@@ -60,8 +48,6 @@ export async function GET(request: NextRequest) {
       .map(([id, count]) => ({ id, name: classMap.get(id) || id, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-
-    // Demand vs Supply
     const demandSupply = classes
       .map((c) => {
         const demand = intoCounts[c.id] || 0;
@@ -76,8 +62,6 @@ export async function GET(request: NextRequest) {
       })
       .sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0))
       .slice(0, 10);
-
-    // Success rate and average wait time by class
     const matchClassStats: Record<
       string,
       { matches: number; totalWait: number; requests: number }
@@ -121,8 +105,6 @@ export async function GET(request: NextRequest) {
       )
       .sort((a, b) => (b.successRate ?? 0) - (a.successRate ?? 0))
       .slice(0, 10);
-
-    // Recent successful swaps
     const recentSwaps = matches.map((m: (typeof matches)[number]) => ({
       id: m.id,
       createdAt: m.createdAt,
@@ -136,7 +118,6 @@ export async function GET(request: NextRequest) {
           : reqId;
       }),
     }));
-
     return NextResponse.json({
       popularInto,
       popularLeave,
@@ -144,11 +125,5 @@ export async function GET(request: NextRequest) {
       classSuccessStats,
       recentSwaps,
     });
-  } catch (error) {
-    console.error("Error getting dashboard stats:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});

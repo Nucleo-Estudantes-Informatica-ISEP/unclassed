@@ -94,7 +94,12 @@ docs/domain-model/ # PlantUML domain diagram
 
 ### Request and data layers
 
-Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
+Routes use `defineHandler` (`src/lib/defineHandler.ts`) to authenticate through `authorizeRequest`, parse JSON with a Zod `schema`, optionally apply resource `authorize` checks, and map errors. Handlers call application services/repositories and return a `Response`; status codes, headers, cookies and redirects are preserved. Swap routes share this wrapper through `createSwapRequestHandlers`.
+
+- Session writes enforce same-origin validation by default. Preserve every route's admin/cron/rate-limit policy and service ownership checks.
+- Use `auth: false` only for public endpoints or NextAuth protocol handlers that own authentication. `auth: { requireAuth: false }` still resolves optional session/cron identity (for example, detailed health status).
+- Use `schema` for JSON bodies. Malformed JSON returns 400; `onError` maps domain errors or special fallback responses and may return undefined to use the shared mapping. Unexpected errors return a generic 500.
+- Browser components and hooks use `httpClient` (`src/lib/httpClient.ts`) with a response type, such as `httpClient.get<MyDto>(url)`. Its get/post/patch/put/delete methods serialize JSON, preserve request options and throw `HttpError` with status, parsed body and response headers for HTTP failures. A 204 response resolves to undefined; use `void` when expecting no body. Generic response types describe the contract; they do not validate server data at runtime.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
 - `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
@@ -125,8 +130,8 @@ Rules:
 
 - Preserve the ZITADEL `email_verified` gate.
 - Local `User.password` exists for compatibility but active sign-in is OIDC. Do not add a parallel password-login flow without an explicit product decision.
-- Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
-- For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
+- Use `defineHandler()` backed by `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. `apiAccess` remains the single authorization layer; do not hand-roll `getServerSession()`/role checks inline in a route.
+- For session-authenticated writes, retain the wrapper default `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
 
 ## API conventions

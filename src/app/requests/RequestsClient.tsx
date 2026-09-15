@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import Link from "next/link";
 import { AlertCircle, ArrowLeftRight, CheckCircle, Clock, Eye, Package2, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -34,17 +35,7 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
           ? `/api/swap-requests/single/${requestId}`
           : `/api/swap-requests/bundle/${requestId}`;
 
-      const response = await fetch(endpoint, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao cancelar pedido");
-      }
+      await httpClient.put(endpoint, { status: "CANCELLED" });
 
       toast.success("Pedido cancelado com sucesso!");
       window.location.reload();
@@ -72,13 +63,7 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
           ? `/api/swap-requests/single/${requestId}`
           : `/api/swap-requests/bundle/${requestId}`;
 
-      const response = await fetch(endpoint, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao eliminar pedido");
-      }
+      await httpClient.delete(endpoint);
 
       toast.success("Pedido eliminado com sucesso!");
       window.location.reload();

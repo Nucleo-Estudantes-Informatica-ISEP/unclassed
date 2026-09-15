@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
 import { Button } from "@/lib/components/ui/button";
@@ -93,25 +94,21 @@ export default function AdvancedMatchingDashboard() {
 
   const loadStats = useCallback(async () => {
     try {
-      const [matchingResponse, cronResponse] = await Promise.all([
-        fetch('/api/matching'),
-        fetch('/api/admin/cron')
+      const [matchingResult, cronResult] = await Promise.allSettled([
+        httpClient.get<MatchingStats & { success: boolean }>('/api/matching'),
+        httpClient.get<{ success: boolean; cronStats: CronStats; executionHistory: CronExecution[] }>('/api/admin/cron'),
       ]);
-      
-      const matchingData = await matchingResponse.json();
-      const cronData = await cronResponse.json();
-      
-      if (matchingData.success) {
-        setStats(matchingData);
+      if (matchingResult.status === "fulfilled" && matchingResult.value.success) {
+        setStats(matchingResult.value);
       } else {
         toast.error("Falha ao carregar estatísticas de matching");
       }
-      
-      if (cronData.success) {
-        setCronStats(cronData.cronStats);
-        setCronHistory(cronData.executionHistory);
+
+      if (cronResult.status === "fulfilled" && cronResult.value.success) {
+        setCronStats(cronResult.value.cronStats);
+        setCronHistory(cronResult.value.executionHistory);
       } else {
-        console.warn('Failed to load cron statistics:', cronData.error);
+        console.warn('Failed to load cron statistics');
       }
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -137,8 +134,7 @@ export default function AdvancedMatchingDashboard() {
   const runBatchProcessing = async () => {
     setRunningBatch(true);
     try {
-      const response = await fetch('/api/matching', { method: 'PUT' });
-      const result = await response.json();
+      const result = await httpClient.put<BatchResult>('/api/matching');
       
       setLastBatchResult(result);
       

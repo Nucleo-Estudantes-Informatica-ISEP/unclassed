@@ -1,5 +1,6 @@
 'use client';
 
+import { httpClient } from "@/lib/httpClient";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/lib/components/ui/button';
@@ -43,24 +44,11 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
     try {
       const updateData = { [preferenceType]: value };
       
-      const response = await fetch('/api/user/preferences', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setPreferences(prev => ({ ...prev, [preferenceType]: value }));
-        toast.success('Preferências atualizadas com sucesso!');
-      } else {
-        toast.error(data.error || 'Erro ao atualizar preferências');
-      }
-    } catch {
-      toast.error('Erro de conexão. Tenta novamente.');
+      await httpClient.patch('/api/user/preferences', updateData);
+      setPreferences(prev => ({ ...prev, [preferenceType]: value }));
+      toast.success('Preferências atualizadas com sucesso!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -70,24 +58,11 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
     setIsSaving(true);
 
     try {
-      const response = await fetch('/api/user/preferences', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone: preferences.phone }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setPreferences((prev) => ({ ...prev, phone: data.user.phone }));
-        toast.success('Telemóvel atualizado com sucesso!');
-      } else {
-        toast.error(data.error || 'Erro ao atualizar telemóvel');
-      }
-    } catch {
-      toast.error('Erro de conexão. Tenta novamente.');
+      const data = await httpClient.patch<{ user: { phone: string | null } }>('/api/user/preferences', { phone: preferences.phone });
+      setPreferences(prev => ({ ...prev, phone: data.user.phone }));
+      toast.success('Telemóvel atualizado com sucesso!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);
     }

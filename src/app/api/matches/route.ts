@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-
-import { authorizeRequest } from "@/lib/apiAccess";
-import * as classRepo from "@/application/repositories/classRepository";
-import * as matchRepository from "@/application/repositories/matchRepository";
-import * as userRepository from "@/application/repositories/userRepository";
+import { defineHandler } from "@/lib/defineHandler";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
 
 interface MatchLike {
   id: string;
@@ -46,12 +45,12 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 function sanitizeUserForMatch(
   user:
     | {
-      id: string;
-      name: string;
-      email: string;
-      phone: string | null;
-      sharePhoneOnMatch: boolean | null;
-    }
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        sharePhoneOnMatch: boolean | null;
+      }
     | undefined,
   sessionUserId: string
 ) {
@@ -97,22 +96,19 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
   return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
+export const GET = defineHandler({
+  auth: {},
 
+  handler: async (context) => {
+    const { request } = context;
+    const { session } = context;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const matchType = searchParams.get("matchType");
     const userId = searchParams.get("userId");
-
-    // Build where clause
-    const where: NonNullable<Parameters<typeof matchRepository.findMany>[0]>["where"] = {};
-
+    const where: NonNullable<
+      Parameters<typeof matchRepository.findMany>[0]
+    >["where"] = {};
     if (
       status &&
       matchStatuses.includes(status as (typeof matchStatuses)[number])
@@ -124,7 +120,6 @@ export async function GET(request: NextRequest) {
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
       };
     }
-
     if (
       matchType &&
       matchTypes.includes(matchType as (typeof matchTypes)[number])
@@ -132,13 +127,10 @@ export async function GET(request: NextRequest) {
       const validatedMatchType = matchType as (typeof matchTypes)[number];
       where.matchType = validatedMatchType;
     }
-
     const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
-
-    // Filter matches that involve the user (if not admin)
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
@@ -151,12 +143,9 @@ export async function GET(request: NextRequest) {
         coerceParticipants(match.participants).some((p) => p.userId === userId)
       );
     }
-
     const dedupedMatches = dedupeMatches(
       filteredMatches as unknown as MatchLike[]
     );
-
-    // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
       dedupedMatches.map(async (match) => {
         const participants = coerceParticipants(match.participants);
@@ -202,9 +191,7 @@ export async function GET(request: NextRequest) {
         return result;
       })
     );
-
     const response = NextResponse.json(enrichedMatches);
-    // Prevent caching to ensure fresh data
     response.headers.set(
       "Cache-Control",
       "no-cache, no-store, must-revalidate"
@@ -212,11 +199,5 @@ export async function GET(request: NextRequest) {
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Expires", "0");
     return response;
-  } catch (error) {
-    console.error("Error fetching matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});

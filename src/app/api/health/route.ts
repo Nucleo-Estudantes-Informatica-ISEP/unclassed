@@ -5,31 +5,45 @@
  * Used for monitoring and load balancer health checks.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
+import { defineHandler } from "@/lib/defineHandler";
 import { env } from "@/lib/env";
-import * as userRepository from "@/application/repositories/userRepository";
 import { isAppInitialized } from "@/lib/startup";
 import { getCronSchedulerStatus } from "@/services/cronScheduler";
+import * as userRepository from "@/application/repositories/userRepository";
 
 /**
  * Health check endpoint
  * Returns application status and service health
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = defineHandler({
+  auth: {
+    requireAuth: false,
+    allowCronSecret: true,
+  },
+  onError: (error) => {
+    console.error("Health check error:", error);
+    return NextResponse.json(
+      {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        initialized: isAppInitialized(),
+      },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
+  },
+  handler: async (context) => {
     const startTime = Date.now();
-    const authResult = await authorizeRequest(request, {
-      requireAuth: false,
-      allowCronSecret: true,
-    });
     const includeDetailedStatus =
-      authResult.ok &&
-      (authResult.authenticatedBy === "cron" ||
-        authResult.session?.role === "ADMIN");
-
-    // Test database connectivity
+      context.authenticatedBy === "cron" || context.session?.role === "ADMIN";
     let dbHealth = "healthy";
     let dbResponseTime = 0;
     try {
@@ -40,10 +54,7 @@ export async function GET(request: NextRequest) {
       dbHealth = "unhealthy";
       console.error("Database health check failed:", error);
     }
-
-    // Calculate total response time
     const responseTime = Date.now() - startTime;
-
     const healthData = {
       status: dbHealth === "healthy" ? "healthy" : "unhealthy",
       timestamp: new Date().toISOString(),
@@ -57,7 +68,6 @@ export async function GET(request: NextRequest) {
         responseTime,
       },
     };
-
     const responsePayload = includeDetailedStatus
       ? {
           ...healthData,
@@ -79,10 +89,7 @@ export async function GET(request: NextRequest) {
           },
         }
       : healthData;
-
-    // Return appropriate HTTP status
     const httpStatus = healthData.status === "healthy" ? 200 : 503;
-
     return NextResponse.json(responsePayload, {
       status: httpStatus,
       headers: {
@@ -91,23 +98,5 @@ export async function GET(request: NextRequest) {
         Expires: "0",
       },
     });
-  } catch (error) {
-    console.error("Health check error:", error);
-
-    return NextResponse.json(
-      {
-        status: "unhealthy",
-        timestamp: new Date().toISOString(),
-        initialized: isAppInitialized(),
-      },
-      {
-        status: 503,
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      }
-    );
-  }
-}
+  },
+});
