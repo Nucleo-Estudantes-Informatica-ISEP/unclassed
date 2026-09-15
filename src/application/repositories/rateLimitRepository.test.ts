@@ -74,4 +74,32 @@ describe("rateLimitRepository", () => {
       expect(rateLimitRepo.isUniqueConstraintError(error)).toBe(false);
     });
   });
+
+  describe("findMany", () => {
+    it("calls prisma.rateLimitBucket.findMany", async () => {
+      const mock = [{ id: "b1", key: "k1", count: 1 }];
+      const spy = vi
+        .spyOn(prisma.rateLimitBucket, "findMany")
+        .mockResolvedValueOnce(mock as never);
+
+      const res = await rateLimitRepo.findMany();
+      expect(spy).toHaveBeenCalledWith({});
+      expect(res).toBe(mock);
+      spy.mockRestore();
+    });
+  });
+
+  describe("findUnique", () => {
+    it("calls prisma.rateLimitBucket.findUnique", async () => {
+      const mock = { id: "b1", key: "k1", count: 1 };
+      const spy = vi
+        .spyOn(prisma.rateLimitBucket, "findUnique")
+        .mockResolvedValueOnce(mock as never);
+
+      const res = await rateLimitRepo.findUnique({ where: { key: "k1" } });
+      expect(spy).toHaveBeenCalledWith({ where: { key: "k1" } });
+      expect(res).toBe(mock);
+      spy.mockRestore();
+    });
+  });
 });

@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "node tests/run-integration.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",

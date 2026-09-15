@@ -19,3 +19,7 @@ export async function update(args: Parameters<typeof prisma.graphPartition.updat
 export async function updateMany(args: Parameters<typeof prisma.graphPartition.updateMany>[0]) {
   return prisma.graphPartition.updateMany(args);
 }
+
+export async function deleteMany(args: Parameters<typeof prisma.graphPartition.deleteMany>[0] = {}) {
+  return prisma.graphPartition.deleteMany(args);
+}

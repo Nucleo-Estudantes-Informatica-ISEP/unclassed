@@ -55,7 +55,9 @@ Node.js `>=20.9.0` required. Prefer `pnpm`; `package-lock.json` is legacy and `p
 pnpm dev        # Next.js development server
 pnpm lint       # ESLint
 pnpm typecheck  # tsc --noEmit
-pnpm test       # Vitest over every **/*.{test,spec}.ts file
+pnpm test       # Vitest unit test suite (fast, database-independent)
+pnpm test:unit  # alias for unit test suite
+pnpm test:integration # Vitest integration tests against MongoDB replica set
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
 pnpm sync       # compatibility alias for schema:deploy
@@ -173,7 +175,7 @@ Before finishing a change:
 6. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
 7. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
-`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. Colocate a test next to the file it covers; import `test` from `vitest`, and use either Vitest expectations or `node:assert`. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
+`pnpm test` (or `pnpm test:unit`) runs Vitest over unit test files (`*.test.ts`/`*.spec.ts`, excluding `*.integration.test.ts`) fast and without database dependencies. `pnpm test:integration` runs integration tests (`tests/integration/**/*.integration.test.ts`) against a MongoDB replica set (`DATABASE_URL` must point to an isolated database with "test" or "integration" in its name). Direct `prisma` access is confined to `src/application/repositories/`; tests and test helpers use repository abstractions. Colocate a unit test next to the file it covers; import `test` from `vitest`, and use either Vitest expectations or `node:assert`. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
 
 ## Gotchas
 
