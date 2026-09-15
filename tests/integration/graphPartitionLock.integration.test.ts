@@ -1,42 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import { assertSafeTestDatabaseUrl, clearTestDatabase } from "@tests/helpers/db";
+import { lockPartition, unlockPartition } from "@/services/partitionLock";
 
 describe("GraphPartition distributed locking semantics in MongoDB", () => {
-  const STALE_LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
-  async function tryAcquirePartitionLock(partitionId: string, processId: string): Promise<boolean> {
-    const staleBefore = new Date(Date.now() - STALE_LOCK_TIMEOUT_MS);
-    const res = await graphPartitionRepo.updateMany({
-      where: {
-        id: partitionId,
-        OR: [
-          { isLocked: false },
-          {
-            isLocked: true,
-            lockedAt: { lt: staleBefore },
-          },
-        ],
-      },
-      data: {
-        isLocked: true,
-        lockedAt: new Date(),
-        lockedBy: processId,
-      },
-    });
-    return res.count === 1;
-  }
-
-  async function releasePartitionLock(partitionId: string, processId: string): Promise<void> {
-    await graphPartitionRepo.updateMany({
-      where: { id: partitionId, lockedBy: processId },
-      data: {
-        isLocked: false,
-        lockedAt: null,
-        lockedBy: null,
-      },
-    });
-  }
 
   beforeEach(async () => {
     assertSafeTestDatabaseUrl();
@@ -58,11 +25,11 @@ describe("GraphPartition distributed locking semantics in MongoDB", () => {
     });
 
     // Worker 1 acquires lock
-    const worker1Acquired = await tryAcquirePartitionLock(partition.id, "worker-1");
+    const worker1Acquired = await lockPartition(partition.id, "worker-1");
     expect(worker1Acquired).toBe(true);
 
     // Worker 2 attempts to acquire the same partition lock simultaneously
-    const worker2Acquired = await tryAcquirePartitionLock(partition.id, "worker-2");
+    const worker2Acquired = await lockPartition(partition.id, "worker-2");
     expect(worker2Acquired).toBe(false);
 
     // Verify MongoDB state
@@ -71,10 +38,10 @@ describe("GraphPartition distributed locking semantics in MongoDB", () => {
     expect(lockedDoc?.lockedBy).toBe("worker-1");
 
     // Worker 1 releases lock
-    await releasePartitionLock(partition.id, "worker-1");
+    await unlockPartition(partition.id, "worker-1");
 
     // Worker 2 now succeeds
-    const worker2Retry = await tryAcquirePartitionLock(partition.id, "worker-2");
+    const worker2Retry = await lockPartition(partition.id, "worker-2");
     expect(worker2Retry).toBe(true);
 
     const docAfterRetry = await graphPartitionRepo.findUnique({ where: { id: partition.id } });
@@ -96,7 +63,7 @@ describe("GraphPartition distributed locking semantics in MongoDB", () => {
     });
 
     // Healthy worker attempts acquisition
-    const acquired = await tryAcquirePartitionLock(partition.id, "healthy-worker");
+    const acquired = await lockPartition(partition.id, "healthy-worker");
     expect(acquired).toBe(true);
 
     const doc = await graphPartitionRepo.findUnique({ where: { id: partition.id } });

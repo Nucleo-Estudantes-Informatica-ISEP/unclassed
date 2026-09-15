@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import { processMatchAction } from "@/application/services/matchActionService";
 import {
   assertSafeTestDatabaseUrl,
   clearTestDatabase,
@@ -50,52 +52,13 @@ describe("Match actions, optimistic concurrency, and request reactivation in Mon
     });
 
     // 1. Participant 1 accepts
-    const participantsStep1 = [
-      {
-        userId: user1.id,
-        fromClass: classA.id,
-        toClass: classB.id,
-        status: "accepted",
-        acceptedAt: new Date(),
-      },
-      {
-        userId: user2.id,
-        fromClass: classB.id,
-        toClass: classA.id,
-        status: "pending",
-      },
-    ];
-
-    await matchRepo.update({
-      where: { id: match.id },
-      data: {
-        participants: participantsStep1,
-        status: "PROPOSED", // Only 1 accepted, remains PROPOSED
-      },
-    });
+    await processMatchAction(match.id, user1.id, "accept");
 
     const step1Doc = await matchRepo.findUnique({ where: { id: match.id } });
     expect(step1Doc?.status).toBe("PROPOSED");
 
     // 2. Participant 2 accepts -> all accepted, moves to ACCEPTED
-    const participantsStep2 = [
-      participantsStep1[0],
-      {
-        userId: user2.id,
-        fromClass: classB.id,
-        toClass: classA.id,
-        status: "accepted",
-        acceptedAt: new Date(),
-      },
-    ];
-
-    await matchRepo.update({
-      where: { id: match.id },
-      data: {
-        participants: participantsStep2,
-        status: "ACCEPTED",
-      },
-    });
+    await processMatchAction(match.id, user2.id, "accept");
 
     const step2Doc = await matchRepo.findUnique({ where: { id: match.id } });
     expect(step2Doc?.status).toBe("ACCEPTED");
@@ -144,6 +107,14 @@ describe("Match actions, optimistic concurrency, and request reactivation in Mon
       },
     });
 
+    await graphPartitionRepo.create({
+      data: {
+        partitionKey: `subject-${subject.id}`,
+        ticketType: "SPECIFIC_CLASS",
+        activeRequests: 2,
+      },
+    });
+
     // Link requests to match
     await singleSwapRepo.updateMany({
       where: { id: { in: [req1.id, req2.id] } },
@@ -151,20 +122,7 @@ describe("Match actions, optimistic concurrency, and request reactivation in Mon
     });
 
     // User 1 rejects match
-    await matchRepo.update({
-      where: { id: match.id },
-      data: { status: "REJECTED" },
-    });
-
-    // Reactivate participant requests
-    await singleSwapRepo.updateMany({
-      where: { id: { in: match.singleSwapRequestIds } },
-      data: {
-        status: "ACTIVE",
-        provisionalMatchId: null,
-        provisionalUntil: null,
-      },
-    });
+    await processMatchAction(match.id, user1.id, "reject");
 
     const refreshedReq1 = await singleSwapRepo.findById(req1.id);
     const refreshedReq2 = await singleSwapRepo.findById(req2.id);
