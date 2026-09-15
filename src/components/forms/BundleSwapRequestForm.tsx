@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { Form } from "@/lib/components/ui/form";
 import { useClasses } from "@/hooks/useApi";
 import { useSwapRequestWizardForm } from "@/hooks/useSwapRequestWizardForm";
+import { MatchCompletionNotice } from "@/components/forms/MatchCompletionNotice";
 import {
   CurrentClassField,
   PreferredClassesField,
@@ -143,6 +144,8 @@ export default function BundleSwapRequestForm({
               loading={classesLoading}
               error={classesError}
             />
+
+            <MatchCompletionNotice />
 
             <WizardNavigation
               onBack={onBack}
