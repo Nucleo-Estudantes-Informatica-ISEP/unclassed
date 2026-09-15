@@ -531,38 +531,33 @@ GitHub CI runs separate parallel gates for lint/typecheck/unit tests/build and a
 
 ### Running Integration Tests Locally with Docker
 
-Integration tests require a real MongoDB replica set because transactions (`prisma.$transaction`) and partial unique indexes cannot be exercised with in-memory mocks.
+Integration tests run against an ephemeral MongoDB 7 replica set to validate transactions (`prisma.$transaction`), partial unique constraints, and atomic operations.
 
-Follow these steps to run them locally:
+Thanks to the cross-platform integration runner (`tests/run-integration.mjs`), you can execute the entire workflow in a **single command** on Windows, macOS, and Linux:
 
-1. **Ensure the Docker service is running**:
-   ```bash
-   sudo systemctl start docker
-   ```
-   *(If you encounter permission errors accessing `/var/run/docker.sock`, ensure your user belongs to the `docker` group via `sudo usermod -aG docker $USER` and log back in, or run with appropriate docker privileges).*
+```bash
+pnpm test:integration
+```
 
-2. **Start the ephemeral MongoDB replica set container**:
-   ```bash
-   ./tests/infra/mongo-replica-set.sh start
-   ```
-   This launches a `mongo:7` container named `mongo-integration` configured with `--replSet rs0` and waits until the replica set primary is elected and ready.
+This single command automatically:
+1. Verifies Docker is running (and provides a friendly notice if it isn't).
+2. Starts the ephemeral MongoDB replica set container (`mongo-integration`) on port 27017 and initiates `rs0`.
+3. Runs `pnpm schema:deploy` to apply the Prisma schema and versioned MongoDB indexes to `unclassed_integration`.
+4. Executes the Vitest integration suite.
+5. Stops and tears down the container automatically upon completion.
 
-3. **Deploy schema and indexes to the disposable test database**:
-   ```bash
-   DATABASE_URL="mongodb://127.0.0.1:27017/unclassed_integration?replicaSet=rs0&directConnection=true" pnpm schema:deploy
-   ```
+#### Useful Flags & Options:
+- **Keep container running between test runs** (for fast iteration):
+  ```bash
+  pnpm test:integration --keep-alive
+  ```
+- **Skip schema deployment** (when already deployed and container is kept alive):
+  ```bash
+  pnpm test:integration --skip-deploy
+  ```
 
-4. **Run the integration test suite**:
-   ```bash
-   DATABASE_URL="mongodb://127.0.0.1:27017/unclassed_integration?replicaSet=rs0&directConnection=true" pnpm test:integration
-   ```
-
-5. **Stop and cleanup the test container**:
-   ```bash
-   ./tests/infra/mongo-replica-set.sh stop
-   ```
-
-> **Safety Gate**: The test suite strictly validates that `DATABASE_URL` specifies a database name containing `test` or `integration` (such as `unclassed_integration`). Tests will immediately abort if pointed at an unverified or production database.
+> **Prerequisite**: Ensure the Docker service is running (`sudo systemctl start docker` on Linux, or Docker Desktop on Windows/macOS).
+> **Safety Gate**: The test suite strictly validates that `DATABASE_URL` specifies a database name containing `test` or `integration`. Tests will immediately abort if pointed at an unverified or production database.
 
 ## Troubleshooting
 
