@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import { assertSafeTestDatabaseUrl, clearTestDatabase } from "@tests/helpers/db";
-import { lockPartition, unlockPartition } from "@/services/partitionLock";
+import {
+  lockPartition,
+  unlockPartition,
+  PARTITION_LOCK_STALE_MS,
+} from "@/services/partitionLock";
 
 describe("GraphPartition distributed locking semantics in MongoDB", () => {
 
@@ -49,7 +53,7 @@ describe("GraphPartition distributed locking semantics in MongoDB", () => {
     expect(docAfterRetry?.lockedBy).toBe("worker-2");
   });
 
-  it("automatically reclaims stale partition locks if a worker died without releasing", async () => {
+  it("automatically reclaims stale partition locks based on production PARTITION_LOCK_STALE_MS timeout", async () => {
     const partition = await graphPartitionRepo.create({
       data: {
         partitionKey: "subject-test-lock-stale",
@@ -57,12 +61,22 @@ describe("GraphPartition distributed locking semantics in MongoDB", () => {
         activeRequests: 2,
         isLocked: true,
         lockedBy: "dead-worker",
-        // Locked 10 minutes ago (exceeding the 5 min timeout)
-        lockedAt: new Date(Date.now() - 10 * 60 * 1000),
+        // Still within the 2-minute stale window (1 minute ago)
+        lockedAt: new Date(Date.now() - (PARTITION_LOCK_STALE_MS - 60 * 1000)),
       },
     });
 
-    // Healthy worker attempts acquisition
+    // Worker attempts acquisition while lock is still considered active (< 2 min)
+    const tooEarlyAcquisition = await lockPartition(partition.id, "healthy-worker");
+    expect(tooEarlyAcquisition).toBe(false);
+
+    // Backdate lock to exceed PARTITION_LOCK_STALE_MS (2 minutes)
+    await graphPartitionRepo.updateMany({
+      where: { id: partition.id },
+      data: { lockedAt: new Date(Date.now() - (PARTITION_LOCK_STALE_MS + 1000)) },
+    });
+
+    // Healthy worker attempts acquisition after stale threshold
     const acquired = await lockPartition(partition.id, "healthy-worker");
     expect(acquired).toBe(true);
 

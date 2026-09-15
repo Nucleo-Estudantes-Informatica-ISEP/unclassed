@@ -62,6 +62,12 @@ describe("Cron execution history and state transitions in MongoDB", () => {
 
     const r1 = await store.create(job);
     const r2 = await store.create(job);
+    if (!r1 || !r2) throw new Error("Expected records to be created");
+
+    // Explicitly separate timestamps to ensure deterministic ordering without timing dependency
+    const now = new Date();
+    await store.update(r1.id, { startedAt: new Date(now.getTime() - 60_000) });
+    await store.update(r2.id, { startedAt: now });
 
     const history = await store.history(10);
     expect(history.length).toBe(2);

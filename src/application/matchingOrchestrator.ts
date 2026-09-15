@@ -141,8 +141,8 @@ interface UserRecord {
   emailNotifications?: boolean | null;
 }
 
-const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
-const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
+export const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
+export const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface ClassRecord {
   id: string;
@@ -1121,7 +1121,7 @@ export class MatchingOrchestrator {
     }
   }
 
-  private async reserveMatchNotificationDelivery(
+  async reserveMatchNotificationDelivery(
     matchId: string,
     userId: string,
     email: string
