@@ -89,4 +89,33 @@ describe("subjectRepository", () => {
 
     spy.mockRestore();
   });
+
+  it("create calls prisma.subject.create", async () => {
+    const mock = { id: "s1", code: "ALGAN", name: "Algebra", year: 1, semester: 1 };
+    const spy = vi
+      .spyOn(prisma.subject, "create")
+      .mockResolvedValueOnce(mock as never);
+
+    const args = { data: { code: "ALGAN", name: "Algebra", year: 1, semester: 1 } };
+    const res = await import("@/application/repositories/subjectRepository").then((m) => m.create(args));
+
+    expect(spy).toHaveBeenCalledWith(args);
+    expect(res).toBe(mock);
+
+    spy.mockRestore();
+  });
+
+  it("deleteMany calls prisma.subject.deleteMany", async () => {
+    const mock = { count: 1 };
+    const spy = vi
+      .spyOn(prisma.subject, "deleteMany")
+      .mockResolvedValueOnce(mock as never);
+
+    const res = await import("@/application/repositories/subjectRepository").then((m) => m.deleteMany());
+
+    expect(spy).toHaveBeenCalledWith({});
+    expect(res).toBe(mock);
+
+    spy.mockRestore();
+  });
 });

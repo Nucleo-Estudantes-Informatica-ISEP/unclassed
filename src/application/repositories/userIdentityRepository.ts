@@ -8,3 +8,8 @@ export async function findUnique(args: Parameters<typeof prisma.userIdentity.fin
 export async function create(args: Parameters<typeof prisma.userIdentity.create>[0], tx?: Prisma.TransactionClient) {
   return (tx || prisma).userIdentity.create(args);
 }
+
+export async function deleteMany(args: Parameters<typeof prisma.userIdentity.deleteMany>[0] = {}, tx?: Prisma.TransactionClient) {
+  return (tx || prisma).userIdentity.deleteMany(args);
+}
+

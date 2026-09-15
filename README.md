@@ -520,13 +520,49 @@ Before merging changes, run:
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test            # or pnpm test:unit (fast, database-independent unit tests)
+pnpm test:integration # runs integration tests against MongoDB replica set
 pnpm build
 ```
 
-`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
+`pnpm test` (and `pnpm test:unit`) runs Vitest over unit test files (`*.test.ts`/`*.spec.ts`, excluding `*.integration.test.ts`). `pnpm test:integration` runs integration tests against a real MongoDB replica set, verifying transactions, unique active request indexes, distributed locks, notification reservations, and rate limiting.
 
-GitHub CI uses a frozen install and requires lint, typecheck, all tests, Prisma/schema validation, the production build, a non-root Docker image build, and Gitleaks before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+GitHub CI runs separate parallel gates for lint/typecheck/unit tests/build and a dedicated ephemeral MongoDB replica set integration test job before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+
+### Running Integration Tests Locally with Docker
+
+Integration tests require a real MongoDB replica set because transactions (`prisma.$transaction`) and partial unique indexes cannot be exercised with in-memory mocks.
+
+Follow these steps to run them locally:
+
+1. **Ensure the Docker service is running**:
+   ```bash
+   sudo systemctl start docker
+   ```
+   *(If you encounter permission errors accessing `/var/run/docker.sock`, ensure your user belongs to the `docker` group via `sudo usermod -aG docker $USER` and log back in, or run with appropriate docker privileges).*
+
+2. **Start the ephemeral MongoDB replica set container**:
+   ```bash
+   ./tests/infra/mongo-replica-set.sh start
+   ```
+   This launches a `mongo:7` container named `mongo-integration` configured with `--replSet rs0` and waits until the replica set primary is elected and ready.
+
+3. **Deploy schema and indexes to the disposable test database**:
+   ```bash
+   DATABASE_URL="mongodb://127.0.0.1:27017/unclassed_integration?replicaSet=rs0&directConnection=true" pnpm schema:deploy
+   ```
+
+4. **Run the integration test suite**:
+   ```bash
+   DATABASE_URL="mongodb://127.0.0.1:27017/unclassed_integration?replicaSet=rs0&directConnection=true" pnpm test:integration
+   ```
+
+5. **Stop and cleanup the test container**:
+   ```bash
+   ./tests/infra/mongo-replica-set.sh stop
+   ```
+
+> **Safety Gate**: The test suite strictly validates that `DATABASE_URL` specifies a database name containing `test` or `integration` (such as `unclassed_integration`). Tests will immediately abort if pointed at an unverified or production database.
 
 ## Troubleshooting
 
