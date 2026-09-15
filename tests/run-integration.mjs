@@ -1,26 +1,56 @@
 #!/usr/bin/env node
+/**
+ * Cross-platform integration test runner for Unclassed.
+ *
+ * This script automates the complete lifecycle required for MongoDB integration tests:
+ * 1. Verifies Docker daemon availability with platform-specific guidance (Windows, Linux, macOS).
+ * 2. Starts an ephemeral MongoDB 7 replica set container (`mongo-integration`) on port 27017.
+ * 3. Polls until MongoDB is responsive, initiates `rs0`, and waits for primary election.
+ * 4. Deploys the Prisma schema and versioned partial unique indexes to `unclassed_integration`.
+ * 5. Executes the Vitest integration test suite (`vitest.integration.config.mts`).
+ * 6. Guarantees container teardown and environment cleanup upon completion or interruption.
+ *
+ * Usage:
+ *   pnpm test:integration                # Run full automated lifecycle (start -> test -> cleanup)
+ *   pnpm test:integration --keep-alive   # Keep the MongoDB container running for fast local re-runs
+ *   pnpm test:integration --skip-deploy  # Skip schema deploy (useful when container was kept alive)
+ */
+
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 
+// Configuration constants
 const DEFAULT_PORT = process.env.MONGO_PORT || "27017";
 const DEFAULT_DATABASE_URL = `mongodb://127.0.0.1:${DEFAULT_PORT}/unclassed_integration?replicaSet=rs0&directConnection=true`;
 const CONTAINER_NAME = "mongo-integration";
 const IMAGE = process.env.MONGO_IMAGE || "mongo:7";
 
+// Command line arguments
 const args = process.argv.slice(2);
 const keepAlive = args.includes("--keep-alive") || args.includes("-k");
 const skipDeploy = args.includes("--skip-deploy");
 
+// Tracks whether this execution started the container
 let startedContainer = false;
 
+/**
+ * Log formatted info message with cyan tag.
+ */
 function log(message) {
   console.log(`\x1b[36m[integration-test]\x1b[0m ${message}`);
 }
 
+/**
+ * Log formatted error message with red tag.
+ */
 function logError(message) {
   console.error(`\x1b[31m[integration-test error]\x1b[0m ${message}`);
 }
 
+/**
+ * Executes a command synchronously with inherited stdio (output streamed to console).
+ * Automatically handles shell execution on Windows (e.g. for pnpm.cmd).
+ */
 function runCommand(command, cmdArgs, options = {}) {
   return spawnSync(command, cmdArgs, {
     stdio: "inherit",
@@ -29,6 +59,9 @@ function runCommand(command, cmdArgs, options = {}) {
   });
 }
 
+/**
+ * Executes a command silently and captures its stdout/stderr for inspection.
+ */
 function runSilent(command, cmdArgs) {
   return spawnSync(command, cmdArgs, {
     stdio: ["ignore", "pipe", "pipe"],
@@ -37,6 +70,10 @@ function runSilent(command, cmdArgs) {
   });
 }
 
+/**
+ * Verifies that the Docker daemon is accessible.
+ * If not, prints helpful platform-specific troubleshooting instructions and exits.
+ */
 function checkDockerAvailable() {
   const result = runSilent("docker", ["info"]);
   if (result.status !== 0) {
@@ -46,12 +83,17 @@ function checkDockerAvailable() {
     } else if (process.platform === "darwin") {
       logError("Please start Docker Desktop on macOS before running integration tests.");
     } else {
-      logError("Please start the Docker service (e.g. 'sudo systemctl start docker') and ensure your user has docker permissions.");
+      logError(
+        "Please start the Docker service (e.g. 'sudo systemctl start docker') and ensure your user has docker permissions."
+      );
     }
     process.exit(1);
   }
 }
 
+/**
+ * Checks if the ephemeral test container is currently running.
+ */
 function isContainerRunning() {
   const result = runSilent("docker", [
     "ps",
@@ -63,6 +105,9 @@ function isContainerRunning() {
   return result.stdout.trim() === CONTAINER_NAME;
 }
 
+/**
+ * Checks if a container with the test name exists (even if stopped).
+ */
 function isContainerExisting() {
   const result = runSilent("docker", [
     "ps",
@@ -75,21 +120,30 @@ function isContainerExisting() {
   return result.stdout.trim() === CONTAINER_NAME;
 }
 
+/**
+ * Pure JavaScript async delay utility (cross-platform, non-blocking).
+ */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Starts the ephemeral MongoDB 7 replica set container and waits for primary readiness.
+ */
 async function startMongoContainer() {
   checkDockerAvailable();
 
+  // If already running (e.g. from previous run with --keep-alive), reuse it
   if (isContainerRunning()) {
     log(`Container "${CONTAINER_NAME}" is already running. Reusing existing instance.`);
     return;
   }
 
+  // Remove stale stopped container if present
   if (isContainerExisting()) {
     log(`Removing stopped container "${CONTAINER_NAME}"...`);
     runSilent("docker", ["rm", "-f", CONTAINER_NAME]);
   }
 
+  // Launch fresh MongoDB container configured for replica set rs0
   log(`Starting ephemeral MongoDB replica set container (${IMAGE}) on port ${DEFAULT_PORT}...`);
   const runRes = runSilent("docker", [
     "run",
@@ -111,7 +165,7 @@ async function startMongoContainer() {
 
   startedContainer = true;
 
-  // Poll until MongoDB accepts connections
+  // Poll until MongoDB accepts connections (ping command succeeds)
   log("Waiting for MongoDB to accept connections...");
   const maxAttempts = 30;
   let ready = false;
@@ -132,12 +186,12 @@ async function startMongoContainer() {
   }
 
   if (!ready) {
-    logError("MongoDB failed to respond in time.");
+    logError("MongoDB failed to respond within 30 seconds.");
     cleanup();
     process.exit(1);
   }
 
-  // Initiate replica set
+  // Initiate replica set rs0 with local bind
   log("Initiating replica set rs0...");
   runSilent("docker", [
     "exec",
@@ -148,8 +202,8 @@ async function startMongoContainer() {
     `try { rs.status(); } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:${DEFAULT_PORT}' }] }); }`,
   ]);
 
-  // Wait for primary
-  log("Waiting for replica set primary...");
+  // Poll until primary election completes (isWritablePrimary returns true)
+  log("Waiting for replica set primary election...");
   let primary = false;
   for (let i = 0; i < maxAttempts; i++) {
     const checkPrimary = runSilent("docker", [
@@ -176,14 +230,19 @@ async function startMongoContainer() {
   log("MongoDB replica set rs0 is ready!");
 }
 
+/**
+ * Cleans up the ephemeral test container unless explicitly instructed to --keep-alive.
+ * Ensures no leftover containers, volumes, or open ports remain after test execution.
+ */
 function cleanup() {
   if (startedContainer && !keepAlive) {
     log(`Stopping and removing ephemeral container "${CONTAINER_NAME}"...`);
     runSilent("docker", ["rm", "-f", CONTAINER_NAME]);
+    log("Environment cleaned up successfully.");
   }
 }
 
-// Ensure cleanup on signals
+// Guarantee cleanup when interrupted via Ctrl+C (SIGINT) or kill (SIGTERM)
 process.on("SIGINT", () => {
   cleanup();
   process.exit(130);
@@ -194,6 +253,9 @@ process.on("SIGTERM", () => {
   process.exit(143);
 });
 
+/**
+ * Main orchestration function.
+ */
 async function main() {
   const databaseUrl = process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
   const env = {
@@ -201,22 +263,27 @@ async function main() {
     DATABASE_URL: databaseUrl,
   };
 
+  let exitCode = 0;
+
   try {
-    // If DATABASE_URL is not set externally, handle the container automatically
+    // Step 1: Manage ephemeral container if not using a custom external database
     if (!process.env.DATABASE_URL || process.env.DATABASE_URL === DEFAULT_DATABASE_URL) {
       await startMongoContainer();
     }
 
+    // Step 2: Deploy schema and versioned MongoDB partial unique indexes
     if (!skipDeploy) {
       log("Deploying Prisma schema and versioned indexes to test database...");
       const pnpmCmd = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
       const deployRes = runCommand(pnpmCmd, ["schema:deploy"], { env });
       if (deployRes.status !== 0) {
         logError("Schema deploy failed.");
-        process.exit(deployRes.status ?? 1);
+        exitCode = deployRes.status ?? 1;
+        return;
       }
     }
 
+    // Step 3: Run Vitest integration test suite
     log("Running integration test suite...");
     const pnpmCmd = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
     const testRes = runCommand(
@@ -225,12 +292,14 @@ async function main() {
       { env }
     );
 
-    cleanup();
-    process.exit(testRes.status ?? 0);
+    exitCode = testRes.status ?? 0;
   } catch (error) {
-    logError(`Unexpected failure: ${error}`);
+    logError(`Unexpected failure during integration test run: ${error}`);
+    exitCode = 1;
+  } finally {
+    // Step 4: Guarantee environment teardown in all scenarios (pass, fail, or crash)
     cleanup();
-    process.exit(1);
+    process.exit(exitCode);
   }
 }
 
