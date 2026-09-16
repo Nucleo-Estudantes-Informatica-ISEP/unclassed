@@ -5,7 +5,21 @@ import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapReq
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import * as userRepo from "@/application/repositories/userRepository";
 import { emailService } from "@/services/emailService";
-import { assertMatchActionAllowed, MatchActionError, MatchAction } from "@/services/matchActionRules";
+import {
+  assertMatchActionAllowed,
+  MatchActionError,
+  MatchActionNotFoundError,
+  MatchActionForbiddenError,
+  MatchActionConflictError,
+  MatchAction,
+} from "@/services/matchActionRules";
+
+export {
+  MatchActionError,
+  MatchActionNotFoundError,
+  MatchActionForbiddenError,
+  MatchActionConflictError,
+};
 
 export interface MatchParticipant {
   userId: string;
@@ -48,14 +62,14 @@ export async function processMatchAction(matchId: string, userId: string, action
   })) as MatchRecord | null;
 
   if (!match) {
-    throw new MatchActionError('Match não encontrado');
+    throw new MatchActionNotFoundError('Match não encontrado');
   }
 
   const participants = coerceParticipants(match.participants);
   const userParticipation = participants.find((p) => p.userId === userId);
 
   if (!userParticipation) {
-    throw new MatchActionError('Acesso negado');
+    throw new MatchActionForbiddenError('Acesso negado');
   }
 
   assertMatchActionAllowed(
@@ -187,7 +201,7 @@ async function handleMatchRevoke(match: MatchRecord, userId: string) {
   const now = new Date();
 
   if (!provisionalUntil || now > provisionalUntil) {
-    throw new MatchActionError('O período de revogação expirou');
+    throw new MatchActionConflictError('O período de revogação expirou');
   }
 
   console.log(`User ${userId} revoked match ${match.id} - reactivating requests`);
@@ -220,7 +234,7 @@ async function updateMatchAtomically(
   });
 
   if (result.count !== 1) {
-    throw new MatchActionError(
+    throw new MatchActionConflictError(
       "O match foi atualizado por outro participante. Atualiza a página e tenta novamente."
     );
   }

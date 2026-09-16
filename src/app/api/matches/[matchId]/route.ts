@@ -11,7 +11,12 @@ import { z } from 'zod';
 
 import { authorizeRequest } from '@/lib/apiAccess';
 import * as matchRepo from "@/application/repositories/matchRepository";
-import { matchActions, MatchActionError } from '@/services/matchActionRules';
+import {
+  matchActions,
+  MatchActionError,
+  MatchActionNotFoundError,
+  MatchActionForbiddenError,
+} from '@/services/matchActionRules';
 import { processMatchAction, coerceParticipants, MatchRecord } from '@/application/services/matchActionService';
 
 const matchActionSchema = z.object({ action: z.enum(matchActions) });
@@ -96,8 +101,14 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
     }
+    if (error instanceof MatchActionNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    if (error instanceof MatchActionForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     if (error instanceof MatchActionError) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
+      return NextResponse.json({ error: error.message }, { status: error.status ?? 409 });
     }
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

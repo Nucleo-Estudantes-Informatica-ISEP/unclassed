@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
-import { processMatchAction } from "@/application/services/matchActionService";
+import {
+  processMatchAction,
+  MatchActionNotFoundError,
+  MatchActionForbiddenError,
+} from "@/application/services/matchActionService";
 import {
   assertSafeTestDatabaseUrl,
   clearTestDatabase,
@@ -167,5 +171,32 @@ describe("Match actions, optimistic concurrency, and request reactivation in Mon
     // Verify status remained ACCEPTED
     const finalDoc = await matchRepo.findUnique({ where: { id: match.id } });
     expect(finalDoc?.status).toBe("ACCEPTED");
+  });
+
+  it("throws MatchActionNotFoundError when match does not exist in the database", async () => {
+    const user = await createTestUser();
+    await expect(
+      processMatchAction("000000000000000000000000", user.id, "accept")
+    ).rejects.toThrow(MatchActionNotFoundError);
+  });
+
+  it("throws MatchActionForbiddenError when user is not a participant in the match", async () => {
+    const participant = await createTestUser();
+    const intruder = await createTestUser();
+    const subject = await createTestSubject();
+
+    const match = await matchRepo.create({
+      data: {
+        matchType: "SINGLE",
+        swapPattern: "DIRECT",
+        status: "PROPOSED",
+        graphPartition: `subject-${subject.id}`,
+        participants: [{ userId: participant.id, status: "pending" }],
+      },
+    });
+
+    await expect(
+      processMatchAction(match.id, intruder.id, "accept")
+    ).rejects.toThrow(MatchActionForbiddenError);
   });
 });
