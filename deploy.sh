@@ -16,43 +16,43 @@ NC='\033[0m' # No Color
 # Default configuration
 DEFAULT_INSTANCES=3
 
-echo -e "${BLUE}🚀 Unclassed Docker Deployment${NC}"
+echo -e "${BLUE}Unclassed Docker Deployment${NC}"
 echo "==============================================="
 
 # Check if .env exists
 if [ ! -f .env ]; then
-    echo -e "${YELLOW}⚠️  .env file not found. Creating from template...${NC}"
+    echo -e "${YELLOW}.env file not found. Creating from template...${NC}"
     if [ -f .env.example ]; then
         cp .env.example .env
-        echo -e "${RED}📝 Please edit .env file with your configuration before continuing!${NC}"
+        echo -e "${RED}Please edit .env file with your configuration before continuing!${NC}"
         exit 1
     else
-        echo -e "${RED}❌ No .env template found. Please create .env file manually.${NC}"
+        echo -e "${RED}No .env template found. Please create .env file manually.${NC}"
         exit 1
     fi
 fi
 
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}❌ Docker is not running. Please start Docker first.${NC}"
+    echo -e "${RED}Docker is not running. Please start Docker first.${NC}"
     exit 1
 fi
 
 # Check if Docker Compose is available
 if ! command -v docker-compose > /dev/null 2>&1; then
-    echo -e "${RED}❌ docker-compose not found. Please install Docker Compose.${NC}"
+    echo -e "${RED}docker-compose not found. Please install Docker Compose.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Docker environment ready${NC}"
+echo -e "${GREEN}Docker environment ready${NC}"
 
 # Function to deploy with specific number of instances
 deploy_with_instances() {
     local count=$1
-    echo -e "${BLUE}📦 Building application image...${NC}"
+    echo -e "${BLUE}Building application image...${NC}"
     docker-compose build
 
-    echo -e "${BLUE}🔄 Scaling to ${count} instances...${NC}"
+    echo -e "${BLUE}Scaling to ${count} instances...${NC}"
     
     # Generate dynamic compose file for scaling
     cat > docker-compose.override.yml << EOF
@@ -102,7 +102,7 @@ EOF
     done
 
     # Update nginx config for dynamic instances
-    echo -e "${BLUE}🌐 Updating nginx configuration for ${count} instances...${NC}"
+    echo -e "${BLUE}Updating nginx configuration for ${count} instances...${NC}"
     
     # Generate nginx upstream config
     cat > nginx.conf << 'EOF'
@@ -206,23 +206,23 @@ EOF
 }
 EOF
 
-    echo -e "${BLUE}🚀 Starting deployment...${NC}"
+    echo -e "${BLUE}Starting deployment...${NC}"
     docker-compose up -d
 
-    echo -e "${GREEN}✅ Deployment completed!${NC}"
+    echo -e "${GREEN}Deployment completed!${NC}"
     echo "==============================================="
-    echo "🌐 Application: http://localhost:8080"
-    echo -e "📊 Instances: ${GREEN}${count}${NC}"
-    echo -e "🔧 Management: ${BLUE}docker-compose logs -f${NC}"
+    echo "Application: http://localhost:8080"
+    echo -e "Instances: ${GREEN}${count}${NC}"
+    echo -e "Management: ${BLUE}docker-compose logs -f${NC}"
 }
 
 # Function to show status
 show_status() {
-    echo -e "${BLUE}📊 Current Status${NC}"
+    echo -e "${BLUE}Current Status${NC}"
     echo "==============================================="
     docker-compose ps
     echo ""
-    echo -e "${BLUE}📈 Resource Usage${NC}"
+    echo -e "${BLUE}Resource Usage${NC}"
     docker stats --no-stream
 }
 
@@ -234,7 +234,7 @@ show_logs() {
 # Function to scale instances
 scale_instances() {
     local new_count=$1
-    echo -e "${YELLOW}🔄 Scaling to ${new_count} instances...${NC}"
+    echo -e "${YELLOW}Scaling to ${new_count} instances...${NC}"
     deploy_with_instances $new_count
 }
 
@@ -246,7 +246,7 @@ case "${1:-deploy}" in
         ;;
     "scale")
         if [ -z "$2" ]; then
-            echo -e "${RED}❌ Please specify number of instances: ./deploy.sh scale 5${NC}"
+            echo -e "${RED}Please specify number of instances: ./deploy.sh scale 5${NC}"
             exit 1
         fi
         scale_instances $2
@@ -258,19 +258,19 @@ case "${1:-deploy}" in
         show_logs
         ;;
     "stop")
-        echo -e "${YELLOW}🛑 Stopping all services...${NC}"
+        echo -e "${YELLOW}Stopping all services...${NC}"
         docker-compose down
         ;;
     "restart")
-        echo -e "${BLUE}🔄 Restarting all services...${NC}"
+        echo -e "${BLUE}Restarting all services...${NC}"
         docker-compose restart
         ;;
     "clean")
-        echo -e "${RED}🧹 Cleaning up containers and images...${NC}"
+        echo -e "${RED}Cleaning up containers and images...${NC}"
         docker-compose down -v --rmi all
         ;;
     *)
-        echo -e "${BLUE}🚀 Unclassed Deployment Script${NC}"
+        echo -e "${BLUE}Unclassed Deployment Script${NC}"
         echo "Usage: $0 [command] [options]"
         echo ""
         echo "Commands:"

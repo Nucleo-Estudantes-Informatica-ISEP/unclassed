@@ -37,4 +37,12 @@ export async function findManyByIds(ids: string[]) {
   if (!ids || ids.length === 0) return [];
   return prisma.subject.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
 }
+export async function create(args: Parameters<typeof prisma.subject.create>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).subject.create(args);
+}
+
+export async function deleteMany(args: Parameters<typeof prisma.subject.deleteMany>[0] = {}, tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).subject.deleteMany(args);
+}
+
 export type { Subject } from "@prisma/client";

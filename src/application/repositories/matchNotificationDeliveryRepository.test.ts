@@ -46,4 +46,16 @@ describe("matchNotificationDeliveryRepository", () => {
       expect(result).toEqual(mockResult);
     });
   });
+
+  describe("deleteMany", () => {
+    it("calls prisma.matchNotificationDelivery.deleteMany", async () => {
+      const mockResult = { count: 1 };
+      const spy = vi.spyOn(prisma.matchNotificationDelivery, "deleteMany").mockResolvedValue(mockResult as never);
+
+      const result = await matchNotificationDeliveryRepo.deleteMany({});
+
+      expect(spy).toHaveBeenCalledWith({});
+      expect(result).toEqual(mockResult);
+    });
+  });
 });

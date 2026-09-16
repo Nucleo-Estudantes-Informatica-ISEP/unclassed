@@ -64,4 +64,16 @@ describe("userIdentityRepository", () => {
       expect(result).toEqual(mockResult);
     });
   });
+
+  describe("deleteMany", () => {
+    it("calls prisma.userIdentity.deleteMany", async () => {
+      const mockResult = { count: 1 };
+      const spy = vi.spyOn(prisma.userIdentity, "deleteMany").mockResolvedValue(mockResult as never);
+
+      const result = await userIdentityRepo.deleteMany();
+
+      expect(spy).toHaveBeenCalledWith({});
+      expect(result).toEqual(mockResult);
+    });
+  });
 });

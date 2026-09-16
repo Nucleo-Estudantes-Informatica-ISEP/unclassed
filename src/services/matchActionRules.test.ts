@@ -4,9 +4,29 @@ import { test } from "vitest";
 import {
   assertMatchActionAllowed,
   MatchActionError,
+  MatchActionNotFoundError,
+  MatchActionForbiddenError,
+  MatchActionConflictError,
 } from "./matchActionRules";
 
 const now = new Date("2026-08-16T10:00:00.000Z");
+
+test("error classes set corresponding HTTP statuses and inheritance", () => {
+  const notFound = new MatchActionNotFoundError();
+  assert.equal(notFound.status, 404);
+  assert.equal(notFound.message, "Match não encontrado");
+  assert.ok(notFound instanceof MatchActionError);
+
+  const forbidden = new MatchActionForbiddenError();
+  assert.equal(forbidden.status, 403);
+  assert.equal(forbidden.message, "Acesso negado");
+  assert.ok(forbidden instanceof MatchActionError);
+
+  const conflict = new MatchActionConflictError("Conflito");
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.message, "Conflito");
+  assert.ok(conflict instanceof MatchActionError);
+});
 
 test("allows only participants to perform match actions", () => {
   assert.throws(
@@ -21,7 +41,7 @@ test("allows only participants to perform match actions", () => {
         "accept",
         now
       ),
-    MatchActionError
+    MatchActionForbiddenError
   );
 });
 

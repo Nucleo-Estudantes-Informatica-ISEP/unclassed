@@ -520,13 +520,44 @@ Before merging changes, run:
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test            # or pnpm test:unit (fast, database-independent unit tests)
+pnpm test:integration # runs integration tests against MongoDB replica set
 pnpm build
 ```
 
-`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
+`pnpm test` (and `pnpm test:unit`) runs Vitest over unit test files (`*.test.ts`/`*.spec.ts`, excluding `*.integration.test.ts`). `pnpm test:integration` runs integration tests against a real MongoDB replica set, verifying transactions, unique active request indexes, distributed locks, notification reservations, and rate limiting.
 
-GitHub CI uses a frozen install and requires lint, typecheck, all tests, Prisma/schema validation, the production build, a non-root Docker image build, and Gitleaks before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+GitHub CI runs separate parallel gates for lint/typecheck/unit tests/build and a dedicated ephemeral MongoDB replica set integration test job before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+
+### Running Integration Tests Locally with Docker
+
+Integration tests run against an ephemeral MongoDB 7 replica set to validate transactions (`prisma.$transaction`), partial unique constraints, and atomic operations.
+
+Thanks to the cross-platform integration runner (`tests/run-integration.mjs`), you can execute the entire workflow in a **single command** on Windows, macOS, and Linux:
+
+```bash
+pnpm test:integration
+```
+
+This single command automatically:
+1. Verifies Docker is running (and provides a friendly notice if it isn't).
+2. Starts the ephemeral MongoDB replica set container (`mongo-integration`) on port 27017 and initiates `rs0`.
+3. Runs `pnpm schema:deploy` to apply the Prisma schema and versioned MongoDB indexes to `unclassed_integration`.
+4. Executes the Vitest integration suite.
+5. Stops and tears down the container automatically upon completion.
+
+#### Useful Flags & Options:
+- **Keep container running between test runs** (for fast iteration):
+  ```bash
+  pnpm test:integration --keep-alive
+  ```
+- **Skip schema deployment** (when already deployed and container is kept alive):
+  ```bash
+  pnpm test:integration --skip-deploy
+  ```
+
+> **Prerequisite**: Ensure the Docker service is running (`sudo systemctl start docker` on Linux, or Docker Desktop on Windows/macOS).
+> **Safety Gate**: The test suite strictly validates that `DATABASE_URL` specifies a database name containing `test` or `integration`. Tests will immediately abort if pointed at an unverified or production database.
 
 ## Troubleshooting
 

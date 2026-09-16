@@ -1,6 +1,7 @@
 import * as classRepo from "@/application/repositories/classRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 import type { JsonValue } from "@/application/repositories/matchRepository";
+import { lockPartition, unlockPartition, PARTITION_LOCK_STALE_MS } from "@/services/partitionLock";
 
 import { env } from "@/lib/env";
 import * as matchRepo from "@/application/repositories/matchRepository";
@@ -140,8 +141,8 @@ interface UserRecord {
   emailNotifications?: boolean | null;
 }
 
-const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
-const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
+export const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
+export const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface ClassRecord {
   id: string;
@@ -203,7 +204,6 @@ export function assembleCycleMatch(
 export class MatchingOrchestrator {
   private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds
   private readonly DIRECT_MATCH_TIMEOUT = 5000; // 5 seconds
-  private readonly PARTITION_LOCK_STALE_MS = 2 * 60 * 1000; // 2 minutes
 
   // ===== IMMEDIATE PROCESSING (<5 seconds) =====
 
@@ -223,7 +223,7 @@ export class MatchingOrchestrator {
       console.log(`Starting immediate processing for request ${requestId}`);
 
       // Acquire partition lock for immediate processing to prevent race conditions
-      const lockAcquired = await this.lockPartition(
+      const lockAcquired = await lockPartition(
         context.partition.id,
         context.processId
       );
@@ -247,7 +247,7 @@ export class MatchingOrchestrator {
         return [];
       } finally {
         // Always unlock the partition
-        await this.unlockPartition(context.partition.id, context.processId);
+        await unlockPartition(context.partition.id, context.processId);
       }
     } catch (error) {
       console.error(`Immediate processing failed for ${requestId}:`, error);
@@ -443,7 +443,7 @@ export class MatchingOrchestrator {
 
     try {
       // Lock partition for processing (distributed lock)
-      const acquired = await this.lockPartition(partition.id, context.processId);
+      const acquired = await lockPartition(partition.id, context.processId);
       if (!acquired) {
         console.log(
           `Skipping partition ${partition.partitionKey}: lock already held by another worker`);
@@ -482,7 +482,7 @@ export class MatchingOrchestrator {
       );
     } finally {
       // Always unlock partition
-      await this.unlockPartition(partition.id, context.processId);
+      await unlockPartition(partition.id, context.processId);
     }
   }
 
@@ -787,51 +787,8 @@ export class MatchingOrchestrator {
     return timeSinceLastProcess >= intervalMs;
   }
 
-  private async lockPartition(
-    partitionId: string,
-    processId: string
-  ): Promise<boolean> {
-    // Attempt to acquire lock if free or stale
-    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
-    const res = await graphPartitionRepo.updateMany({
-      where: {
-        id: partitionId,
-        OR: [
-          { isLocked: false },
-          {
-            isLocked: true,
-            lockedAt: { lt: staleBefore },
-          },
-        ],
-      },
-      data: {
-        isLocked: true,
-        lockedAt: new Date(),
-        lockedBy: processId,
-      },
-    });
-    return res.count === 1;
-  }
-
-  private async unlockPartition(
-    partitionId: string,
-    processId?: string
-  ): Promise<void> {
-    // Release lock only if held by this process (if provided)
-    await graphPartitionRepo.updateMany({
-      where: processId
-        ? { id: partitionId, lockedBy: processId }
-        : { id: partitionId },
-      data: {
-        isLocked: false,
-        lockedAt: null,
-        lockedBy: null,
-      },
-    });
-  }
-
   private async getActivePartitions(): Promise<GraphPartition[]> {
-    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
+    const staleBefore = new Date(Date.now() - PARTITION_LOCK_STALE_MS);
     return await graphPartitionRepo.findMany({
       where: {
         activeRequests: { gt: 0 },
@@ -1164,7 +1121,7 @@ export class MatchingOrchestrator {
     }
   }
 
-  private async reserveMatchNotificationDelivery(
+  async reserveMatchNotificationDelivery(
     matchId: string,
     userId: string,
     email: string

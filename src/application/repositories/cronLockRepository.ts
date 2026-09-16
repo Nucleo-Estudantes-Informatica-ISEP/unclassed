@@ -17,6 +17,10 @@ export async function count(args: Parameters<typeof prisma.cronLock.count>[0]) {
   return prisma.cronLock.count(args);
 }
 
+export async function findUnique(args: Parameters<typeof prisma.cronLock.findUnique>[0]) {
+  return prisma.cronLock.findUnique(args);
+}
+
 export function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
