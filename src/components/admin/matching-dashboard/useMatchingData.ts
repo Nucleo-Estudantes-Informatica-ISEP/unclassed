@@ -28,6 +28,8 @@ export function useMatchingData(autoRefresh: boolean) {
     fetcher,
     { 
       refreshInterval: autoRefresh ? 30000 : 0,
+      revalidateOnFocus: autoRefresh,
+      revalidateOnReconnect: autoRefresh,
       onError: () => toast.error("Erro ao carregar estatísticas"),
       onSuccess: (data) => {
         if (!data.success) {
@@ -46,6 +48,8 @@ export function useMatchingData(autoRefresh: boolean) {
     fetcher,
     { 
       refreshInterval: autoRefresh ? 30000 : 0,
+      revalidateOnFocus: autoRefresh,
+      revalidateOnReconnect: autoRefresh,
       onError: (err) => console.warn('Failed to load cron statistics:', err),
       onSuccess: (data) => {
         if (!data.success) {
