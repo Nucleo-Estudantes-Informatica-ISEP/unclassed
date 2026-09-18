@@ -1,0 +1,79 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
+import { Badge } from "@/lib/components/ui/badge";
+import { Progress } from "@/lib/components/ui/progress";
+import { Database } from "lucide-react";
+import { PartitionStat } from "./types";
+
+interface PartitionsTabProps {
+  partitionStats: PartitionStat[];
+}
+
+export function PartitionsTab({ partitionStats }: PartitionsTabProps) {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Graph Partitions
+          </CardTitle>
+          <CardDescription>
+            Performance statistics for each graph partition
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {partitionStats.map((partition) => (
+              <Card key={partition.partitionKey}>
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-base">{partition.partitionKey}</CardTitle>
+                      <CardDescription>
+                        {partition.ticketType === "SPECIFIC_CLASS" ? "Subject-specific" : "All classes"}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={partition.activeRequests > 0 ? "default" : "secondary"}>
+                        {partition.activeRequests} active
+                      </Badge>
+                      <Badge variant="outline">
+                        {(partition.successRate * 100).toFixed(1)}% success
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Active Requests</p>
+                      <p className="font-medium">{partition.activeRequests}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Taxa de Sucesso</p>
+                      <p className="font-medium">{(partition.successRate * 100).toFixed(1)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Avg Processing</p>
+                      <p className="font-medium">{partition.avgProcessingTime}ms</p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <Progress value={partition.successRate * 100} className="h-2" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            
+            {partitionStats.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Database className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                <p>No active graph partitions</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
