@@ -1,21 +1,14 @@
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { MatchingStats, CronStats, CronExecution, BatchResult, PartitionStat } from "./types";
+import { toast } from "sonner";
+import { MatchingStats, CronStats, CronExecution, BatchResult } from "./types";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-interface MatchingDataResponse {
+type MatchingDataResponse = MatchingStats & {
   success: boolean;
   error?: string;
-  partitions: number;
-  activePartitions: number;
-  totalActiveRequests: number;
-  matches24h: number;
-  provisionalMatches: number;
-  averageSatisfactionScore: number;
-  averageProcessingTime: number;
-  partitionStats: PartitionStat[];
-}
+};
 
 interface CronDataResponse {
   success: boolean;
@@ -25,22 +18,47 @@ interface CronDataResponse {
 }
 
 export function useMatchingData(autoRefresh: boolean) {
-  const { data: matchingData, error: matchingError, mutate: mutateMatching } = useSWR<MatchingDataResponse>(
+  const { 
+    data: matchingData, 
+    error: matchingError, 
+    mutate: mutateMatching,
+    isValidating: isMatchingValidating
+  } = useSWR<MatchingDataResponse>(
     '/api/matching',
     fetcher,
-    { refreshInterval: autoRefresh ? 30000 : 0 }
+    { 
+      refreshInterval: autoRefresh ? 30000 : 0,
+      onError: () => toast.error("Erro ao carregar estatísticas"),
+      onSuccess: (data) => {
+        if (!data.success) {
+          toast.error("Falha ao carregar estatísticas de matching");
+        }
+      }
+    }
   );
 
-  const { data: cronData, error: cronError, mutate: mutateCron } = useSWR<CronDataResponse>(
+  const { 
+    data: cronData, 
+    mutate: mutateCron,
+    isValidating: isCronValidating
+  } = useSWR<CronDataResponse>(
     '/api/admin/cron',
     fetcher,
-    { refreshInterval: autoRefresh ? 30000 : 0 }
+    { 
+      refreshInterval: autoRefresh ? 30000 : 0,
+      onError: (err) => console.warn('Failed to load cron statistics:', err),
+      onSuccess: (data) => {
+        if (!data.success) {
+          console.warn('Failed to load cron statistics:', data.error);
+        }
+      }
+    }
   );
 
-  const isLoading = (!matchingData && !matchingError) || (!cronData && !cronError);
+  const isLoading = (!matchingData && !matchingError);
+  const isValidating = isMatchingValidating || isCronValidating;
   
-  // matchingData contains the properties directly when successful
-  const stats = matchingData?.success ? (matchingData as unknown as MatchingStats) : null;
+  const stats = matchingData?.success ? matchingData : null;
   const cronStats = cronData?.success ? cronData.cronStats : null;
   const cronHistory = cronData?.success ? cronData.executionHistory : [];
 
@@ -49,7 +67,8 @@ export function useMatchingData(autoRefresh: boolean) {
     cronStats,
     cronHistory,
     isLoading,
-    isError: matchingError || cronError || (!matchingData?.success && matchingData) || (!cronData?.success && cronData),
+    isValidating,
+    isError: matchingError || (!matchingData?.success && matchingData !== undefined),
     mutate: () => {
       mutateMatching();
       mutateCron();
@@ -62,9 +81,24 @@ async function triggerBatchFetcher(url: string) {
   return res.json();
 }
 
-export function useBatchProcessing() {
+export function useBatchProcessing(onSuccessCallback?: () => void) {
   return useSWRMutation<BatchResult, Error, string, never>(
     '/api/matching',
-    triggerBatchFetcher
+    triggerBatchFetcher,
+    {
+      throwOnError: false,
+      onSuccess: (result) => {
+        if (result.success) {
+          toast.success(result.message);
+          if (onSuccessCallback) onSuccessCallback();
+        } else {
+          toast.error("Falha no processamento em lote");
+        }
+      },
+      onError: (error) => {
+        console.error('Error running batch processing:', error);
+        toast.error("Erro ao executar processamento em lote");
+      }
+    }
   );
 }

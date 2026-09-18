@@ -16,7 +16,7 @@ import { useMatchingData } from "./matching-dashboard/useMatchingData";
 
 export default function AdvancedMatchingDashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const { stats, cronStats, cronHistory, isLoading, isError, mutate } = useMatchingData(autoRefresh);
+  const { stats, cronStats, cronHistory, isLoading, isValidating, isError, mutate } = useMatchingData(autoRefresh);
 
   const toggleAutoRefresh = () => {
     setAutoRefresh(!autoRefresh);
@@ -39,8 +39,8 @@ export default function AdvancedMatchingDashboard() {
           <CardContent className="p-8 text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
             <p className="text-lg font-medium">Falha ao carregar estatísticas de matching</p>
-            <Button onClick={mutate} className="mt-4">
-              <RefreshCw className="mr-2 h-4 w-4" />
+            <Button onClick={mutate} className="mt-4" disabled={isValidating}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
               Tentar novamente
             </Button>
           </CardContent>
@@ -77,9 +77,9 @@ export default function AdvancedMatchingDashboard() {
                 variant="outline"
                 size="sm"
                 onClick={mutate}
-                disabled={isLoading}
+                disabled={isValidating}
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>

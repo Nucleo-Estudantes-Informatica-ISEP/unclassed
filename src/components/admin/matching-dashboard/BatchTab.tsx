@@ -1,34 +1,17 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
 import { Button } from "@/lib/components/ui/button";
 import { Clock, Zap, RefreshCw, Play, CheckCircle, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
 import { useBatchProcessing } from "./useMatchingData";
-import { BatchResult } from "./types";
 
 interface BatchTabProps {
   onSuccess: () => void; // Trigger a refresh when successful
 }
 
 export function BatchTab({ onSuccess }: BatchTabProps) {
-  const { trigger, isMutating } = useBatchProcessing();
-  const [lastBatchResult, setLastBatchResult] = useState<BatchResult | null>(null);
+  const { trigger, isMutating, data: lastBatchResult } = useBatchProcessing(onSuccess);
 
-  const runBatchProcessing = async () => {
-    try {
-      const result = await trigger();
-      setLastBatchResult(result);
-      
-      if (result.success) {
-        toast.success(result.message);
-        onSuccess();
-      } else {
-        toast.error("Falha no processamento em lote");
-      }
-    } catch (error) {
-      console.error('Error running batch processing:', error);
-      toast.error("Erro ao executar processamento em lote");
-    }
+  const runBatchProcessing = () => {
+    trigger();
   };
 
   return (
@@ -114,7 +97,7 @@ export function BatchTab({ onSuccess }: BatchTabProps) {
                   {lastBatchResult.message}
                 </p>
 
-                {lastBatchResult.errors.length > 0 && (
+                {(lastBatchResult.errors?.length ?? 0) > 0 && (
                   <div className="mt-4">
                     <h4 className="font-medium text-red-600 mb-2">Erros:</h4>
                     <ul className="list-disc list-inside text-sm space-y-1">
