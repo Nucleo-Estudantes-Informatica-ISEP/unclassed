@@ -6,11 +6,10 @@ import {
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
+import { toMatchDto } from "@/services/matchDto.js";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepository from "@/application/repositories/matchRepository";
 import * as userRepository from "@/application/repositories/userRepository";
-
-import { toMatchDto } from "../../../services/matchDto.js";
 
 interface MatchLike {
   id: string;
