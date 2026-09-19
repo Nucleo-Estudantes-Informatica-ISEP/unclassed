@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-
 import { authorizeRequest } from "@/lib/apiAccess";
-import * as classRepo from "@/application/repositories/classRepository";
-import * as matchRepository from "@/application/repositories/matchRepository";
-import * as userRepository from "@/application/repositories/userRepository";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
+import { toMatchDto } from "@/services/matchDto";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
 
 interface MatchLike {
   id: string;
@@ -46,12 +46,12 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 function sanitizeUserForMatch(
   user:
     | {
-      id: string;
-      name: string;
-      email: string;
-      phone: string | null;
-      sharePhoneOnMatch: boolean | null;
-    }
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        sharePhoneOnMatch: boolean | null;
+      }
     | undefined,
   sessionUserId: string
 ) {
@@ -111,7 +111,9 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
 
     // Build where clause
-    const where: NonNullable<Parameters<typeof matchRepository.findMany>[0]>["where"] = {};
+    const where: NonNullable<
+      Parameters<typeof matchRepository.findMany>[0]
+    >["where"] = {};
 
     if (
       status &&
@@ -152,9 +154,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dedupedMatches = dedupeMatches(
-      filteredMatches as unknown as MatchLike[]
-    );
+    const dedupedMatches = dedupeMatches(filteredMatches);
 
     // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
@@ -195,10 +195,7 @@ export async function GET(request: NextRequest) {
           };
         });
 
-        const result = {
-          ...match,
-          participants: enrichedParticipants,
-        };
+        const result = toMatchDto(match, enrichedParticipants, undefined);
         return result;
       })
     );
