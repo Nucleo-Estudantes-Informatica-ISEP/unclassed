@@ -1,5 +1,6 @@
 import { Settings } from "lucide-react";
 
+import { ClientDate } from "@/components/ClientDate";
 import {
   Card,
   CardContent,
@@ -46,7 +47,10 @@ export function SettingsTab({
               <div>
                 <p className="text-muted-foreground">Last Updated</p>
                 <p className="font-medium">
-                  {loadedAt.toLocaleTimeString("pt-PT")}
+                  <ClientDate
+                    date={loadedAt.toISOString()}
+                    format="timeOnly"
+                  />
                 </p>
               </div>
               <div>

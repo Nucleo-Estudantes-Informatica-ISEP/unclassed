@@ -1,6 +1,7 @@
 import { Activity, CheckCircle, Clock, TrendingUp } from "lucide-react";
 
 import type { CronStats } from "@/services/cron/types";
+import { ClientDate } from "@/components/ClientDate";
 import { Badge } from "@/lib/components/ui/badge";
 import {
   Card,
@@ -53,12 +54,18 @@ export function CronTab({ cronStats, cronHistory }: CronTabProps) {
           <CardContent>
             <div className="text-2xl font-bold">
               {cronStats.lastRunTime
-                ? new Date(cronStats.lastRunTime).toLocaleTimeString()
+                ? <ClientDate
+                    date={cronStats.lastRunTime.toISOString()}
+                    format="timeOnly"
+                  />
                 : "Never"}
             </div>
             <p className="text-muted-foreground text-xs">
               {cronStats.lastRunTime
-                ? new Date(cronStats.lastRunTime).toLocaleDateString()
+                ? <ClientDate
+                    date={cronStats.lastRunTime.toISOString()}
+                    format="short"
+                  />
                 : "No executions yet"}
             </p>
           </CardContent>
@@ -162,7 +169,10 @@ export function CronTab({ cronStats, cronHistory }: CronTabProps) {
                   <br />
                   <span className="text-muted-foreground">
                     {run.nextRun
-                      ? new Date(run.nextRun).toLocaleString()
+                      ? <ClientDate
+                          date={run.nextRun.toISOString()}
+                          format="dateTime"
+                        />
                       : "Not scheduled"}
                   </span>
                 </div>
@@ -210,7 +220,10 @@ export function CronTab({ cronStats, cronHistory }: CronTabProps) {
                       <div>
                         <p className="text-muted-foreground">Started</p>
                         <p className="font-medium">
-                          {new Date(execution.startedAt).toLocaleTimeString()}
+                          <ClientDate
+                            date={execution.startedAt.toISOString()}
+                            format="timeOnly"
+                          />
                         </p>
                       </div>
 

@@ -20,6 +20,10 @@ for (const component of serverComponents) {
     assert.doesNotMatch(source, /^\s*["']use client["'];?/m);
     assert.doesNotMatch(source, /\bfetch\s*\(/);
     assert.doesNotMatch(source, /\buseSWR/);
+    assert.doesNotMatch(
+      source,
+      /\.toLocale(?:String|DateString|TimeString)\s*\(/
+    );
   });
 }
 

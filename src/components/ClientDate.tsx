@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 interface ClientDateProps {
   date: string | Date;
-  format?: 'short' | 'long' | 'time';
+  format?: 'short' | 'long' | 'time' | 'dateTime' | 'timeOnly';
   className?: string;
 }
 
@@ -39,6 +39,23 @@ export function ClientDate({ date, format = 'short', className }: ClientDateProp
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
+        });
+        break;
+      case 'dateTime':
+        formatted = dateObj.toLocaleString('pt-PT', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        break;
+      case 'timeOnly':
+        formatted = dateObj.toLocaleTimeString('pt-PT', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
         });
         break;
       default:
