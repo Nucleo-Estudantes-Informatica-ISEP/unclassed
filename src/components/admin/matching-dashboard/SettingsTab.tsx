@@ -1,15 +1,24 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
-import { Button } from "@/lib/components/ui/button";
 import { Settings } from "lucide-react";
 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/lib/components/ui/card";
+
 interface SettingsTabProps {
-  autoRefresh: boolean;
-  toggleAutoRefresh: () => void;
   partitions: number;
   activePartitions: number;
+  loadedAt: Date;
 }
 
-export function SettingsTab({ autoRefresh, toggleAutoRefresh, partitions, activePartitions }: SettingsTabProps) {
+export function SettingsTab({
+  partitions,
+  activePartitions,
+  loadedAt,
+}: SettingsTabProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -19,29 +28,13 @@ export function SettingsTab({ autoRefresh, toggleAutoRefresh, partitions, active
             Dashboard Settings
           </CardTitle>
           <CardDescription>
-            Configure dashboard refresh and display options
+            Dashboard and matching system information
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">Auto-refresh</h3>
-              <p className="text-sm text-muted-foreground">
-                Automatically refresh statistics every 30 seconds
-              </p>
-            </div>
-            <Button
-              variant={autoRefresh ? "default" : "outline"}
-              size="sm"
-              onClick={toggleAutoRefresh}
-            >
-              {autoRefresh ? "Enabled" : "Disabled"}
-            </Button>
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="font-medium mb-2">System Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <h3 className="mb-2 font-medium">System Information</h3>
+            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
               <div>
                 <p className="text-muted-foreground">Total Graph Partitions</p>
                 <p className="font-medium">{partitions}</p>
@@ -52,7 +45,9 @@ export function SettingsTab({ autoRefresh, toggleAutoRefresh, partitions, active
               </div>
               <div>
                 <p className="text-muted-foreground">Last Updated</p>
-                <p className="font-medium">{new Date().toLocaleTimeString()}</p>
+                <p className="font-medium">
+                  {loadedAt.toLocaleTimeString("pt-PT")}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Dashboard Version</p>

@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+
 import getServerSession from "@/services/getServerSession";
+import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
 import UserDashboard from "@/components/dashboard/UserDashboard";
 
 export default async function DashboardPage() {
@@ -12,7 +14,10 @@ export default async function DashboardPage() {
   return (
     <UserDashboard
       userId={session.id}
-      userRole={session.role as "USER" | "ADMIN"}
+      userRole={session.role}
+      adminDashboard={
+        session.role === "ADMIN" ? <AdvancedMatchingDashboard /> : null
+      }
     />
   );
 }

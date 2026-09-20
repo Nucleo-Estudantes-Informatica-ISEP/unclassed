@@ -1,8 +1,15 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
-import { Badge } from "@/lib/components/ui/badge";
-import { Progress } from "@/lib/components/ui/progress";
 import { Database } from "lucide-react";
+
 import { PartitionStat } from "./types";
+import { Badge } from "@/lib/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/lib/components/ui/card";
+import { Progress } from "@/lib/components/ui/progress";
 
 interface PartitionsTabProps {
   partitionStats: PartitionStat[];
@@ -26,19 +33,29 @@ export function PartitionsTab({ partitionStats }: PartitionsTabProps) {
             {partitionStats.map((partition) => (
               <Card key={partition.partitionKey}>
                 <CardHeader className="pb-3">
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-base">{partition.partitionKey}</CardTitle>
+                      <CardTitle className="text-base">
+                        {partition.partitionKey}
+                      </CardTitle>
                       <CardDescription>
-                        {partition.ticketType === "SPECIFIC_CLASS" ? "Subject-specific" : "All classes"}
+                        {partition.ticketType === "SPECIFIC_CLASS"
+                          ? "Subject-specific"
+                          : "All classes"}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={partition.activeRequests > 0 ? "default" : "secondary"}>
+                      <Badge
+                        variant={
+                          partition.activeRequests > 0 ? "default" : "secondary"
+                        }
+                      >
                         {partition.activeRequests} active
                       </Badge>
                       <Badge variant="outline">
-                        {(partition.successRate * 100).toFixed(1)}% success
+                        {partition.successRate === null
+                          ? "No data"
+                          : `${(partition.successRate * 100).toFixed(1)}% success`}
                       </Badge>
                     </div>
                   </div>
@@ -51,23 +68,34 @@ export function PartitionsTab({ partitionStats }: PartitionsTabProps) {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Taxa de Sucesso</p>
-                      <p className="font-medium">{(partition.successRate * 100).toFixed(1)}%</p>
+                      <p className="font-medium">
+                        {partition.successRate === null
+                          ? "—"
+                          : `${(partition.successRate * 100).toFixed(1)}%`}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Avg Processing</p>
-                      <p className="font-medium">{partition.avgProcessingTime}ms</p>
+                      <p className="font-medium">
+                        {partition.avgProcessingTime === null
+                          ? "—"
+                          : `${partition.avgProcessingTime}ms`}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-3">
-                    <Progress value={partition.successRate * 100} className="h-2" />
+                    <Progress
+                      value={(partition.successRate ?? 0) * 100}
+                      className="h-2"
+                    />
                   </div>
                 </CardContent>
               </Card>
             ))}
-            
+
             {partitionStats.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Database className="mx-auto h-12 w-12 mb-4 opacity-50" />
+              <div className="text-muted-foreground py-8 text-center">
+                <Database className="mx-auto mb-4 h-12 w-12 opacity-50" />
                 <p>No active graph partitions</p>
               </div>
             )}
