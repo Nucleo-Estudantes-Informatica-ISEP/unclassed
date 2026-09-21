@@ -1,6 +1,6 @@
 'use client';
 
-import { httpClient } from "@/lib/httpClient";
+import { HttpError, httpClient } from "@/lib/httpClient";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/lib/components/ui/button';
@@ -48,7 +48,7 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
       setPreferences(prev => ({ ...prev, [preferenceType]: value }));
       toast.success('Preferências atualizadas com sucesso!');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro de conexão. Tenta novamente.');
+      toast.error(error instanceof HttpError ? error.message : 'Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -62,7 +62,7 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
       setPreferences(prev => ({ ...prev, phone: data.user.phone }));
       toast.success('Telemóvel atualizado com sucesso!');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro de conexão. Tenta novamente.');
+      toast.error(error instanceof HttpError ? error.message : 'Erro de conexão. Tenta novamente.');
     } finally {
       setIsSaving(false);
     }
