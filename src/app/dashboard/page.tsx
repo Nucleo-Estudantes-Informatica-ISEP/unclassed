@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import getServerSession from "@/services/getServerSession";
-import AdvancedMatchingDashboard from "@/components/admin/AdvancedMatchingDashboard";
+import AdvancedMatchingDashboard, {
+  MatchingDashboardSkeleton,
+} from "@/components/admin/AdvancedMatchingDashboard";
 import UserDashboard from "@/components/dashboard/UserDashboard";
 
 export default async function DashboardPage() {
@@ -16,7 +19,11 @@ export default async function DashboardPage() {
       userId={session.id}
       userRole={session.role}
       adminDashboard={
-        session.role === "ADMIN" ? <AdvancedMatchingDashboard /> : null
+        session.role === "ADMIN" ? (
+          <Suspense fallback={<MatchingDashboardSkeleton />}>
+            <AdvancedMatchingDashboard />
+          </Suspense>
+        ) : null
       }
     />
   );

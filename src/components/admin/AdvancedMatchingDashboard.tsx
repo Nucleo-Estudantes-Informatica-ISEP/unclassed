@@ -12,16 +12,38 @@ import { OverviewTab } from "./matching-dashboard/OverviewTab";
 import { PartitionsTab } from "./matching-dashboard/PartitionsTab";
 import { SettingsTab } from "./matching-dashboard/SettingsTab";
 
-async function loadDashboardData() {
+export function MatchingDashboardSkeleton() {
+  return (
+    <div
+      className="bg-muted/50 h-64 animate-pulse rounded-xl border"
+      aria-label="A carregar dashboard de matching"
+    />
+  );
+}
+
+async function loadCronData() {
   try {
     const scheduler = getCronScheduler();
-    const [stats, cronStats, cronHistory] = await Promise.all([
-      new MatchingOrchestrator().getAdvancedStats(),
+    const [cronStats, cronHistory] = await Promise.all([
       scheduler.getCronStats(),
       scheduler.getExecutionHistory(100),
     ]);
 
-    return { stats, cronStats, cronHistory, loadedAt: new Date() };
+    return { cronStats, cronHistory };
+  } catch (error) {
+    console.warn("Failed to load cron dashboard data:", error);
+    return null;
+  }
+}
+
+export async function loadDashboardData() {
+  try {
+    const [stats, cronData] = await Promise.all([
+      new MatchingOrchestrator().getAdvancedStats(),
+      loadCronData(),
+    ]);
+
+    return { stats, cronData, loadedAt: new Date() };
   } catch (error) {
     console.error("Failed to load matching dashboard:", error);
     return null;
@@ -47,7 +69,7 @@ export default async function AdvancedMatchingDashboard() {
     );
   }
 
-  const { stats, cronStats, cronHistory, loadedAt } = data;
+  const { stats, cronData, loadedAt } = data;
 
   return (
     <div className="w-full">
@@ -62,13 +84,26 @@ export default async function AdvancedMatchingDashboard() {
               graph partitioning
             </p>
           </div>
-          <RefreshButton />
+          <RefreshButton initialAutoRefresh />
         </div>
       </div>
 
       <DashboardTabs
         overview={<OverviewTab stats={stats} />}
-        cron={<CronTab cronStats={cronStats} cronHistory={cronHistory} />}
+        cron={
+          cronData ? (
+            <CronTab
+              cronStats={cronData.cronStats}
+              cronHistory={cronData.cronHistory}
+            />
+          ) : (
+            <Card>
+              <CardContent className="text-muted-foreground p-8 text-center">
+                Estatísticas do cron indisponíveis
+              </CardContent>
+            </Card>
+          )
+        }
         partitions={<PartitionsTab partitionStats={stats.partitionStats} />}
         batch={<BatchTab />}
         settings={

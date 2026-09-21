@@ -36,3 +36,17 @@ test("interactive dashboard islands remain Client Components", async () => {
     assert.match(source, /^\s*["']use client["'];?/m);
   }
 });
+
+test("dashboard streams server data and preserves automatic refresh", async () => {
+  const page = await readFile(
+    resolve(process.cwd(), "src/app/dashboard/page.tsx"),
+    "utf8"
+  );
+  const dashboard = await readFile(
+    resolve(adminComponents, "AdvancedMatchingDashboard.tsx"),
+    "utf8"
+  );
+
+  assert.match(page, /<Suspense\s+fallback=/);
+  assert.match(dashboard, /<RefreshButton\s+initialAutoRefresh\s*\/>/);
+});

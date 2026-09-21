@@ -8,6 +8,21 @@ interface ClientDateProps {
   className?: string;
 }
 
+export function getDatePlaceholder(
+  format: NonNullable<ClientDateProps['format']>
+) {
+  switch (format) {
+    case 'timeOnly':
+      return '--:--:--';
+    case 'dateTime':
+      return '--/--/----, --:--:--';
+    case 'time':
+      return '--/--/----, --:--';
+    default:
+      return '--/--/----';
+  }
+}
+
 export function ClientDate({ date, format = 'short', className }: ClientDateProps) {
   const [formattedDate, setFormattedDate] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
@@ -67,7 +82,7 @@ export function ClientDate({ date, format = 'short', className }: ClientDateProp
 
   // Show loading placeholder during SSR
   if (!isClient) {
-    return <span className={className}>--/--/----</span>;
+    return <span className={className}>{getDatePlaceholder(format)}</span>;
   }
 
   return <span className={className}>{formattedDate}</span>;
