@@ -7,36 +7,27 @@ vi.mock("@/lib/startup", () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 test("register() initialises the application once in the nodejs runtime", async () => {
-  const originalRuntime = process.env.NEXT_RUNTIME;
-  process.env.NEXT_RUNTIME = "nodejs";
+  vi.stubEnv("NEXT_RUNTIME", "nodejs");
 
-  try {
-    const { register } = await import("./instrumentation");
-    const { initializeApplication } = await import("@/lib/startup");
+  const { register } = await import("./instrumentation");
+  const { initializeApplication } = await import("@/lib/startup");
 
-    await register();
+  await register();
 
-    assert.equal(vi.mocked(initializeApplication).mock.calls.length, 1);
-  } finally {
-    process.env.NEXT_RUNTIME = originalRuntime;
-  }
+  assert.equal(vi.mocked(initializeApplication).mock.calls.length, 1);
 });
 
 test("register() does not initialise the application outside the nodejs runtime", async () => {
-  const originalRuntime = process.env.NEXT_RUNTIME;
-  process.env.NEXT_RUNTIME = "edge";
+  vi.stubEnv("NEXT_RUNTIME", "edge");
 
-  try {
-    const { register } = await import("./instrumentation");
-    const { initializeApplication } = await import("@/lib/startup");
+  const { register } = await import("./instrumentation");
+  const { initializeApplication } = await import("@/lib/startup");
 
-    await register();
+  await register();
 
-    assert.equal(vi.mocked(initializeApplication).mock.calls.length, 0);
-  } finally {
-    process.env.NEXT_RUNTIME = originalRuntime;
-  }
+  assert.equal(vi.mocked(initializeApplication).mock.calls.length, 0);
 });
