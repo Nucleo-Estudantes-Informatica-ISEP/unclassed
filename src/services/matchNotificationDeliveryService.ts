@@ -138,3 +138,51 @@ export async function markMatchNotificationDeliveryFailed(
     );
   }
 }
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Unknown delivery error";
+}
+
+export async function deliverMatchNotificationOnce(
+  matchId: string,
+  userId: string,
+  email: string,
+  send: () => Promise<boolean>
+): Promise<"skipped" | "sent" | "failed"> {
+  const reserved = await reserveMatchNotificationDelivery(
+    matchId,
+    userId,
+    email
+  );
+
+  if (!reserved) {
+    return "skipped";
+  }
+
+  try {
+    const sent = await send();
+
+    if (sent) {
+      await markMatchNotificationDeliverySent(matchId, userId);
+      return "sent";
+    }
+
+    await markMatchNotificationDeliveryFailed(
+      matchId,
+      userId,
+      "Email service returned false"
+    );
+    return "failed";
+  } catch (error) {
+    await markMatchNotificationDeliveryFailed(
+      matchId,
+      userId,
+      getErrorMessage(error)
+    );
+    return "failed";
+  }
+}

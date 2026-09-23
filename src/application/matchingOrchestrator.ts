@@ -1070,63 +1070,31 @@ export class MatchingOrchestrator {
           dashboardUrl: baseUrl,
         };
 
-        const notificationReserved =
-          await matchNotificationDeliveryService.reserveMatchNotificationDelivery(
+        const outcome =
+          await matchNotificationDeliveryService.deliverMatchNotificationOnce(
             matchId,
             user.id,
-            user.email
+            user.email,
+            () =>
+              emailService.sendMatchNotification(user.email, notificationData)
           );
 
-        if (!notificationReserved) {
+        if (outcome === "skipped") {
           console.log(
             `Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
           continue;
         }
 
-        try {
-          const emailSent = await emailService.sendMatchNotification(
-            user.email,
-            notificationData
-          );
-
-          if (emailSent) {
-            await matchNotificationDeliveryService.markMatchNotificationDeliverySent(
-              matchId,
-              user.id
-            );
-            console.log(`Match notification sent to ${user.email}`);
-            continue;
-          }
-
-          await matchNotificationDeliveryService.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            "Email service returned false"
-          );
-          console.log(`Failed to send notification to ${user.email}`);
-        } catch (error) {
-          await matchNotificationDeliveryService.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            this.getErrorMessage(error)
-          );
-          console.error(
-            `Error sending notification to ${user.email} for match ${matchId}:`,
-            error
-          );
+        if (outcome === "sent") {
+          console.log(`Match notification sent to ${user.email}`);
+          continue;
         }
+
+        console.log(`Failed to send notification to ${user.email}`);
       }
     } catch (error) {
       console.error("Error sending match notifications:", error);
     }
-  }
-
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return "Unknown delivery error";
   }
 
   private async createMatches(
