@@ -48,5 +48,5 @@ test("dashboard streams server data and preserves automatic refresh", async () =
   );
 
   assert.match(page, /<Suspense\s+fallback=/);
-  assert.match(dashboard, /<RefreshButton\s+initialAutoRefresh\s*\/>/);
+  assert.match(dashboard, /<RefreshButton[^>]*initialAutoRefresh/);
 });

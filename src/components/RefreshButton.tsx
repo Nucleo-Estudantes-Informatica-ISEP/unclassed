@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/lib/components/ui/button";
-import { Switch } from "@/lib/components/ui/switch";
-import { Label } from "@/lib/components/ui/label";
 import { RefreshCw } from "lucide-react";
+
+import { Button } from "@/lib/components/ui/button";
+import { Label } from "@/lib/components/ui/label";
+import { Switch } from "@/lib/components/ui/switch";
 
 interface RefreshButtonProps {
   autoRefreshInterval?: number; // in seconds, default 30
@@ -26,7 +27,7 @@ export function RefreshButton({
     try {
       router.refresh();
       // Add a small delay to show the loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       // Reset the countdown when manually refreshing
       setSecondsLeft(autoRefreshInterval);
     } finally {
@@ -42,6 +43,8 @@ export function RefreshButton({
     }
 
     const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           // Refresh and reset countdown
@@ -52,7 +55,15 @@ export function RefreshButton({
       });
     }, 1000);
 
-    return () => clearInterval(interval);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void handleRefresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [autoRefresh, autoRefreshInterval, handleRefresh]);
 
   return (
@@ -66,11 +77,14 @@ export function RefreshButton({
           disabled={isRefreshing}
         />
         <div className="flex flex-col">
-          <Label htmlFor="auto-refresh" className="text-xs font-medium cursor-pointer">
+          <Label
+            htmlFor="auto-refresh"
+            className="cursor-pointer text-xs font-medium"
+          >
             Atualização automática
           </Label>
           {autoRefresh && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {secondsLeft}s
             </span>
           )}
@@ -86,9 +100,9 @@ export function RefreshButton({
         className="flex items-center gap-2"
       >
         <RefreshCw
-          className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+          className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
         />
-        {isRefreshing ? 'A atualizar...' : 'Atualizar'}
+        {isRefreshing ? "A atualizar..." : "Atualizar"}
       </Button>
     </div>
   );

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { AlertTriangle } from "lucide-react";
 
 import { Card, CardContent } from "@/lib/components/ui/card";

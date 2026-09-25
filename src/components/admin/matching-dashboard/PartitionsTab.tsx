@@ -54,7 +54,7 @@ export function PartitionsTab({ partitionStats }: PartitionsTabProps) {
                       </Badge>
                       <Badge variant="outline">
                         {partition.successRate === null
-                          ? "No data"
+                          ? "Sem dados"
                           : `${(partition.successRate * 100).toFixed(1)}% success`}
                       </Badge>
                     </div>
