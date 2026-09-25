@@ -91,7 +91,7 @@ src/
 
 prisma/           # MongoDB schema, seed, reset helper
 data/             # static subject data
-docs/domain-model/ # PlantUML domain diagram
+docs/domain-model/ # Mermaid domain diagram
 ```
 
 ### Request and data layers
