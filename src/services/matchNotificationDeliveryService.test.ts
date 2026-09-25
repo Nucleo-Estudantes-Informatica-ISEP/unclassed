@@ -163,7 +163,9 @@ test("deliverMatchNotificationOnce marks the reservation failed with the error m
   const updateMany = vi
     .spyOn(matchNotificationDeliveryRepo, "updateMany")
     .mockResolvedValue({ count: 1 } as never);
-  const send = vi.fn().mockRejectedValue(new Error("SMTP timeout"));
+  const thrown = new Error("SMTP timeout");
+  const send = vi.fn().mockRejectedValue(thrown);
+  const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
   const outcome = await deliverMatchNotificationOnce(
     "match-1",
@@ -178,4 +180,8 @@ test("deliverMatchNotificationOnce marks the reservation failed with the error m
     (call?.data as { lastError: string }).lastError,
     "SMTP timeout"
   );
+  assert.deepEqual(errorLog.mock.calls[0], [
+    "Error sending notification to user@example.com for match match-1:",
+    thrown,
+  ]);
 });

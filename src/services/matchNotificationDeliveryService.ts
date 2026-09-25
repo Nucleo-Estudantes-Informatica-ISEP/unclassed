@@ -178,6 +178,10 @@ export async function deliverMatchNotificationOnce(
     );
     return "failed";
   } catch (error) {
+    console.error(
+      `Error sending notification to ${email} for match ${matchId}:`,
+      error
+    );
     await markMatchNotificationDeliveryFailed(
       matchId,
       userId,
