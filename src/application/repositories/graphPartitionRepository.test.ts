@@ -72,4 +72,17 @@ describe("graphPartitionRepository", () => {
       expect(result).toEqual(mockResult);
     });
   });
+
+  describe("deleteMany", () => {
+    it("calls prisma.graphPartition.deleteMany", async () => {
+      const mockResult = { count: 3 };
+      const spy = vi.spyOn(prisma.graphPartition, "deleteMany").mockResolvedValue(mockResult as never);
+
+      const args = {};
+      const result = await graphPartitionRepo.deleteMany(args);
+
+      expect(spy).toHaveBeenCalledWith(args);
+      expect(result).toEqual(mockResult);
+    });
+  });
 });

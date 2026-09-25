@@ -11,3 +11,8 @@ export async function create(args: Parameters<typeof prisma.matchNotificationDel
 export async function updateMany(args: Parameters<typeof prisma.matchNotificationDelivery.updateMany>[0]) {
   return prisma.matchNotificationDelivery.updateMany(args);
 }
+
+export async function deleteMany(args: Parameters<typeof prisma.matchNotificationDelivery.deleteMany>[0] = {}) {
+  return prisma.matchNotificationDelivery.deleteMany(args);
+}
+

@@ -23,4 +23,12 @@ export async function findByNames(names: string[]) {
   if (!names || names.length === 0) return [];
   return prisma.class.findMany({ where: { name: { in: names } } });
 }
+export async function create(args: Parameters<typeof prisma.class.create>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).class.create(args);
+}
+
+export async function deleteMany(args: Parameters<typeof prisma.class.deleteMany>[0] = {}, tx?: import("@prisma/client").Prisma.TransactionClient) {
+  return (tx || prisma).class.deleteMany(args);
+}
+
 export type { Class } from "@prisma/client";
