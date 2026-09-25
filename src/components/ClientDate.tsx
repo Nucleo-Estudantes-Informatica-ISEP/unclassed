@@ -4,8 +4,23 @@ import { useState, useEffect } from 'react';
 
 interface ClientDateProps {
   date: string | Date;
-  format?: 'short' | 'long' | 'time';
+  format?: 'short' | 'long' | 'time' | 'dateTime' | 'timeOnly';
   className?: string;
+}
+
+export function getDatePlaceholder(
+  format: NonNullable<ClientDateProps['format']>
+) {
+  switch (format) {
+    case 'timeOnly':
+      return '--:--:--';
+    case 'dateTime':
+      return '--/--/----, --:--:--';
+    case 'time':
+      return '--/--/----, --:--';
+    default:
+      return '--/--/----';
+  }
 }
 
 export function ClientDate({ date, format = 'short', className }: ClientDateProps) {
@@ -41,6 +56,23 @@ export function ClientDate({ date, format = 'short', className }: ClientDateProp
           minute: '2-digit'
         });
         break;
+      case 'dateTime':
+        formatted = dateObj.toLocaleString('pt-PT', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        break;
+      case 'timeOnly':
+        formatted = dateObj.toLocaleTimeString('pt-PT', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        break;
       default:
         formatted = dateObj.toLocaleDateString('pt-PT');
     }
@@ -50,7 +82,7 @@ export function ClientDate({ date, format = 'short', className }: ClientDateProp
 
   // Show loading placeholder during SSR
   if (!isClient) {
-    return <span className={className}>--/--/----</span>;
+    return <span className={className}>{getDatePlaceholder(format)}</span>;
   }
 
   return <span className={className}>{formattedDate}</span>;

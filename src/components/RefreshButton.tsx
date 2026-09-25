@@ -9,11 +9,15 @@ import { RefreshCw } from "lucide-react";
 
 interface RefreshButtonProps {
   autoRefreshInterval?: number; // in seconds, default 30
+  initialAutoRefresh?: boolean;
 }
 
-export function RefreshButton({ autoRefreshInterval = 30 }: RefreshButtonProps = {}) {
+export function RefreshButton({
+  autoRefreshInterval = 30,
+  initialAutoRefresh = false,
+}: RefreshButtonProps = {}) {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
   const [secondsLeft, setSecondsLeft] = useState(autoRefreshInterval);
   const router = useRouter();
 
