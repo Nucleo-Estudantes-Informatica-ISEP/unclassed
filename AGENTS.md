@@ -92,6 +92,9 @@ src/
 
 prisma/           # MongoDB schema, seed, reset helper
 data/             # static subject data
+docs/architecture.md # Runtime layer diagram
+docs/database.md   # MongoDB schema notes
+docs/decisions/    # Numbered architecture decision records
 docs/domain-model/ # Mermaid domain diagram
 ```
 
@@ -151,6 +154,7 @@ Documentation should answer a future contributor's first question without duplic
 - Update `README.md` when a user-visible capability, setup prerequisite, environment variable, script, route, deployment requirement, or operational workflow changes.
 - Update this `AGENTS.md` when the stack, layer map, contribution/verification workflow, architectural boundary, or persistent gotcha changes.
 - Keep documentation adjacent to its audience: public setup and operations in `README.md`; contributor rules and architecture here; domain diagrams in `docs/domain-model/`; code-specific rationale beside the code.
+- Record accepted architectural decisions as numbered ADRs in `docs/decisions/`.
 - Document why for non-obvious constraints, especially auth boundaries, lifecycle-managed clients, cron locks, data integrity rules, and security decisions. Do not restate code line-by-line.
 - Keep examples runnable and command names synchronized with `package.json`.
 - In the same change that alters behavior, update relevant docs. Do not defer known documentation drift to a follow-up.

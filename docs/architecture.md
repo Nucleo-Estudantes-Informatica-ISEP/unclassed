@@ -6,6 +6,7 @@ The application separates request handling, matching decisions, and persistence.
 flowchart LR
     Browser[Browser] --> App[Next.js App Router]
     App --> Access[authorizeRequest]
+    CronCaller[Trusted cron caller] -->|Bearer CRON_SECRET| Access
     Access --> Session[NextAuth session and local user]
     OIDC[AuthNEI / ZITADEL] --> Session
     Access --> Application[Application services and MatchingOrchestrator]
@@ -16,7 +17,7 @@ flowchart LR
     Application --> Repos[Application repositories]
     Application --> Mail[Email service]
     Repos --> Prisma[Shared Prisma client]
-    Locks --> Prisma
+    Locks --> Repos
     Prisma --> Mongo[(MongoDB)]
 ```
 
