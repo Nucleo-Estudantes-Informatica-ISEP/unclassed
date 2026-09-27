@@ -12,6 +12,8 @@ export function getDatePlaceholder(
   format: NonNullable<ClientDateProps['format']>
 ) {
   switch (format) {
+    case 'long':
+      return '-- de -------- de ----';
     case 'timeOnly':
       return '--:--:--';
     case 'dateTime':

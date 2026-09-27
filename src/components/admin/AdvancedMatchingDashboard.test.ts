@@ -10,7 +10,10 @@ const stats = { partitions: 1 };
 let statsUnavailable = false;
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/components/RefreshButton", () => ({ RefreshButton: () => null }));
+vi.mock("@/components/RefreshButton", () => ({
+  RefreshButton: ({ initialAutoRefresh }: { initialAutoRefresh?: boolean }) =>
+    initialAutoRefresh ? "auto-refresh-on" : "auto-refresh-off",
+}));
 
 vi.mock("@/application/matchingOrchestrator", () => ({
   MatchingOrchestrator: class {
@@ -30,24 +33,29 @@ vi.mock("@/services/cronScheduler", () => ({
 }));
 
 test("matching statistics survive unavailable cron telemetry", async () => {
-  vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-  const result = await loadDashboardData();
-
-  assert.deepEqual(result?.stats, stats);
-  assert.equal(result?.cronData, null);
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  try {
+    const result = await loadDashboardData();
+    assert.deepEqual(result?.stats, stats);
+    assert.equal(result?.cronData, null);
+  } finally {
+    warning.mockRestore();
+  }
 });
 
 test("unavailable matching statistics show the error card", async () => {
   statsUnavailable = true;
   const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
   try {
     assert.equal(await loadDashboardData(), null);
     const html = renderToStaticMarkup(await AdvancedMatchingDashboard());
     assert.match(html, /Falha ao carregar estatísticas de matching/);
+    assert.match(html, /auto-refresh-on/);
   } finally {
     statsUnavailable = false;
     error.mockRestore();
+    warning.mockRestore();
   }
 });

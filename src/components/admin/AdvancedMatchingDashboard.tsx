@@ -64,7 +64,7 @@ export default async function AdvancedMatchingDashboard() {
             Falha ao carregar estatísticas de matching
           </p>
           <div className="mt-4 flex justify-center">
-            <RefreshButton />
+            <RefreshButton initialAutoRefresh />
           </div>
         </CardContent>
       </Card>
