@@ -3,6 +3,7 @@ import { test } from "vitest";
 
 import {
   getLogContext,
+  logger,
   safeError,
   withJobExecution,
   withLogContext,
@@ -25,4 +26,11 @@ test("request and job context is inherited and isolated", async () => {
 test("error metadata excludes message and stack", () => {
   const error = new Error("user@example.com secret");
   assert.deepEqual(safeError(error), { errorType: "Error" });
+});
+
+test("logging fields do not leak into later context", () => {
+  withLogContext({ requestId: "request-a" }, () => {
+    logger.info({ jobId: "batch-matching" }, "Running job");
+    assert.deepEqual(getLogContext(), { requestId: "request-a" });
+  });
 });
