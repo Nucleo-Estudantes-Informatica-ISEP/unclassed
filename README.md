@@ -78,6 +78,8 @@ The core product flow is:
 
 ## Core Domain Model
 
+See the [Mermaid domain diagram](./docs/domain-model/domain-model.md) for all Prisma models, fields, and declared relations.
+
 The Prisma schema defines the following main entities:
 
 - `User`: local application user, role, notification preferences, phone-sharing preference
