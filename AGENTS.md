@@ -12,6 +12,7 @@ For each task:
    - `feature/` or `feat/` — new functionality
    - `bugfix/` or `fix/` — bug fixes
    - `hotfix/` — urgent production fixes
+   - `refactor/` — behavior-preserving code restructuring
    - `release/` — release preparation
    - `docs/` — documentation-only changes
    - `chore/` — tooling, configuration, and other maintenance

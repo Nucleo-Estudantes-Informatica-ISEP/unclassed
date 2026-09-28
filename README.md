@@ -365,6 +365,7 @@ This recommendation is based on the repo structure and deployment files: the cod
 ## Admin and Operations
 
 Admins have access to an advanced monitoring surface exposed through the dashboard and API.
+The matching dashboard refreshes every 30 seconds while its tab is visible and refreshes when the tab becomes visible again. If cron telemetry fails, matching statistics remain available.
 
 What the admin tooling covers:
 

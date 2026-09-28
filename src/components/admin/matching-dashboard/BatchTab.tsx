@@ -1,14 +1,33 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
+"use client";
+
+import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Play,
+  RefreshCw,
+  Zap,
+} from "lucide-react";
+
 import { Button } from "@/lib/components/ui/button";
-import { Clock, Zap, RefreshCw, Play, CheckCircle, AlertTriangle } from "lucide-react";
-import { useBatchProcessing } from "./useMatchingData";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/lib/components/ui/card";
 
-interface BatchTabProps {
-  onSuccess: () => void; // Trigger a refresh when successful
-}
+import { useBatchProcessing } from "./useBatchProcessing";
 
-export function BatchTab({ onSuccess }: BatchTabProps) {
-  const { trigger, isMutating, data: lastBatchResult } = useBatchProcessing(onSuccess);
+export function BatchTab() {
+  const router = useRouter();
+  const {
+    trigger,
+    isMutating,
+    data: lastBatchResult,
+  } = useBatchProcessing(() => router.refresh());
 
   const runBatchProcessing = () => {
     trigger();
@@ -27,14 +46,14 @@ export function BatchTab({ onSuccess }: BatchTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <h3 className="font-medium">Manual Batch Processing</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Process all active partitions for 3-way and multi-way matches
               </p>
             </div>
-            <Button 
+            <Button
               onClick={runBatchProcessing}
               disabled={isMutating}
               className="flex items-center gap-2"
@@ -57,32 +76,48 @@ export function BatchTab({ onSuccess }: BatchTabProps) {
           {lastBatchResult && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <Clock className="h-4 w-4" />
                   Last Batch Processing Result
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Partitions Processed</p>
-                    <p className="font-bold">{lastBatchResult.processedPartitions}</p>
+                    <p className="text-muted-foreground text-sm">
+                      Partitions Processed
+                    </p>
+                    <p className="font-bold">
+                      {lastBatchResult.processedPartitions}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Matches Found</p>
-                    <p className="font-bold text-green-600">{lastBatchResult.matchesFound}</p>
+                    <p className="text-muted-foreground text-sm">
+                      Matches Found
+                    </p>
+                    <p className="font-bold text-green-600">
+                      {lastBatchResult.matchesFound}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Processing Time</p>
-                    <p className="font-bold">{lastBatchResult.totalProcessingTime}ms</p>
+                    <p className="text-muted-foreground text-sm">
+                      Processing Time
+                    </p>
+                    <p className="font-bold">
+                      {lastBatchResult.totalProcessingTime}ms
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Expired Provisional</p>
-                    <p className="font-bold text-orange-600">{lastBatchResult.expiredProvisionalMatches}</p>
+                    <p className="text-muted-foreground text-sm">
+                      Expired Provisional
+                    </p>
+                    <p className="font-bold text-orange-600">
+                      {lastBatchResult.expiredProvisionalMatches}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-2 mb-2">
+
+                <div className="mb-2 flex items-center gap-2">
                   {lastBatchResult.success ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
@@ -92,17 +127,19 @@ export function BatchTab({ onSuccess }: BatchTabProps) {
                     {lastBatchResult.success ? "Sucesso" : "Falha"}
                   </span>
                 </div>
-                
-                <p className="text-sm text-muted-foreground">
+
+                <p className="text-muted-foreground text-sm">
                   {lastBatchResult.message}
                 </p>
 
                 {(lastBatchResult.errors?.length ?? 0) > 0 && (
                   <div className="mt-4">
-                    <h4 className="font-medium text-red-600 mb-2">Erros:</h4>
-                    <ul className="list-disc list-inside text-sm space-y-1">
+                    <h4 className="mb-2 font-medium text-red-600">Erros:</h4>
+                    <ul className="list-inside list-disc space-y-1 text-sm">
                       {lastBatchResult.errors.map((error, index) => (
-                        <li key={index} className="text-red-600">{error}</li>
+                        <li key={index} className="text-red-600">
+                          {error}
+                        </li>
                       ))}
                     </ul>
                   </div>
