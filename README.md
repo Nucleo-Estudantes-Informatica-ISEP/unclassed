@@ -152,6 +152,10 @@ The main variables are:
 | `EMAIL_USER` | Optional | SMTP username |
 | `EMAIL_PASS` | Optional | SMTP password |
 | `EMAIL_FROM` | Optional | Sender address |
+| `SENTRY_DSN` | Optional | Server-side GlitchTip project DSN |
+| `NEXT_PUBLIC_SENTRY_DSN` | Optional | Browser GlitchTip DSN, set before building the image |
+| `SENTRY_ENVIRONMENT` | Optional | Server environment label, e.g. `production` or `staging` |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Optional | Browser environment label, set before building the image |
 
 ### Authentication Notes
 
@@ -422,6 +426,14 @@ Use SMTP configuration to enable:
 If SMTP is not configured, matching can still work, but email delivery features will not.
 
 ## Docker
+
+### GlitchTip in Coolify
+
+Create a Coolify project named **`service:monitoring-GlitchTip`** and add a **Docker Compose Empty** Service in its production environment. Paste [`deploy/coolify/glitchtip.yml`](./deploy/coolify/glitchtip.yml) into its Compose editor. Assign an HTTPS domain to the `glitchtip` component (internal port 8000), then set `GLITCHTIP_EMAIL_URL` to a working SMTP URL and `GLITCHTIP_FROM_EMAIL` to the alert sender. Keep the generated PostgreSQL credentials and GlitchTip secret in Coolify; back up the `glitchtip-postgres` and `glitchtip-uploads` volumes. The service uses GlitchTip's all-in-one web/worker process, PostgreSQL, and Valkey.
+
+After deploying, create the first administrator from the GlitchTip container terminal with `./manage.py createsuperuser`. Public registration starts disabled. Create separate staging and production projects, add team members, and configure **Project Alerts → Create New Alert** for each project. Copy each project's DSN into the corresponding app deployment's `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN`; set matching environment labels. Rebuild the app after changing `NEXT_PUBLIC_*` values. Verify an event arrives with a stack trace and `requestId` tag, then confirm an alert email arrives. [GlitchTip installation](https://glitchtip.com/documentation/install/), [Coolify Services](https://coolify.io/docs/services/what-is-a-service), [GlitchTip alerts](https://glitchtip.com/documentation/error-tracking/).
+
+The SDK reports uncaught server and browser exceptions. It strips request headers, bodies, user fields, breadcrumbs, raw exception messages, and stack local variables before sending events. Stack file names and line numbers remain. Tracing stays disabled until its payloads receive the same privacy review. Existing handled failures continue to appear in application logs; verify them with the `x-request-id` header. Client stack frames can be minified until source maps are uploaded.
 
 ### Run with Docker Compose
 

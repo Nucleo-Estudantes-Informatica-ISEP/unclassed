@@ -12,6 +12,9 @@ services:
     build:
       context: .
       target: runner
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
     depends_on:
       schema:
         condition: service_completed_successfully
@@ -44,4 +47,6 @@ services:
       - EMAIL_PASS=${EMAIL_PASS:-}
       - ADMIN_CACHE_TTL=${ADMIN_CACHE_TTL:-300}
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-1}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
     restart: unless-stopped

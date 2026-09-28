@@ -1,0 +1,52 @@
+# Create a Coolify Docker Compose Empty service named service:monitoring-GlitchTip.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${SERVICE_USER_POSTGRESQL}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRESQL}
+      POSTGRES_DB: glitchtip
+    volumes:
+      - glitchtip-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:9
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  glitchtip:
+    image: glitchtip/glitchtip:6
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_GLITCHTIP_8000
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/glitchtip
+      - VALKEY_URL=redis://valkey:6379
+      - SECRET_KEY=$SERVICE_BASE64_64_GLITCHTIP_SECRET
+      - GLITCHTIP_DOMAIN=${SERVICE_URL_GLITCHTIP}
+      - ALLOWED_HOSTS=${SERVICE_FQDN_GLITCHTIP}
+      - CSRF_TRUSTED_ORIGINS=${SERVICE_URL_GLITCHTIP}
+      - EMAIL_URL=${GLITCHTIP_EMAIL_URL:?Set SMTP URL for alerts}
+      - DEFAULT_FROM_EMAIL=${GLITCHTIP_FROM_EMAIL:?Set alert sender}
+      - ENABLE_USER_REGISTRATION=False
+      - SERVER_ROLE=all_in_one
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    restart: unless-stopped
+
+volumes:
+  glitchtip-postgres:
+  glitchtip-uploads:
