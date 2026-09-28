@@ -134,7 +134,7 @@ Rules:
 - Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
 - For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
-- GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary; preserve exception stacks and correlation tags while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
+- GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary for exceptions and forwarded Pino logs; preserve exception stacks and correlation IDs while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
 - Use `src/lib/logger.ts` for server logs. Request routes use `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
 
 ## API conventions

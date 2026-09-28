@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { sanitizeMonitoringEvent } from "./sanitizeMonitoringEvent";
+import {
+  sanitizeMonitoringEvent,
+  sanitizeMonitoringLog,
+} from "./sanitizeMonitoringEvent";
 
-import type { ErrorEvent } from "@sentry/nextjs";
+import type { ErrorEvent, Log } from "@sentry/nextjs";
 
 test("monitoring event keeps stack and correlation but strips PII", () => {
   const event = {
@@ -52,5 +55,59 @@ test("monitoring event keeps stack and correlation but strips PII", () => {
   assert.doesNotMatch(
     JSON.stringify(sanitized),
     /user@example.com|token-secret/
+  );
+});
+
+test("monitoring logs keep known operation and correlation, dropping PII", () => {
+  const log = {
+    level: "error",
+    message: "Job failed",
+    attributes: {
+      requestId: "123e4567-e89b-42d3-a456-426614174000",
+      jobExecutionId: "123e4567-e89b-42d3-a456-426614174001",
+      jobId: "batch-matching",
+      durationMs: 42,
+      errorType: "TypeError",
+      email: "user@example.com",
+      authorization: "Bearer token-secret",
+      nested: { password: "token-secret" },
+    },
+  } satisfies Log;
+
+  const sanitized = sanitizeMonitoringLog(log);
+  assert.equal(sanitized?.message, "Job failed");
+  assert.deepEqual(sanitized?.attributes, {
+    requestId: "123e4567-e89b-42d3-a456-426614174000",
+    jobExecutionId: "123e4567-e89b-42d3-a456-426614174001",
+    jobId: "batch-matching",
+    durationMs: 42,
+    errorType: "TypeError",
+  });
+  assert.doesNotMatch(
+    JSON.stringify(sanitized),
+    /user@example.com|token-secret/
+  );
+});
+
+test("monitoring logs reject dynamic messages and invalid metadata", () => {
+  assert.equal(
+    sanitizeMonitoringLog({
+      level: "info",
+      message: "Created match for user@example.com",
+    }),
+    null
+  );
+  assert.deepEqual(
+    sanitizeMonitoringLog({
+      level: "info",
+      message: "Running job",
+      attributes: {
+        requestId: "user@example.com",
+        jobId: "user@example.com",
+        durationMs: -1,
+        errorType: "user@example.com",
+      },
+    })?.attributes,
+    {}
   );
 });
