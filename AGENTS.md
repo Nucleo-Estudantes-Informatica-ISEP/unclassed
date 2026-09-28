@@ -134,6 +134,7 @@ Rules:
 - Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
 - For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
+- Use `src/lib/logger.ts` for server logs. Request routes use `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
 
 ## API conventions
 

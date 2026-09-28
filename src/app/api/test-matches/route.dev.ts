@@ -1,61 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Class } from "@/application/repositories/classRepository";
-import type { Subject } from "@/application/repositories/subjectRepository";
-import type { User } from "@/application/repositories/userRepository";
-import { SingleSwapRequestDto } from "@/services/swapRequestDto";
 
 import { authorizeRequest } from "@/lib/apiAccess";
-import * as userRepo from "@/application/repositories/userRepository";
+import { logger, safeError } from "@/lib/logger";
+import { withRequestLogContext } from "@/lib/requestLogContext";
+import { SingleSwapRequestDto } from "@/services/swapRequestDto";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import type { Class } from "@/application/repositories/classRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as classRepo from "@/application/repositories/classRepository";
+import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import type { User } from "@/application/repositories/userRepository";
+import * as userRepo from "@/application/repositories/userRepository";
 
 import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
-  const authResult = await authorizeRequest(request, {
-    devOnly: true,
-    requireAdmin: true,
-    enforceSameOriginForSessionWrites: true,
-  });
-  if (!authResult.ok) return authResult.response;
-
-  try {
-    const users = await createSampleUsers();
-    const classes = await getSeededClasses();
-    const subject = await getSeededSubject();
-
-    await matchRepo.deleteMany({});
-    await singleSwapRequestRepo.deleteMany();
-    await bundleSwapRequestRepo.deleteMany();
-
-    const swapRequests = await createSampleSwapRequests(
-      users,
-      classes,
-      subject
-    );
-    const matches = await createSampleMatches(users, classes, swapRequests);
-
-    return NextResponse.json({
-      success: true,
-      created: {
-        users: users.length,
-        classes: classes.length,
-        subjects: 1,
-        swapRequests: swapRequests.length,
-        matches: matches.length,
-      },
-      message: "Matches de exemplo criados com sucesso!",
+  return withRequestLogContext(request, async () => {
+    const authResult = await authorizeRequest(request, {
+      devOnly: true,
+      requireAdmin: true,
+      enforceSameOriginForSessionWrites: true,
     });
-  } catch (error) {
-    console.error("Error creating test matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
+    if (!authResult.ok) return authResult.response;
+
+    try {
+      const users = await createSampleUsers();
+      const classes = await getSeededClasses();
+      const subject = await getSeededSubject();
+
+      await matchRepo.deleteMany({});
+      await singleSwapRequestRepo.deleteMany();
+      await bundleSwapRequestRepo.deleteMany();
+
+      const swapRequests = await createSampleSwapRequests(
+        users,
+        classes,
+        subject
+      );
+      const matches = await createSampleMatches(users, classes, swapRequests);
+
+      return NextResponse.json({
+        success: true,
+        created: {
+          users: users.length,
+          classes: classes.length,
+          subjects: 1,
+          swapRequests: swapRequests.length,
+          matches: matches.length,
+        },
+        message: "Matches de exemplo criados com sucesso!",
+      });
+    } catch (error) {
+      logger.error(safeError(error), "Error creating test matches:");
+      return NextResponse.json(
+        { error: "Erro interno do servidor" },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 async function createSampleUsers(): Promise<User[]> {

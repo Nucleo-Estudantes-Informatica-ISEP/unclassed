@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
-
 import { authorizeRequest } from "@/lib/apiAccess";
-import * as classRepo from "@/application/repositories/classRepository";
-import * as matchRepository from "@/application/repositories/matchRepository";
-import * as userRepository from "@/application/repositories/userRepository";
+import { logger, safeError } from "@/lib/logger";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
+import { withRequestLogContext } from "@/lib/requestLogContext";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
 
 interface MatchLike {
   id: string;
@@ -46,12 +47,12 @@ function coerceParticipants(value: unknown): RawParticipant[] {
 function sanitizeUserForMatch(
   user:
     | {
-      id: string;
-      name: string;
-      email: string;
-      phone: string | null;
-      sharePhoneOnMatch: boolean | null;
-    }
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        sharePhoneOnMatch: boolean | null;
+      }
     | undefined,
   sessionUserId: string
 ) {
@@ -98,125 +99,131 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
+  return withRequestLogContext(request, async () => {
+    try {
+      const authResult = await authorizeRequest(request);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+      const { session } = authResult;
 
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const matchType = searchParams.get("matchType");
-    const userId = searchParams.get("userId");
+      const { searchParams } = new URL(request.url);
+      const status = searchParams.get("status");
+      const matchType = searchParams.get("matchType");
+      const userId = searchParams.get("userId");
 
-    // Build where clause
-    const where: NonNullable<Parameters<typeof matchRepository.findMany>[0]>["where"] = {};
+      // Build where clause
+      const where: NonNullable<
+        Parameters<typeof matchRepository.findMany>[0]
+      >["where"] = {};
 
-    if (
-      status &&
-      matchStatuses.includes(status as (typeof matchStatuses)[number])
-    ) {
-      const validatedStatus = status as (typeof matchStatuses)[number];
-      where.status = validatedStatus;
-    } else {
-      where.status = {
-        in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
-      };
-    }
-
-    if (
-      matchType &&
-      matchTypes.includes(matchType as (typeof matchTypes)[number])
-    ) {
-      const validatedMatchType = matchType as (typeof matchTypes)[number];
-      where.matchType = validatedMatchType;
-    }
-
-    const matches = await matchRepository.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Filter matches that involve the user (if not admin)
-    let filteredMatches = matches;
-    if (session.role !== "ADMIN") {
-      filteredMatches = matches.filter((match) =>
-        coerceParticipants(match.participants).some(
-          (p) => p.userId === session.id
-        )
-      );
-    } else if (userId) {
-      filteredMatches = matches.filter((match) =>
-        coerceParticipants(match.participants).some((p) => p.userId === userId)
-      );
-    }
-
-    const dedupedMatches = dedupeMatches(
-      filteredMatches as unknown as MatchLike[]
-    );
-
-    // Enrich matches with user and class information
-    const enrichedMatches = await Promise.all(
-      dedupedMatches.map(async (match) => {
-        const participants = coerceParticipants(match.participants);
-
-        // Get user information for participants
-        const userIds = participants
-          .map((p) => p.userId)
-          .filter((id): id is string => id !== undefined);
-        const users = await userRepository.findMany({
-          where: { id: { in: userIds } },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            sharePhoneOnMatch: true,
-          },
-        });
-        // Get class information
-        const classIds = [
-          ...participants.map((p) => p.fromClass),
-          ...participants.map((p) => p.toClass),
-        ].filter((id): id is string => id !== undefined);
-        const classes = await classRepo.findManyByIds(classIds);
-
-        const enrichedParticipants = participants.map((p) => {
-          const user = users.find((u) => u.id === p.userId);
-          const fromClass = classes.find((c) => c.id === p.fromClass);
-          const toClass = classes.find((c) => c.id === p.toClass);
-
-          return {
-            ...p,
-            user: sanitizeUserForMatch(user, session.id),
-            fromClass,
-            toClass,
-          };
-        });
-
-        const result = {
-          ...match,
-          participants: enrichedParticipants,
+      if (
+        status &&
+        matchStatuses.includes(status as (typeof matchStatuses)[number])
+      ) {
+        const validatedStatus = status as (typeof matchStatuses)[number];
+        where.status = validatedStatus;
+      } else {
+        where.status = {
+          in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
         };
-        return result;
-      })
-    );
+      }
 
-    const response = NextResponse.json(enrichedMatches);
-    // Prevent caching to ensure fresh data
-    response.headers.set(
-      "Cache-Control",
-      "no-cache, no-store, must-revalidate"
-    );
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
-    return response;
-  } catch (error) {
-    console.error("Error fetching matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
+      if (
+        matchType &&
+        matchTypes.includes(matchType as (typeof matchTypes)[number])
+      ) {
+        const validatedMatchType = matchType as (typeof matchTypes)[number];
+        where.matchType = validatedMatchType;
+      }
+
+      const matches = await matchRepository.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Filter matches that involve the user (if not admin)
+      let filteredMatches = matches;
+      if (session.role !== "ADMIN") {
+        filteredMatches = matches.filter((match) =>
+          coerceParticipants(match.participants).some(
+            (p) => p.userId === session.id
+          )
+        );
+      } else if (userId) {
+        filteredMatches = matches.filter((match) =>
+          coerceParticipants(match.participants).some(
+            (p) => p.userId === userId
+          )
+        );
+      }
+
+      const dedupedMatches = dedupeMatches(
+        filteredMatches as unknown as MatchLike[]
+      );
+
+      // Enrich matches with user and class information
+      const enrichedMatches = await Promise.all(
+        dedupedMatches.map(async (match) => {
+          const participants = coerceParticipants(match.participants);
+
+          // Get user information for participants
+          const userIds = participants
+            .map((p) => p.userId)
+            .filter((id): id is string => id !== undefined);
+          const users = await userRepository.findMany({
+            where: { id: { in: userIds } },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              sharePhoneOnMatch: true,
+            },
+          });
+          // Get class information
+          const classIds = [
+            ...participants.map((p) => p.fromClass),
+            ...participants.map((p) => p.toClass),
+          ].filter((id): id is string => id !== undefined);
+          const classes = await classRepo.findManyByIds(classIds);
+
+          const enrichedParticipants = participants.map((p) => {
+            const user = users.find((u) => u.id === p.userId);
+            const fromClass = classes.find((c) => c.id === p.fromClass);
+            const toClass = classes.find((c) => c.id === p.toClass);
+
+            return {
+              ...p,
+              user: sanitizeUserForMatch(user, session.id),
+              fromClass,
+              toClass,
+            };
+          });
+
+          const result = {
+            ...match,
+            participants: enrichedParticipants,
+          };
+          return result;
+        })
+      );
+
+      const response = NextResponse.json(enrichedMatches);
+      // Prevent caching to ensure fresh data
+      response.headers.set(
+        "Cache-Control",
+        "no-cache, no-store, must-revalidate"
+      );
+      response.headers.set("Pragma", "no-cache");
+      response.headers.set("Expires", "0");
+      return response;
+    } catch (error) {
+      logger.error(safeError(error), "Error fetching matches:");
+      return NextResponse.json(
+        { error: "Erro interno do servidor" },
+        { status: 500 }
+      );
+    }
+  });
 }

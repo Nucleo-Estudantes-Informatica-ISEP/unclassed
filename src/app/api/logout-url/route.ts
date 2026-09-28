@@ -3,6 +3,8 @@ import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
 import { env } from "@/lib/env";
+import { logger, safeError } from "@/lib/logger";
+import { withRequestLogContext } from "@/lib/requestLogContext";
 import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
 
 const authDebugEnabled = env.AUTH_DEBUG;
@@ -17,7 +19,9 @@ async function getJwtTokenFromRequest(request: NextRequest) {
   const req = {
     cookies: request.cookies,
     headers: {
-      cookie: allCookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; "),
+      cookie: allCookies
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join("; "),
     },
   } as unknown as Parameters<typeof getToken>[0]["req"];
 
@@ -40,7 +44,8 @@ async function getJwtTokenFromRequest(request: NextRequest) {
     },
   ].filter(({ cookieName }) =>
     allCookies.some(
-      (cookie) => cookie.name === cookieName || cookie.name.startsWith(`${cookieName}.`)
+      (cookie) =>
+        cookie.name === cookieName || cookie.name.startsWith(`${cookieName}.`)
     )
   );
 
@@ -64,50 +69,31 @@ async function getJwtTokenFromRequest(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const token = await getJwtTokenFromRequest(request);
-    const idTokenHint =
-      typeof token?.idTokenHint === "string"
-        ? token.idTokenHint
-        : typeof token?.idToken === "string"
-          ? token.idToken
-          : null;
-    const logoutHint = typeof token?.email === "string" ? token.email : null;
+  return withRequestLogContext(request, async () => {
+    try {
+      const token = await getJwtTokenFromRequest(request);
+      const idTokenHint =
+        typeof token?.idTokenHint === "string"
+          ? token.idTokenHint
+          : typeof token?.idToken === "string"
+            ? token.idToken
+            : null;
+      const logoutHint = typeof token?.email === "string" ? token.email : null;
 
-    if (authDebugEnabled) {
-      console.info("[auth][logout-url]", {
-        hasJwt: Boolean(token),
-        cookieNames: request.cookies.getAll().map((cookie) => cookie.name),
-        hasIdTokenHint: typeof token?.idTokenHint === "string",
-        hasIdToken: typeof token?.idToken === "string",
-        hasEmail: typeof token?.email === "string",
-        hasSub: typeof token?.sub === "string",
-        hasZitadelSub: typeof token?.zitadelSub === "string",
-      });
+      if (authDebugEnabled) {
+        logger.info("[auth][logout-url]");
+      }
+
+      const redirectTo = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
+
+      if (authDebugEnabled) {
+        logger.info("[auth][logout-url-generated]");
+      }
+
+      return NextResponse.json({ redirectTo });
+    } catch (error) {
+      logger.error(safeError(error), "Failed to build logout URL:");
+      return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
     }
-
-    const redirectTo = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
-
-    if (authDebugEnabled) {
-      const url = new URL(redirectTo);
-      console.info("[auth][logout-url-generated]", {
-        origin: url.origin,
-        pathname: url.pathname,
-        hasClientId: url.searchParams.has("client_id"),
-        hasIdTokenHint: url.searchParams.has("id_token_hint"),
-        hasLogoutHint: url.searchParams.has("logout_hint"),
-        hasPostLogoutRedirectUri: url.searchParams.has(
-          "post_logout_redirect_uri"
-        ),
-        postLogoutRedirectUri: url.searchParams.get(
-          "post_logout_redirect_uri"
-        ),
-      });
-    }
-
-    return NextResponse.json({ redirectTo });
-  } catch (error) {
-    console.error("Failed to build logout URL:", error);
-    return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
-  }
+  });
 }
