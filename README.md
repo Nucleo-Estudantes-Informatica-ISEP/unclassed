@@ -69,7 +69,10 @@ The core product flow is:
 ├── data/
 │   └── subjects.json
 ├── docs/
-│   └── domain-model/
+│   ├── architecture.md      # Runtime layer diagram
+│   ├── database.md          # MongoDB schema quirks and change process
+│   ├── decisions/           # Architecture decision records
+│   └── domain-model/        # Mermaid schema diagram
 ├── Dockerfile
 ├── docker-compose.yaml
 ├── docker-compose.override.yml
@@ -78,7 +81,7 @@ The core product flow is:
 
 ## Core Domain Model
 
-See the [Mermaid domain diagram](./docs/domain-model/domain-model.md) for all Prisma models, fields, and declared relations.
+See the [Mermaid domain diagram](./docs/domain-model/domain-model.md), [database notes](./docs/database.md), [architecture diagram](./docs/architecture.md), and [decision records](./docs/decisions/) for contributor context.
 
 The Prisma schema defines the following main entities:
 
