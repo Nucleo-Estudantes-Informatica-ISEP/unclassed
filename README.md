@@ -156,6 +156,9 @@ The main variables are:
 | `NEXT_PUBLIC_SENTRY_DSN` | Optional | Browser GlitchTip DSN, set before building the image |
 | `SENTRY_ENVIRONMENT` | Optional | Server environment label, e.g. `production` or `staging` |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Optional | Browser environment label, set before building the image |
+| `LOG_LEVEL` | Optional | Pino level; defaults to `info` in production |
+
+HTTP API responses include `x-request-id`; server logs use the same request ID. Cron and matching runs add `jobExecutionId`. Production logs are JSON; local development uses `pino-pretty`. Log payloads omit exception messages, request bodies, emails, tokens, and passwords.
 
 ### Authentication Notes
 

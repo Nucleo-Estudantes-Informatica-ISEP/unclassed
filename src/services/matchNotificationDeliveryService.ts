@@ -1,5 +1,6 @@
-import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
+import { logger, safeError } from "@/lib/logger";
 import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
+import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
 
 export const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
 export const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
@@ -30,20 +31,19 @@ export async function reserveMatchNotificationDelivery(
     return true;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      const existingDelivery =
-        await matchNotificationDeliveryRepo.findUnique({
-          where: {
-            matchId_userId_notificationType: {
-              matchId,
-              userId,
-              notificationType: MATCH_NOTIFICATION_TYPE,
-            },
+      const existingDelivery = await matchNotificationDeliveryRepo.findUnique({
+        where: {
+          matchId_userId_notificationType: {
+            matchId,
+            userId,
+            notificationType: MATCH_NOTIFICATION_TYPE,
           },
-          select: {
-            status: true,
-            updatedAt: true,
-          },
-        });
+        },
+        select: {
+          status: true,
+          updatedAt: true,
+        },
+      });
 
       if (!existingDelivery) {
         return false;
@@ -106,9 +106,9 @@ export async function markMatchNotificationDeliverySent(
       },
     });
   } catch (error) {
-    console.warn(
-      `Failed to mark match notification delivery as sent for match ${matchId} and user ${userId}:`,
-      error
+    logger.warn(
+      safeError(error),
+      "Failed to mark match notification delivery as sent for match and user:"
     );
   }
 }
@@ -132,9 +132,9 @@ export async function markMatchNotificationDeliveryFailed(
       },
     });
   } catch (error) {
-    console.warn(
-      `Failed to mark match notification delivery as failed for match ${matchId} and user ${userId}:`,
-      error
+    logger.warn(
+      safeError(error),
+      "Failed to mark match notification delivery as failed for match and user:"
     );
   }
 }
@@ -178,10 +178,7 @@ export async function deliverMatchNotificationOnce(
     );
     return "failed";
   } catch (error) {
-    console.error(
-      `Error sending notification to ${email} for match ${matchId}:`,
-      error
-    );
+    logger.error(safeError(error), "Error sending notification to for match:");
     await markMatchNotificationDeliveryFailed(
       matchId,
       userId,

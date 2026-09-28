@@ -26,6 +26,9 @@ const environmentSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    LOG_LEVEL: z
+      .enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"])
+      .optional(),
     NEXT_PHASE: optionalString,
     npm_lifecycle_event: optionalString,
     npm_package_version: optionalString,

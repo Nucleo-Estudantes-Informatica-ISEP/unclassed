@@ -1,8 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ArrowLeftRight, CheckCircle, Clock, Eye, Package2, Trash2, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  CheckCircle,
+  Clock,
+  Eye,
+  Package2,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
+
+import { logger } from "@/lib/clientLogger";
 import { Badge } from "@/lib/components/ui/badge";
 import { Button } from "@/lib/components/ui/button";
 import { Card, CardContent } from "@/lib/components/ui/card";
@@ -14,15 +25,11 @@ interface RequestsClientProps {
 }
 
 export default function RequestsClient({ userId }: RequestsClientProps) {
-  const {
-    data: singleRequests,
-    loading: singleLoading,
-  } = useSingleSwapRequests(userId);
+  const { data: singleRequests, loading: singleLoading } =
+    useSingleSwapRequests(userId);
 
-  const {
-    data: bundleRequests,
-    loading: bundleLoading,
-  } = useBundleSwapRequests(userId);
+  const { data: bundleRequests, loading: bundleLoading } =
+    useBundleSwapRequests(userId);
 
   const handleCancelRequest = async (
     requestId: string,
@@ -48,8 +55,8 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
 
       toast.success("Pedido cancelado com sucesso!");
       window.location.reload();
-    } catch (error) {
-      console.error("Error cancelling request:", error);
+    } catch {
+      logger.error("Error cancelling request:");
       toast.error("Erro ao cancelar pedido");
     }
   };
@@ -82,8 +89,8 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
 
       toast.success("Pedido eliminado com sucesso!");
       window.location.reload();
-    } catch (error) {
-      console.error("Error deleting request:", error);
+    } catch {
+      logger.error("Error deleting request:");
       toast.error("Erro ao eliminar pedido");
     }
   };
@@ -122,10 +129,10 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
 
   if (singleLoading || bundleLoading) {
     return (
-      <div className="w-full bg-background py-8">
+      <div className="bg-background w-full py-8">
         <div className="container mx-auto px-4 sm:px-10">
           <div className="flex h-64 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+            <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
           </div>
         </div>
       </div>
@@ -133,11 +140,13 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
   }
 
   return (
-    <div className="w-full bg-background py-8">
-      <div className="container mx-auto px-4 sm:px-10 space-y-6">
+    <div className="bg-background w-full py-8">
+      <div className="container mx-auto space-y-6 px-4 sm:px-10">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Os Meus Pedidos</h2>
-          <p className="text-sm text-muted-foreground sm:text-base">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Os Meus Pedidos
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Gere todos os teus pedidos de permuta ativos e passados
           </p>
         </div>
@@ -155,23 +164,29 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                   <Card key={request.id}>
                     <CardContent className="p-6">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <h4 className="font-semibold min-w-0 break-words">
+                            <h4 className="min-w-0 font-semibold break-words">
                               {request.subject?.code} - {request.subject?.name}
                             </h4>
                             {getStatusBadge(request.status)}
                           </div>
-                          <p className="mb-2 text-sm text-muted-foreground">
-                            <strong>Turma atual:</strong> {request.currentClass?.name}
+                          <p className="text-muted-foreground mb-2 text-sm">
+                            <strong>Turma atual:</strong>{" "}
+                            {request.currentClass?.name}
                           </p>
-                          <p className="text-sm text-muted-foreground break-words">
-                            <strong>Turmas preferidas:</strong> {request.preferredClasses
+                          <p className="text-muted-foreground text-sm break-words">
+                            <strong>Turmas preferidas:</strong>{" "}
+                            {request.preferredClasses
                               ?.map((cls: { name: string }) => cls.name)
                               .join(", ")}
                           </p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Criado em <ClientDate date={request.createdAt} format="short" />
+                          <p className="text-muted-foreground mt-2 text-xs">
+                            Criado em{" "}
+                            <ClientDate
+                              date={request.createdAt}
+                              format="short"
+                            />
                           </p>
                         </div>
                         <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
@@ -195,7 +210,9 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                               variant="outline"
                               size="sm"
                               className="w-full sm:w-auto"
-                              onClick={() => handleCancelRequest(request.id, "single")}
+                              onClick={() =>
+                                handleCancelRequest(request.id, "single")
+                              }
                             >
                               Cancelar
                             </Button>
@@ -204,7 +221,9 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                             variant="destructive"
                             size="sm"
                             className="w-full sm:w-auto"
-                            onClick={() => handleDeleteRequest(request.id, "single")}
+                            onClick={() =>
+                              handleDeleteRequest(request.id, "single")
+                            }
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                           </Button>
@@ -217,7 +236,7 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
             ) : (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <ArrowLeftRight className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <ArrowLeftRight className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground">
                     Nenhuma permuta individual criada
                   </p>
@@ -238,23 +257,30 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                   <Card key={request.id}>
                     <CardContent className="p-6">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <h4 className="font-semibold min-w-0 break-words">
-                              Permuta Completa - {request.currentClass?.year}º Ano
+                            <h4 className="min-w-0 font-semibold break-words">
+                              Permuta Completa - {request.currentClass?.year}º
+                              Ano
                             </h4>
                             {getStatusBadge(request.status)}
                           </div>
-                          <p className="mb-2 text-sm text-muted-foreground">
-                            <strong>Turma atual:</strong> {request.currentClass?.name}
+                          <p className="text-muted-foreground mb-2 text-sm">
+                            <strong>Turma atual:</strong>{" "}
+                            {request.currentClass?.name}
                           </p>
-                          <p className="text-sm text-muted-foreground break-words">
-                            <strong>Turmas preferidas:</strong> {request.preferredClasses
+                          <p className="text-muted-foreground text-sm break-words">
+                            <strong>Turmas preferidas:</strong>{" "}
+                            {request.preferredClasses
                               ?.map((cls: { name: string }) => cls.name)
                               .join(", ")}
                           </p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Criado em <ClientDate date={request.createdAt} format="short" />
+                          <p className="text-muted-foreground mt-2 text-xs">
+                            Criado em{" "}
+                            <ClientDate
+                              date={request.createdAt}
+                              format="short"
+                            />
                           </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
@@ -278,7 +304,9 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                               variant="outline"
                               size="sm"
                               className="w-full sm:w-auto"
-                              onClick={() => handleCancelRequest(request.id, "bundle")}
+                              onClick={() =>
+                                handleCancelRequest(request.id, "bundle")
+                              }
                             >
                               Cancelar
                             </Button>
@@ -287,7 +315,9 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
                             variant="destructive"
                             size="sm"
                             className="w-full sm:w-auto"
-                            onClick={() => handleDeleteRequest(request.id, "bundle")}
+                            onClick={() =>
+                              handleDeleteRequest(request.id, "bundle")
+                            }
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                           </Button>
@@ -300,7 +330,7 @@ export default function RequestsClient({ userId }: RequestsClientProps) {
             ) : (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <Package2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <Package2 className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground">
                     Nenhuma permuta completa criada
                   </p>

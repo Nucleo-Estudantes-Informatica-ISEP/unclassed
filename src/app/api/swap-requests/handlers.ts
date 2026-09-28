@@ -1,28 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { 
-  updateSwapRequestSchema,
-  singleSwapRequestSchema,
-  bundleSwapRequestSchema
-} from "@/schemas/swapRequestSchema";
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import { logger, safeError } from "@/lib/logger";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import {
-  SwapRequestError,
-  SwapRequestNotFoundError,
-  SwapRequestForbiddenError,
-  SwapRequestValidationError,
-  SwapRequestConflictError,
-  listSwapRequests,
-  getSwapRequestById,
-  createSingleSwapRequest,
-  createBundleSwapRequest,
-  updateSwapRequestPreferredClasses,
   cancelSwapRequest,
+  createBundleSwapRequest,
+  createSingleSwapRequest,
   deleteSwapRequest,
+  getSwapRequestById,
+  listSwapRequests,
+  SwapRequestConflictError,
+  SwapRequestError,
+  SwapRequestForbiddenError,
+  SwapRequestNotFoundError,
+  SwapRequestValidationError,
+  updateSwapRequestPreferredClasses,
 } from "@/application/services/swapRequestService";
+import {
+  bundleSwapRequestSchema,
+  singleSwapRequestSchema,
+  updateSwapRequestSchema,
+} from "@/schemas/swapRequestSchema";
 
 export type SwapType = "single" | "bundle";
 
@@ -42,7 +43,7 @@ function mapSwapRequestErrorToHttpStatus(error: SwapRequestError): number {
   if (error instanceof SwapRequestForbiddenError) return 403;
   if (error instanceof SwapRequestValidationError) return 400;
   if (error instanceof SwapRequestConflictError) return 409;
-  
+
   return 500; // default for unknown business errors
 }
 
@@ -53,7 +54,7 @@ function handleRouteError(error: unknown, contextDescription: string) {
   if (error instanceof SwapRequestError) {
     const status = mapSwapRequestErrorToHttpStatus(error);
     if (status === 500) {
-      console.error(`Unhandled swap request error in ${contextDescription}:`, error);
+      logger.error({ ...safeError(error), operation: contextDescription }, "Unhandled swap request error");
       return NextResponse.json(
         { error: "Erro interno do servidor" },
         { status: 500 }
@@ -63,11 +64,14 @@ function handleRouteError(error: unknown, contextDescription: string) {
     const body: { error: string; details?: unknown } = {
       error: error.message,
     };
-    
-    if (error instanceof SwapRequestValidationError && error.details !== undefined) {
+
+    if (
+      error instanceof SwapRequestValidationError &&
+      error.details !== undefined
+    ) {
       body.details = error.details;
     }
-    
+
     return NextResponse.json(body, { status });
   }
 
@@ -78,7 +82,7 @@ function handleRouteError(error: unknown, contextDescription: string) {
     );
   }
 
-  console.error(`Error in ${contextDescription}:`, error);
+  logger.error({ ...safeError(error), operation: contextDescription }, "Swap request error");
   return NextResponse.json(
     { error: "Erro interno do servidor" },
     { status: 500 }
@@ -124,13 +128,21 @@ export async function handleCreateSwapRequest(
     const { session } = authResult;
 
     const rawBody = await request.json();
-    if (rawBody && typeof rawBody === "object" && rawBody.preferenceOrderMatters === undefined) {
+    if (
+      rawBody &&
+      typeof rawBody === "object" &&
+      rawBody.preferenceOrderMatters === undefined
+    ) {
       rawBody.preferenceOrderMatters = true;
     }
 
     if (type === "single") {
       const body = singleSwapRequestSchema.parse(rawBody);
-      const result = await createSingleSwapRequest(session, body, singleSwapRequestRepo);
+      const result = await createSingleSwapRequest(
+        session,
+        body,
+        singleSwapRequestRepo
+      );
       return NextResponse.json(
         {
           ...result,
@@ -140,11 +152,16 @@ export async function handleCreateSwapRequest(
       );
     } else {
       const body = bundleSwapRequestSchema.parse(rawBody);
-      const result = await createBundleSwapRequest(session, body, bundleSwapRequestRepo);
+      const result = await createBundleSwapRequest(
+        session,
+        body,
+        bundleSwapRequestRepo
+      );
       return NextResponse.json(
         {
           ...result,
-          message: "Pedido de permuta completa criado! A procurar matches imediatos...",
+          message:
+            "Pedido de permuta completa criado! A procurar matches imediatos...",
         },
         { status: 201 }
       );
@@ -187,14 +204,20 @@ export async function handleUpdateSwapRequest(
 
     const body = await request.json();
     const validatedBody = updateSwapRequestSchema.parse(body);
-    
+
     if (validatedBody.status === "CANCELLED") {
       const result = await cancelSwapRequest(session, id, getRepository(type));
       return NextResponse.json(result);
     }
-    
+
     if (validatedBody.preferredClassIds !== undefined) {
-      const result = await updateSwapRequestPreferredClasses(session, id, type, getRepository(type), validatedBody.preferredClassIds);
+      const result = await updateSwapRequestPreferredClasses(
+        session,
+        id,
+        type,
+        getRepository(type),
+        validatedBody.preferredClassIds
+      );
       return NextResponse.json(result);
     }
 
@@ -218,10 +241,11 @@ export async function handleDeleteSwapRequest(
     const { session } = authResult;
 
     await deleteSwapRequest(session, id, getRepository(type));
-    return NextResponse.json({ 
-      message: type === "single"
-        ? "Pedido de permuta eliminado com sucesso"
-        : "Pedido de permuta completa eliminado com sucesso"
+    return NextResponse.json({
+      message:
+        type === "single"
+          ? "Pedido de permuta eliminado com sucesso"
+          : "Pedido de permuta completa eliminado com sucesso",
     });
   } catch (error) {
     return handleRouteError(error, `deleting ${type} swap request`);

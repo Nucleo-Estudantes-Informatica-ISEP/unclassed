@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
 import { switchAuthNeiAccount } from "@/lib/client-auth-actions";
+import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 
 interface UserMenuProps {
@@ -53,8 +54,8 @@ export default function UserMenu({ user }: UserMenuProps) {
 
       await signOut({ redirect: false });
       window.location.href = redirectTo;
-    } catch (error) {
-      console.error("Logout error:", error);
+    } catch {
+      logger.error("Logout error:");
       toast.error("Erro ao terminar sessão");
       router.push("/");
       router.refresh();

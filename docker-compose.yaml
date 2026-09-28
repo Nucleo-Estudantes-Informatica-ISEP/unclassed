@@ -49,4 +49,5 @@ services:
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-1}
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped

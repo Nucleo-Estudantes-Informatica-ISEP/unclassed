@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
+import { logger, safeError } from "@/lib/logger";
+import { withRequestLogContext } from "@/lib/requestLogContext";
 import { getCronScheduler } from "@/services/cronScheduler";
 
 /**
@@ -9,45 +11,46 @@ import { getCronScheduler } from "@/services/cronScheduler";
  * Admin-only endpoint
  */
 export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request, {
-      requireAdmin: true,
-      rateLimit: "stats",
-    });
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-
-    console.log('Fetching fresh admin cron data');
-    const scheduler = getCronScheduler();
-
-    // Get comprehensive cron statistics
-    const [cronStats, executionHistory, jobStatus] = await Promise.all([
-      scheduler.getCronStats(),
-      scheduler.getExecutionHistory(100),
-      scheduler.getJobStatus()
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      cronStats,
-      executionHistory,
-      jobStatus,
-      scheduler: {
-        isStarted: cronStats.schedulerStatus === 'RUNNING',
-        activeJobs: cronStats.activeJobs,
-        nextScheduledRuns: cronStats.nextScheduledRuns
+  return withRequestLogContext(request, async () => {
+    try {
+      const authResult = await authorizeRequest(request, {
+        requireAdmin: true,
+        rateLimit: "stats",
+      });
+      if (!authResult.ok) {
+        return authResult.response;
       }
-    });
 
-  } catch (error) {
-    console.error("Error getting cron statistics:", error);
-    return NextResponse.json(
-      { error: "Falha ao obter estatísticas do cron" },
-      { status: 500 }
-    );
-  }
+      logger.info("Fetching fresh admin cron data");
+      const scheduler = getCronScheduler();
+
+      // Get comprehensive cron statistics
+      const [cronStats, executionHistory, jobStatus] = await Promise.all([
+        scheduler.getCronStats(),
+        scheduler.getExecutionHistory(100),
+        scheduler.getJobStatus(),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        cronStats,
+        executionHistory,
+        jobStatus,
+        scheduler: {
+          isStarted: cronStats.schedulerStatus === "RUNNING",
+          activeJobs: cronStats.activeJobs,
+          nextScheduledRuns: cronStats.nextScheduledRuns,
+        },
+      });
+    } catch (error) {
+      logger.error(safeError(error), "Error getting cron statistics:");
+      return NextResponse.json(
+        { error: "Falha ao obter estatísticas do cron" },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 /**
@@ -56,87 +59,97 @@ export async function GET(request: NextRequest) {
  * Admin-only endpoint
  */
 export async function POST(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request, {
-      requireAdmin: true,
-      enforceSameOriginForSessionWrites: true,
-      rateLimit: "batch",
-    });
-    if (!authResult.ok) {
-      return authResult.response;
+  return withRequestLogContext(request, async () => {
+    try {
+      const authResult = await authorizeRequest(request, {
+        requireAdmin: true,
+        enforceSameOriginForSessionWrites: true,
+        rateLimit: "batch",
+      });
+      if (!authResult.ok) {
+        return authResult.response;
+      }
+
+      const body = await request.json();
+      const { action, jobId } = body;
+
+      const scheduler = getCronScheduler();
+      switch (action) {
+        case "run_job":
+          if (!jobId) {
+            return NextResponse.json(
+              { error: "O ID do job é obrigatório" },
+              { status: 400 }
+            );
+          }
+
+          await scheduler.runJobManually(jobId);
+          logger.info("Admin manually triggered job:");
+          return NextResponse.json({
+            success: true,
+            message: `Job ${jobId} executado com sucesso`,
+            timestamp: new Date().toISOString(),
+          });
+
+        case "start_scheduler":
+          scheduler.start();
+          logger.info("Admin started cron scheduler");
+          return NextResponse.json({
+            success: true,
+            message: "Agendador cron iniciado",
+            timestamp: new Date().toISOString(),
+          });
+
+        case "stop_scheduler":
+          scheduler.stop();
+          logger.info("Admin stopped cron scheduler");
+          return NextResponse.json({
+            success: true,
+            message: "Agendador cron parado",
+            timestamp: new Date().toISOString(),
+          });
+
+        case "enable_job":
+          if (!jobId) {
+            return NextResponse.json(
+              { error: "O ID do job é obrigatório" },
+              { status: 400 }
+            );
+          }
+
+          scheduler.setJobEnabled(jobId, true);
+          logger.info("Admin enabled job:");
+          return NextResponse.json({
+            success: true,
+            message: `Job ${jobId} enabled`,
+            timestamp: new Date().toISOString(),
+          });
+
+        case "disable_job":
+          if (!jobId) {
+            return NextResponse.json(
+              { error: "O ID do job é obrigatório" },
+              { status: 400 }
+            );
+          }
+
+          scheduler.setJobEnabled(jobId, false);
+          logger.info("Admin disabled job:");
+          return NextResponse.json({
+            success: true,
+            message: `Job ${jobId} disabled`,
+            timestamp: new Date().toISOString(),
+          });
+
+        default:
+          return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
+      }
+    } catch (error) {
+      logger.error(safeError(error), "Error controlling cron scheduler:");
+      return NextResponse.json(
+        { error: "Falha ao controlar o agendador cron" },
+        { status: 500 }
+      );
     }
-
-    const body = await request.json();
-    const { action, jobId } = body;
-
-    const scheduler = getCronScheduler();
-    switch (action) {
-      case "run_job":
-        if (!jobId) {
-          return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
-        }
-
-        await scheduler.runJobManually(jobId);
-        console.log(`Admin manually triggered job: ${jobId}`);
-        return NextResponse.json({
-          success: true,
-          message: `Job ${jobId} executado com sucesso`,
-          timestamp: new Date().toISOString()
-        });
-
-      case "start_scheduler":
-        scheduler.start();
-        console.log("Admin started cron scheduler");
-        return NextResponse.json({
-          success: true,
-          message: "Agendador cron iniciado",
-          timestamp: new Date().toISOString()
-        });
-
-      case "stop_scheduler":
-        scheduler.stop();
-        console.log("Admin stopped cron scheduler");
-        return NextResponse.json({
-          success: true,
-          message: "Agendador cron parado",
-          timestamp: new Date().toISOString()
-        });
-
-      case "enable_job":
-        if (!jobId) {
-          return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
-        }
-
-        scheduler.setJobEnabled(jobId, true);
-        console.log(`Admin enabled job: ${jobId}`);
-        return NextResponse.json({
-          success: true,
-          message: `Job ${jobId} enabled`,
-          timestamp: new Date().toISOString()
-        });
-
-      case "disable_job":
-        if (!jobId) {
-          return NextResponse.json({ error: "O ID do job é obrigatório" }, { status: 400 });
-        }
-
-        scheduler.setJobEnabled(jobId, false);
-        console.log(`Admin disabled job: ${jobId}`);
-        return NextResponse.json({
-          success: true,
-          message: `Job ${jobId} disabled`,
-          timestamp: new Date().toISOString()
-        });
-
-      default:
-        return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
-    }
-
-  } catch (error) {
-    console.error("Error controlling cron scheduler:", error);
-    return NextResponse.json(
-      { error: "Falha ao controlar o agendador cron" },
-      { status: 500 }
-    );
-  }
+  });
 }
