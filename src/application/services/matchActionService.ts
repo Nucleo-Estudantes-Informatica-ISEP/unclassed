@@ -1,4 +1,5 @@
 import { logger, safeError } from "@/lib/logger";
+import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 import { emailService } from "@/services/emailService";
 import {
   assertMatchActionAllowed,
@@ -9,7 +10,6 @@ import {
   MatchActionNotFoundError,
 } from "@/services/matchActionRules";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import type { JsonValue } from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
@@ -310,30 +310,6 @@ async function updateGraphPartitionsFromMatch(match: MatchRecord) {
   for (const partitionKey of Array.from(affectedPartitions)) {
     await updatePartitionRequestCount(partitionKey);
   }
-}
-
-async function updatePartitionRequestCount(partitionKey: string) {
-  const [singleCount, bundleCount] = await Promise.all([
-    singleSwapRequestRepo.count({
-      where: {
-        graphPartition: partitionKey,
-        status: "ACTIVE",
-      },
-    }),
-    bundleSwapRequestRepo.count({
-      where: {
-        graphPartition: partitionKey,
-        status: "ACTIVE",
-      },
-    }),
-  ]);
-
-  await graphPartitionRepo.update({
-    where: { partitionKey },
-    data: { activeRequests: singleCount + bundleCount },
-  });
-
-  logger.info("Updated partition: active requests");
 }
 
 function getActionMessage(action: string): string {

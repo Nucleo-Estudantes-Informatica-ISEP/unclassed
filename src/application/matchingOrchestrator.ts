@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { logger, safeError, withJobExecution } from "@/lib/logger";
+import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 import {
   emailService,
   type MatchNotificationData,
@@ -710,7 +711,7 @@ export class MatchingOrchestrator {
     }
 
     // Update partition request count
-    await this.updatePartitionRequestCount(partition.partitionKey);
+    await updatePartitionRequestCount(partition.partitionKey);
   }
 
   // ===== UTILITY METHODS =====
@@ -961,31 +962,6 @@ export class MatchingOrchestrator {
         : `Year ${partition.year ?? ""}`;
 
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
-  }
-
-  private async updatePartitionRequestCount(
-    partitionKey: string
-  ): Promise<void> {
-    // Count active requests in this partition
-    const [singleCount, bundleCount] = await Promise.all([
-      singleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-      bundleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-    ]);
-
-    await graphPartitionRepo.update({
-      where: { partitionKey },
-      data: { activeRequests: singleCount + bundleCount },
-    });
   }
 
   private async updatePartitionStats(
@@ -1287,7 +1263,7 @@ export class MatchingOrchestrator {
     );
     await Promise.all(
       affectedPartitions.map((partitionKey: string) =>
-        this.updatePartitionRequestCount(partitionKey)
+        updatePartitionRequestCount(partitionKey)
       )
     );
 
