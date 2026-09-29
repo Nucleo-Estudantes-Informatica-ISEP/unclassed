@@ -88,6 +88,8 @@ const classesData = [
   { name: "2DN", year: 2 },
   { name: "2DP", year: 2 },
   { name: "2DO", year: 2 },
+  { name: "2DQ", year: 2 },
+  { name: "2DR", year: 2 },
   { name: "2NA", year: 2 },
   { name: "2NB", year: 2 },
   { name: "2NC", year: 2 },
