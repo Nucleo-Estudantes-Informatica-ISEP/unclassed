@@ -52,7 +52,12 @@ export function sanitizeMonitoringLog(log: Log): Log | null {
   ) {
     attributes.errorType = source.errorType;
   }
-  for (const key of ["durationMs", "lockCount"] as const) {
+  for (const key of [
+    "durationMs",
+    "lockCount",
+    "matchesFound",
+    "processedPartitions",
+  ] as const) {
     const value = source[key];
     if (
       typeof value === "number" &&

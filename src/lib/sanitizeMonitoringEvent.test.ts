@@ -111,3 +111,19 @@ test("monitoring logs reject dynamic messages and invalid metadata", () => {
     {}
   );
 });
+
+test("batch matching logs retain non-sensitive counters", () => {
+  const sanitized = sanitizeMonitoringLog({
+    level: "info",
+    message: "Batch matching completed",
+    attributes: {
+      matchesFound: 3,
+      processedPartitions: 5,
+      email: "user@example.com",
+    },
+  });
+  assert.deepEqual(sanitized?.attributes, {
+    matchesFound: 3,
+    processedPartitions: 5,
+  });
+});
