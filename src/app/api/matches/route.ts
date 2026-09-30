@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import {
@@ -101,14 +101,12 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
   return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
+export const GET = defineHandler({
+  auth: {},
 
+  handler: async (context) => {
+    const { request } = context;
+    const { session } = context;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const matchType = searchParams.get("matchType");
@@ -130,7 +128,6 @@ export async function GET(request: NextRequest) {
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
       };
     }
-
     if (
       matchType &&
       matchTypes.includes(matchType as (typeof matchTypes)[number])
@@ -138,13 +135,10 @@ export async function GET(request: NextRequest) {
       const validatedMatchType = matchType as (typeof matchTypes)[number];
       where.matchType = validatedMatchType;
     }
-
     const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
-
-    // Filter matches that involve the user (if not admin)
     let filteredMatches = matches;
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
@@ -208,9 +202,7 @@ export async function GET(request: NextRequest) {
         return result;
       })
     );
-
     const response = NextResponse.json(enrichedMatches);
-    // Prevent caching to ensure fresh data
     response.headers.set(
       "Cache-Control",
       "no-cache, no-store, must-revalidate"
@@ -218,11 +210,5 @@ export async function GET(request: NextRequest) {
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Expires", "0");
     return response;
-  } catch (error) {
-    console.error("Error fetching matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});

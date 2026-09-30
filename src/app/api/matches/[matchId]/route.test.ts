@@ -15,6 +15,37 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
   const params = Promise.resolve({ matchId: "match-123" });
 
   describe("PATCH /api/matches/[matchId]", () => {
+    it("delegates successful actions to the application lifecycle service", async () => {
+      vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
+        ok: true,
+        session: { id: "user-1", role: "USER" },
+      } as never);
+      const updatedMatch = { id: "match-123", status: "ACCEPTED" };
+      const process = vi
+        .spyOn(matchActionService, "processMatchAction")
+        .mockResolvedValueOnce({
+          updatedMatch,
+          message: "Match aceite!",
+        } as never);
+      try {
+        const response = await PATCH(
+          new NextRequest("http://localhost:3000/api/matches/match-123", {
+            method: "PATCH",
+            body: JSON.stringify({ action: "accept" }),
+          }),
+          { params }
+        );
+        expect(process).toHaveBeenCalledWith("match-123", "user-1", "accept");
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+          success: true,
+          match: updatedMatch,
+          message: "Match aceite!",
+        });
+      } finally {
+        process.mockRestore();
+      }
+    });
     it("returns 404 when match is not found", async () => {
       vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
         ok: true,

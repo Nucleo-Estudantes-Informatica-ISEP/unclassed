@@ -66,8 +66,6 @@ export async function GET(request: NextRequest, { params }: MatchRouteContext) {
         { status: 404 }
       );
     }
-
-    // Check if user is participant
     const participants = coerceParticipants(match.participants);
     const isParticipant = participants.some((p) => p.userId === session.id);
 
@@ -145,5 +143,6 @@ export async function PATCH(
       { error: "Erro interno do servidor" },
       { status: 500 }
     );
-  }
-}
+    return NextResponse.json({ success: true, match: updatedMatch, message });
+  },
+});
