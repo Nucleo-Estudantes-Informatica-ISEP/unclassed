@@ -8,13 +8,14 @@ import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 import * as userRepo from "@/application/repositories/userRepository";
-import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
 import * as txRepo from "@/application/repositories/transactionRepository";
 import {
   emailService,
   type MatchNotificationData,
 } from "@/services/emailService";
+import * as matchNotificationDeliveryService from "@/services/matchNotificationDeliveryService";
 import { buildPartitionKey } from "@/services/partitionKey";
 import type { Graph } from "@/domain/graph/graph";
 import {
@@ -140,9 +141,6 @@ interface UserRecord {
   emailVerified?: boolean | null;
   emailNotifications?: boolean | null;
 }
-
-export const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
-export const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface ClassRecord {
   id: string;
@@ -709,7 +707,7 @@ export class MatchingOrchestrator {
     }
 
     // Update partition request count
-    await this.updatePartitionRequestCount(partition.partitionKey);
+    await updatePartitionRequestCount(partition.partitionKey);
   }
 
   // ===== UTILITY METHODS =====
@@ -804,6 +802,37 @@ export class MatchingOrchestrator {
     });
   }
 
+  private async loadActiveSingleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await singleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+      include: { subject: true },
+    })) as unknown as SingleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
+  }
+
+  private async loadActiveBundleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await bundleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+    })) as unknown as BundleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
+  }
+
   /**
    * Public: Return a snapshot of the graph for a given partitionKey
    * Includes nodes (requests) and directed edges (preferences) with weights/satisfaction
@@ -845,45 +874,19 @@ export class MatchingOrchestrator {
     }
 
     // Build the list of active requests (nodes) mirroring buildPartitionGraph
-    let requests: MatchingRequest[] = [];
+    let requests: MatchingRequest[];
 
     if (partition.ticketType === "SPECIFIC_CLASS") {
-      const singleRequests = (await singleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-        include: { subject: true },
-      })) as unknown as SingleSwapRequestRecord[];
+      const singleRequests = await this.loadActiveSingleRequests(
+        partition.partitionKey
+      );
+      const bundleRequests = await this.loadActiveBundleRequests(
+        partition.partitionKey
+      );
 
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(singleRequests);
-
-      requests = filtered.map(toMatchingRequest);
-      // Combine with bundle requests
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filteredBundle =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = [...requests, ...filteredBundle.map(toMatchingRequest)];
+      requests = [...singleRequests, ...bundleRequests];
     } else {
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = filtered.map(toMatchingRequest);
+      requests = await this.loadActiveBundleRequests(partition.partitionKey);
     }
 
     const graph = buildCompatibilityGraph(requests);
@@ -955,31 +958,6 @@ export class MatchingOrchestrator {
         : `Year ${partition.year ?? ""}`;
 
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
-  }
-
-  private async updatePartitionRequestCount(
-    partitionKey: string
-  ): Promise<void> {
-    // Count active requests in this partition
-    const [singleCount, bundleCount] = await Promise.all([
-      singleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-      bundleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-    ]);
-
-    await graphPartitionRepo.update({
-      where: { partitionKey },
-      data: { activeRequests: singleCount + bundleCount },
-    });
   }
 
   private async updatePartitionStats(
@@ -1073,204 +1051,31 @@ export class MatchingOrchestrator {
           dashboardUrl: baseUrl,
         };
 
-        const notificationReserved =
-          await this.reserveMatchNotificationDelivery(
+        const outcome =
+          await matchNotificationDeliveryService.deliverMatchNotificationOnce(
             matchId,
             user.id,
-            user.email
+            user.email,
+            () =>
+              emailService.sendMatchNotification(user.email, notificationData)
           );
 
-        if (!notificationReserved) {
+        if (outcome === "skipped") {
           console.log(
             `Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
           continue;
         }
 
-        try {
-          const emailSent = await emailService.sendMatchNotification(
-            user.email,
-            notificationData
-          );
-
-          if (emailSent) {
-            await this.markMatchNotificationDeliverySent(matchId, user.id);
-            console.log(`Match notification sent to ${user.email}`);
-            continue;
-          }
-
-          await this.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            "Email service returned false"
-          );
-          console.log(`Failed to send notification to ${user.email}`);
-        } catch (error) {
-          await this.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            this.getErrorMessage(error)
-          );
-          console.error(
-            `Error sending notification to ${user.email} for match ${matchId}:`,
-            error
-          );
+        if (outcome === "sent") {
+          console.log(`Match notification sent to ${user.email}`);
+          continue;
         }
+
+        console.log(`Failed to send notification to ${user.email}`);
       }
     } catch (error) {
       console.error("Error sending match notifications:", error);
     }
-  }
-
-  async reserveMatchNotificationDelivery(
-    matchId: string,
-    userId: string,
-    email: string
-  ): Promise<boolean> {
-    const now = new Date();
-    const staleReservationThreshold = new Date(
-      now.getTime() - MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS
-    );
-
-    try {
-      await matchNotificationDeliveryRepo.create({
-        data: {
-          matchId,
-          userId,
-          email,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-          reservedAt: now,
-          sentAt: null,
-          lastError: null,
-        },
-      });
-      return true;
-    } catch (error) {
-      if (this.isUniqueConstraintError(error)) {
-        const existingDelivery =
-          await matchNotificationDeliveryRepo.findUnique({
-            where: {
-              matchId_userId_notificationType: {
-                matchId,
-                userId,
-                notificationType: MATCH_NOTIFICATION_TYPE,
-              },
-            },
-            select: {
-              status: true,
-              updatedAt: true,
-            },
-          });
-
-        if (!existingDelivery) {
-          return false;
-        }
-
-        if (
-          existingDelivery.status === "SENT" ||
-          (existingDelivery.status === "SENDING" &&
-            existingDelivery.updatedAt > staleReservationThreshold)
-        ) {
-          return false;
-        }
-
-        const reclaimedReservation =
-          await matchNotificationDeliveryRepo.updateMany({
-            where: {
-              matchId,
-              userId,
-              notificationType: MATCH_NOTIFICATION_TYPE,
-              OR: [
-                { status: "FAILED" },
-                {
-                  status: "SENDING",
-                  updatedAt: { lte: staleReservationThreshold },
-                },
-              ],
-            },
-            data: {
-              email,
-              status: "SENDING",
-              reservedAt: now,
-              sentAt: null,
-              lastError: null,
-            },
-          });
-
-        return reclaimedReservation.count > 0;
-      }
-
-      throw error;
-    }
-  }
-
-  private async markMatchNotificationDeliverySent(
-    matchId: string,
-    userId: string
-  ): Promise<void> {
-    try {
-      await matchNotificationDeliveryRepo.updateMany({
-        where: {
-          matchId,
-          userId,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-        },
-        data: {
-          status: "SENT",
-          sentAt: new Date(),
-          lastError: null,
-        },
-      });
-    } catch (error) {
-      console.warn(
-        `Failed to mark match notification delivery as sent for match ${matchId} and user ${userId}:`,
-        error
-      );
-    }
-  }
-
-  private async markMatchNotificationDeliveryFailed(
-    matchId: string,
-    userId: string,
-    reason: string
-  ): Promise<void> {
-    try {
-      await matchNotificationDeliveryRepo.updateMany({
-        where: {
-          matchId,
-          userId,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-        },
-        data: {
-          status: "FAILED",
-          lastError: reason.slice(0, 500),
-        },
-      });
-    } catch (error) {
-      console.warn(
-        `Failed to mark match notification delivery as failed for match ${matchId} and user ${userId}:`,
-        error
-      );
-    }
-  }
-
-  private isUniqueConstraintError(error: unknown): boolean {
-    return (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "P2002"
-    );
-  }
-
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return "Unknown delivery error";
   }
 
   private async createMatches(
@@ -1432,7 +1237,7 @@ export class MatchingOrchestrator {
     );
     await Promise.all(
       affectedPartitions.map((partitionKey: string) =>
-        this.updatePartitionRequestCount(partitionKey)
+        updatePartitionRequestCount(partitionKey)
       )
     );
 
@@ -1522,39 +1327,10 @@ export class MatchingOrchestrator {
 
       console.log(`Building graph for partition ${partition.partitionKey}`);
 
-      // Get all active requests in this partition
-      let requests: MatchingRequest[];
-
-      if (partition.ticketType === "SPECIFIC_CLASS") {
-        // Get all active requests in this partition
-        const singleRequests = (await singleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-          include: { subject: true },
-        })) as unknown as SingleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredSingleRequests =
-          await this.filterUsersWithAcceptedMatches(singleRequests);
-
-        requests = filteredSingleRequests.map(toMatchingRequest);
-      } else {
-        // Bundle swap requests for year-based swaps
-        const bundleRequests = (await bundleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-        })) as unknown as BundleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredBundleRequests =
-          await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-        requests = filteredBundleRequests.map(toMatchingRequest);
-      }
+      const requests =
+        partition.ticketType === "SPECIFIC_CLASS"
+          ? await this.loadActiveSingleRequests(partition.partitionKey)
+          : await this.loadActiveBundleRequests(partition.partitionKey);
 
       console.log(`Found ${requests.length} active requests in partition`);
 

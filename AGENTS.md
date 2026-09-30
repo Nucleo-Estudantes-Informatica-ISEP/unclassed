@@ -12,6 +12,7 @@ For each task:
    - `feature/` or `feat/` — new functionality
    - `bugfix/` or `fix/` — bug fixes
    - `hotfix/` — urgent production fixes
+   - `refactor/` — behavior-preserving code restructuring
    - `release/` — release preparation
    - `docs/` — documentation-only changes
    - `chore/` — tooling, configuration, and other maintenance
@@ -91,7 +92,10 @@ src/
 
 prisma/           # MongoDB schema, seed, reset helper
 data/             # static subject data
-docs/domain-model/ # PlantUML domain diagram
+docs/architecture.md # Runtime layer diagram
+docs/database.md   # MongoDB schema notes
+docs/decisions/    # Numbered architecture decision records
+docs/domain-model/ # Mermaid domain diagram
 ```
 
 ### Request and data layers
@@ -150,6 +154,7 @@ Documentation should answer a future contributor's first question without duplic
 - Update `README.md` when a user-visible capability, setup prerequisite, environment variable, script, route, deployment requirement, or operational workflow changes.
 - Update this `AGENTS.md` when the stack, layer map, contribution/verification workflow, architectural boundary, or persistent gotcha changes.
 - Keep documentation adjacent to its audience: public setup and operations in `README.md`; contributor rules and architecture here; domain diagrams in `docs/domain-model/`; code-specific rationale beside the code.
+- Record accepted architectural decisions as numbered ADRs in `docs/decisions/`.
 - Document why for non-obvious constraints, especially auth boundaries, lifecycle-managed clients, cron locks, data integrity rules, and security decisions. Do not restate code line-by-line.
 - Keep examples runnable and command names synchronized with `package.json`.
 - In the same change that alters behavior, update relevant docs. Do not defer known documentation drift to a follow-up.
@@ -164,6 +169,8 @@ Schema and production-data changes are consequential. Do not run `pnpm schema:de
 Read environment variables server-side only. `.env.example` is source of truth for documented configuration; update it when adding/removing/renaming a variable.
 
 ## Verification
+
+For documentation-only changes (including `AGENTS.md`, `README.md`, and `docs/`), verify changed content, links, filenames, and `git diff --check`. Local application installs, lint, typecheck, tests, builds, audits, schema/migration checks, Docker builds, and runtime smoke checks are unnecessary. CI still runs its configured checks on the PR.
 
 Before finishing a change:
 

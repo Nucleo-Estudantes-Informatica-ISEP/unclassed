@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as matchNotificationRepo from "@/application/repositories/matchNotificationDeliveryRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import {
-  MatchingOrchestrator,
+  reserveMatchNotificationDelivery,
   MATCH_NOTIFICATION_TYPE,
   MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS,
-} from "@/application/matchingOrchestrator";
+} from "@/services/matchNotificationDeliveryService";
 import {
   assertSafeTestDatabaseUrl,
   clearTestDatabase,
@@ -108,8 +108,6 @@ describe("Match notification delivery reservation persistence", () => {
       },
     });
 
-    const orchestrator = new MatchingOrchestrator();
-    
     // 1. Create a stale SENDING reservation (older than 15-minute production timeout)
     const now = new Date();
     const staleDate = new Date(now.getTime() - MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS - 1000);
@@ -131,7 +129,7 @@ describe("Match notification delivery reservation persistence", () => {
     });
 
     // Should successfully reclaim the stale reservation
-    const reclaimed = await orchestrator.reserveMatchNotificationDelivery(
+    const reclaimed = await reserveMatchNotificationDelivery(
       match.id,
       user.id,
       user.email
@@ -139,7 +137,7 @@ describe("Match notification delivery reservation persistence", () => {
     expect(reclaimed).toBe(true);
 
     // 2. Try to reserve again immediately (active SENDING reservation)
-    const active = await orchestrator.reserveMatchNotificationDelivery(
+    const active = await reserveMatchNotificationDelivery(
       match.id,
       user.id,
       user.email
@@ -152,7 +150,7 @@ describe("Match notification delivery reservation persistence", () => {
       data: { status: "SENT" },
     });
 
-    const sent = await orchestrator.reserveMatchNotificationDelivery(
+    const sent = await reserveMatchNotificationDelivery(
       match.id,
       user.id,
       user.email
