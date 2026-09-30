@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authorizeRequest, type AuthorizationOptions } from "@/lib/apiAccess";
+import { logger, safeError } from "@/lib/logger";
+import { withRequestLogContext } from "@/lib/requestLogContext";
 import type { SessionUser } from "@/services/getServerSession";
 
 type AuthPolicy = AuthorizationOptions | false;
@@ -52,48 +54,52 @@ export function defineHandler<
   return async (
     request: NextRequest,
     route?: { params: Promise<P> }
-  ): Promise<Response> => {
-    try {
-      const identity =
-        auth === false
-          ? { session: null, authenticatedBy: "public" as const }
-          : await authorizeRequest(request, {
-              ...auth,
-              enforceSameOriginForSessionWrites: true,
-            });
-      if ("ok" in identity && !identity.ok) return identity.response;
+  ): Promise<Response> =>
+    withRequestLogContext(request, async () => {
+      try {
+        const identity =
+          auth === false
+            ? { session: null, authenticatedBy: "public" as const }
+            : await authorizeRequest(request, {
+                ...auth,
+                enforceSameOriginForSessionWrites: true,
+              });
+        if ("ok" in identity && !identity.ok) return identity.response;
 
-      let body: B | undefined;
-      if (schema) {
-        let input: unknown;
-        try {
-          input = await request.json();
-        } catch (error) {
-          if (!(error instanceof SyntaxError)) throw error;
-          return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+        let body: B | undefined;
+        if (schema) {
+          let input: unknown;
+          try {
+            input = await request.json();
+          } catch (error) {
+            if (!(error instanceof SyntaxError)) throw error;
+            return NextResponse.json(
+              { error: "JSON inválido" },
+              { status: 400 }
+            );
+          }
+          body = await schema.parseAsync(input);
         }
-        body = await schema.parseAsync(input);
+        const context = {
+          ...identity,
+          request,
+          body,
+          params: route ? await route.params : {},
+        } as unknown as HandlerContext<A, B, P>;
+        const denied = await authorize?.(context);
+        if (denied) return denied;
+        return await handler(context);
+      } catch (error) {
+        const mapped = await onError?.(error);
+        if (mapped) return mapped;
+        if (error instanceof z.ZodError) {
+          return NextResponse.json(
+            { error: "Validação falhou" },
+            { status: 400 }
+          );
+        }
+        logger.error(safeError(error), "HTTP handler failed:");
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
       }
-      const context = {
-        ...identity,
-        request,
-        body,
-        params: route ? await route.params : {},
-      } as unknown as HandlerContext<A, B, P>;
-      const denied = await authorize?.(context);
-      if (denied) return denied;
-      return await handler(context);
-    } catch (error) {
-      const mapped = await onError?.(error);
-      if (mapped) return mapped;
-      if (error instanceof z.ZodError) {
-        return NextResponse.json(
-          { error: "Validação falhou" },
-          { status: 400 }
-        );
-      }
-      console.error("HTTP handler failed:", error);
-      return NextResponse.json({ error: errorMessage }, { status: 500 });
-    }
-  };
+    });
 }

@@ -152,6 +152,9 @@ The main variables are:
 | `EMAIL_USER` | Optional | SMTP username |
 | `EMAIL_PASS` | Optional | SMTP password |
 | `EMAIL_FROM` | Optional | Sender address |
+| `LOG_LEVEL` | Optional | Pino level; defaults to `info` in production |
+
+HTTP API responses include `x-request-id`; server logs use the same request ID. Cron and matching runs add `jobExecutionId`. Production logs are JSON; local development uses `pino-pretty`. Log payloads omit exception messages, request bodies, emails, tokens, and passwords.
 
 ### Authentication Notes
 

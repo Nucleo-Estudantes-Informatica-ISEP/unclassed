@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
 
+import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 
 const Login: React.FC = () => {
@@ -54,8 +55,8 @@ const Login: React.FC = () => {
 
     try {
       await signIn("zitadel", { callbackUrl });
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch {
+      logger.error("Login error:");
       setIsLoading(false);
     } finally {
       setIsLoading(false);

@@ -4,6 +4,7 @@ import type { JWT } from "next-auth/jwt";
 
 import { defineHandler } from "@/lib/defineHandler";
 import { env } from "@/lib/env";
+import { logger, safeError } from "@/lib/logger";
 import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
 
 const authDebugEnabled = env.AUTH_DEBUG;
@@ -70,7 +71,7 @@ async function getJwtTokenFromRequest(request: NextRequest) {
 export const GET = defineHandler({
   auth: false,
   onError: (error) => {
-    console.error("Failed to build logout URL:", error);
+    logger.error(safeError(error), "Failed to build logout URL:");
     return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
   },
   handler: async (context) => {
@@ -84,30 +85,11 @@ export const GET = defineHandler({
           : null;
     const logoutHint = typeof token?.email === "string" ? token.email : null;
     if (authDebugEnabled) {
-      console.info("[auth][logout-url]", {
-        hasJwt: Boolean(token),
-        cookieNames: request.cookies.getAll().map((cookie) => cookie.name),
-        hasIdTokenHint: typeof token?.idTokenHint === "string",
-        hasIdToken: typeof token?.idToken === "string",
-        hasEmail: typeof token?.email === "string",
-        hasSub: typeof token?.sub === "string",
-        hasZitadelSub: typeof token?.zitadelSub === "string",
-      });
+      logger.info("[auth][logout-url]");
     }
     const redirectTo = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
     if (authDebugEnabled) {
-      const url = new URL(redirectTo);
-      console.info("[auth][logout-url-generated]", {
-        origin: url.origin,
-        pathname: url.pathname,
-        hasClientId: url.searchParams.has("client_id"),
-        hasIdTokenHint: url.searchParams.has("id_token_hint"),
-        hasLogoutHint: url.searchParams.has("logout_hint"),
-        hasPostLogoutRedirectUri: url.searchParams.has(
-          "post_logout_redirect_uri"
-        ),
-        postLogoutRedirectUri: url.searchParams.get("post_logout_redirect_uri"),
-      });
+      logger.info("[auth][logout-url-generated]");
     }
     return NextResponse.json({ redirectTo });
   },

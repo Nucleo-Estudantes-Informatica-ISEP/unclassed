@@ -1,8 +1,9 @@
-import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 import { CronExpressionParser } from "cron-parser";
 
 import type { CronStats, LockLease, ScheduledJob } from "./cron/types";
 import { env } from "@/lib/env";
+import { logger, safeError, withJobExecution } from "@/lib/logger";
+import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 
 import { CronExecutionStore } from "./cron/executionStore";
 import { CronJobHandlers } from "./cron/jobHandlers";
@@ -39,11 +40,11 @@ export class CronScheduler {
 
   start() {
     if (this.started) {
-      console.log("Cron scheduler already running");
+      logger.info("Cron scheduler already running");
       return;
     }
 
-    console.log("Starting internal cron scheduler...");
+    logger.info("Starting internal cron scheduler...");
     this.started = true;
 
     try {
@@ -55,19 +56,17 @@ export class CronScheduler {
       throw error;
     }
 
-    console.log(
-      `Cron scheduler started with ${this.enabledJobs().length} active jobs`
-    );
+    logger.info("Cron scheduler started with active jobs");
   }
 
   stop() {
     if (!this.started) return;
 
-    console.log("Stopping cron scheduler...");
+    logger.info("Stopping cron scheduler...");
     for (const interval of this.intervals.values()) clearInterval(interval);
     this.intervals.clear();
     this.started = false;
-    console.log("Cron scheduler stopped");
+    logger.info("Cron scheduler stopped");
   }
 
   addJob(job: ScheduledJob) {
@@ -105,12 +104,14 @@ export class CronScheduler {
   }
 
   async runJobManually(jobId: string): Promise<void> {
-    const job = this.registry.get(jobId);
-    if (!job) throw new Error(`Job ${jobId} not found`);
+    return withJobExecution(async () => {
+      const job = this.registry.get(jobId);
+      if (!job) throw new Error(`Job ${jobId} not found`);
 
-    const lease = await this.lock.acquire(job.id, job.lockTimeout);
-    if (!lease) throw new Error(`Job ${jobId} is already running`);
-    await this.runJob(job, lease);
+      const lease = await this.lock.acquire(job.id, job.lockTimeout);
+      if (!lease) throw new Error(`Job ${jobId} is already running`);
+      await this.runJob(job, lease);
+    });
   }
 
   private registerDefaultJobs() {
@@ -142,35 +143,38 @@ export class CronScheduler {
       lockTimeout: 2 * 60 * 1_000,
     });
 
-    console.log("Cron schedules configured:");
-    console.log(`  - Batch Matching: ${env.CRON_BATCH_MATCHING} (lock: 8min)`);
-    console.log(
-      `  - Provisional Cleanup: ${env.CRON_PROVISIONAL_CLEANUP} (lock: 3min)`
+    logger.info(
+      {
+        schedules: {
+          batchMatching: env.CRON_BATCH_MATCHING,
+          provisionalCleanup: env.CRON_PROVISIONAL_CLEANUP,
+          healthCheck: env.CRON_HEALTH_CHECK,
+        },
+      },
+      "Cron schedules configured"
     );
-    console.log(`  - Health Check: ${env.CRON_HEALTH_CHECK} (lock: 2min)`);
   }
 
   private scheduleJob(job: ScheduledJob) {
     job.nextRun = getNextCronRun(job.schedule);
     this.unscheduleJob(job.id);
 
-    const interval = setInterval(async () => {
-      const now = new Date();
-      if (!job.nextRun || now < job.nextRun || job.isRunning) return;
+    const interval = setInterval(
+      () =>
+        void withJobExecution(async () => {
+          const now = new Date();
+          if (!job.nextRun || now < job.nextRun || job.isRunning) return;
 
-      const lease = await this.lock.acquire(job.id, job.lockTimeout);
-      if (lease) void this.runJob(job, lease);
-      else
-        console.log(
-          `Job '${job.name}' skipped - another instance is running`
-        );
-      job.nextRun = getNextCronRun(job.schedule);
-    }, 1_000);
+          const lease = await this.lock.acquire(job.id, job.lockTimeout);
+          if (lease) void this.runJob(job, lease);
+          else logger.info({ jobId: job.id }, "Job skipped: lock held");
+          job.nextRun = getNextCronRun(job.schedule);
+        }),
+      1_000
+    );
 
     this.intervals.set(job.id, interval);
-    console.log(
-      `Scheduled job '${job.name}' - next run: ${job.nextRun.toISOString()}, check interval: 1000ms`
-    );
+    logger.info({ jobId: job.id, nextRun: job.nextRun }, "Scheduled job");
   }
 
   private unscheduleJob(jobId: string) {
@@ -184,7 +188,7 @@ export class CronScheduler {
 
     job.isRunning = true;
     job.lastRun = new Date();
-    console.log(`Running job: ${job.name}`);
+    logger.info({ jobId: job.id }, "Running job");
 
     const startTime = Date.now();
     const heartbeat = setInterval(() => {
@@ -192,13 +196,17 @@ export class CronScheduler {
         .renew(lease)
         .then((renewed) => {
           if (!renewed) {
-            console.error(
-              `Cron lock lease lost while '${job.name}' is still running`
+            logger.error(
+              { jobId: job.id },
+              "Cron lock lease lost while job is running"
             );
           }
         })
         .catch((error) => {
-          console.error(`Failed to renew cron lock for '${job.name}':`, error);
+          logger.error(
+            { ...safeError(error), jobId: job.id },
+            "Failed to renew cron lock"
+          );
         });
     }, getLeaseHeartbeatInterval(lease.timeoutMs));
     heartbeat.unref?.();
@@ -207,7 +215,7 @@ export class CronScheduler {
     try {
       const result = await job.handler();
       const duration = Date.now() - startTime;
-      console.log(`Job '${job.name}' completed in ${duration}ms`);
+      logger.info({ jobId: job.id, durationMs: duration }, "Job completed");
 
       if (execution) {
         await this.executions.update(execution.id, {
@@ -224,7 +232,10 @@ export class CronScheduler {
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`Job '${job.name}' failed:`, error);
+      logger.error(
+        { ...safeError(error), jobId: job.id, durationMs: duration },
+        "Job failed"
+      );
 
       if (execution) {
         await this.executions.update(execution.id, {
@@ -288,7 +299,7 @@ function registerGracefulShutdownHandlers() {
   if (gracefulShutdownHooksRegistered) return;
 
   const shutdown = () => {
-    console.log("Received shutdown signal, stopping cron scheduler...");
+    logger.info("Received shutdown signal, stopping cron scheduler...");
     shutdownCronScheduler();
     process.exit(0);
   };
@@ -304,7 +315,7 @@ export function initializeCronScheduler() {
     scheduler.start();
     registerGracefulShutdownHandlers();
   } else {
-    console.log("Cron scheduler disabled");
+    logger.info("Cron scheduler disabled");
   }
 }
 

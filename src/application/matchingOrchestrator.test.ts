@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test, vi } from "vitest";
 
+import { logger } from "@/lib/logger";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
@@ -63,7 +64,7 @@ test("assembles cycle processing time from the orchestration start", () => {
 });
 
 test("warns when a malformed cycle has no edge", () => {
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
   const match = assembleCycleMatch(
     ["a", "missing"],
@@ -73,7 +74,7 @@ test("warns when a malformed cycle has no edge", () => {
   );
 
   assert.equal(match, null);
-  assert.deepEqual(warn.mock.calls, [["Missing edge from a to missing"]]);
+  assert.deepEqual(warn.mock.calls, [["Missing edge from to"]]);
 });
 
 test("warns when a malformed cycle has no request details", () => {
@@ -90,12 +91,12 @@ test("warns when a malformed cycle has no request details", () => {
     outgoingEdges: () => [edge],
   };
 
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
   const match = assembleCycleMatch(["a", "b"], graph, "subject-1", 1_000);
 
   assert.equal(match, null);
-  assert.deepEqual(warn.mock.calls, [["Request details not found for a"]]);
+  assert.deepEqual(warn.mock.calls, [["Request details not found for"]]);
 });
 
 test("getGraphSnapshot preserves nodes and compatibility edges", async () => {

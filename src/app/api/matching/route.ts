@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { defineHandler } from "@/lib/defineHandler";
+import { logger } from "@/lib/logger";
 import { triggerImmediateMatching } from "@/services/matchingTriggers";
 import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
@@ -25,9 +26,7 @@ export const POST = defineHandler({
   schema: matchingRequestSchema,
   handler: async (context) => {
     const { requestId, requestType } = context.body;
-    console.log(
-      `Immediate matching requested for ${requestType} request ${requestId}`
-    );
+    logger.info("Immediate matching requested for request");
     const immediateMatches = await triggerImmediateMatching(
       requestId,
       requestType
@@ -64,7 +63,7 @@ export const PUT = defineHandler({
   },
 
   handler: async (context) => {
-    console.log("Batch processing requested");
+    logger.info("Batch processing requested");
     const matchingService = new MatchingOrchestrator();
     const results = await matchingService.runBatchProcessing();
     const expiredCount = await matchingService.expireProvisionalMatches();

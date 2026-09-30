@@ -1,4 +1,5 @@
 import type { LockLease } from "./types";
+import { logger, safeError } from "@/lib/logger";
 import * as cronLockRepo from "@/application/repositories/cronLockRepository";
 
 export function getLeaseHeartbeatInterval(timeoutMs: number): number {
@@ -6,9 +7,7 @@ export function getLeaseHeartbeatInterval(timeoutMs: number): number {
 }
 
 export class JobLock {
-  constructor(
-    private readonly defaultTimeout = 10 * 60 * 1_000
-  ) {}
+  constructor(private readonly defaultTimeout = 10 * 60 * 1_000) {}
 
   async acquire(
     jobId: string,
@@ -46,20 +45,18 @@ export class JobLock {
             where: { jobId },
           });
           if (lockCount > 1) {
-            console.error(
-              `Lock invariant violation for job ${jobId}: found ${lockCount} lock rows`
-            );
+            logger.error({ jobId, lockCount }, "Lock invariant violation");
           }
         } catch (retryError) {
-          console.warn(
-            `Failed to retry lock reclaim for job ${jobId}:`,
-            retryError
+          logger.warn(
+            { ...safeError(retryError), jobId },
+            "Failed to retry lock reclaim"
           );
         }
         return null;
       }
 
-      console.warn(`Failed to acquire lock for job ${jobId}:`, error);
+      logger.warn({ ...safeError(error), jobId }, "Failed to acquire lock");
       return null;
     }
   }
@@ -83,9 +80,7 @@ export class JobLock {
         where: { jobId: lease.jobId, createdAt: lease.acquiredAt },
       });
     } catch {
-      console.debug(
-        `Lock release for job ${lease.jobId} had no effect (likely already expired)`
-      );
+      logger.debug({ jobId: lease.jobId }, "Lock release had no effect");
     }
   }
 }
