@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { defineHandler } from "@/lib/defineHandler";
+import { logger } from "@/lib/logger";
 import { getCronScheduler } from "@/services/cronScheduler";
 
 /**
@@ -16,7 +17,7 @@ export const GET = defineHandler({
   },
   errorMessage: "Falha ao obter estatísticas do cron",
   handler: async () => {
-    console.log("Fetching fresh admin cron data");
+    logger.info("Fetching fresh admin cron data");
     const scheduler = getCronScheduler();
     const [cronStats, executionHistory, jobStatus] = await Promise.all([
       scheduler.getCronStats(),
@@ -64,7 +65,7 @@ export const POST = defineHandler({
         }
 
         await scheduler.runJobManually(jobId);
-        console.log(`Admin manually triggered job: ${jobId}`);
+        logger.info("Admin manually triggered job:");
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} executado com sucesso`,
@@ -73,7 +74,7 @@ export const POST = defineHandler({
 
       case "start_scheduler":
         scheduler.start();
-        console.log("Admin started cron scheduler");
+        logger.info("Admin started cron scheduler");
         return NextResponse.json({
           success: true,
           message: "Agendador cron iniciado",
@@ -82,7 +83,7 @@ export const POST = defineHandler({
 
       case "stop_scheduler":
         scheduler.stop();
-        console.log("Admin stopped cron scheduler");
+        logger.info("Admin stopped cron scheduler");
         return NextResponse.json({
           success: true,
           message: "Agendador cron parado",
@@ -98,7 +99,7 @@ export const POST = defineHandler({
         }
 
         scheduler.setJobEnabled(jobId, true);
-        console.log(`Admin enabled job: ${jobId}`);
+        logger.info("Admin enabled job:");
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} enabled`,
@@ -114,7 +115,7 @@ export const POST = defineHandler({
         }
 
         scheduler.setJobEnabled(jobId, false);
-        console.log(`Admin disabled job: ${jobId}`);
+        logger.info("Admin disabled job:");
         return NextResponse.json({
           success: true,
           message: `Job ${jobId} disabled`,

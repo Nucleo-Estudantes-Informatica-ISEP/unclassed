@@ -3,8 +3,10 @@
 import { httpClient } from "@/lib/httpClient";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import type { FieldPath, FieldValues, UseFormReturn } from "react-hook-form";
+import { toast } from "sonner";
+
+import { logger } from "@/lib/clientLogger";
 
 export interface SwapRequestFormBase {
   currentClassId: string;
@@ -12,7 +14,9 @@ export interface SwapRequestFormBase {
   preferenceOrderMatters: boolean;
 }
 
-interface UseSwapRequestWizardFormOptions<T extends FieldValues & SwapRequestFormBase> {
+interface UseSwapRequestWizardFormOptions<
+  T extends FieldValues & SwapRequestFormBase,
+> {
   form: UseFormReturn<T>;
   endpoint: string;
   successMessage: string;
@@ -28,7 +32,9 @@ interface UseSwapRequestWizardFormOptions<T extends FieldValues & SwapRequestFor
  * its own schema, endpoint, and which extra fields (e.g. subjectId) it
  * validates before advancing — this hook only factors out what's identical.
  */
-export function useSwapRequestWizardForm<T extends FieldValues & SwapRequestFormBase>({
+export function useSwapRequestWizardForm<
+  T extends FieldValues & SwapRequestFormBase,
+>({
   form,
   endpoint,
   successMessage,
@@ -68,7 +74,7 @@ export function useSwapRequestWizardForm<T extends FieldValues & SwapRequestForm
         1200
       );
     } catch (error) {
-      console.error(errorLogLabel, error);
+      logger.error(errorLogLabel);
       toast.error(error instanceof Error ? error.message : "Erro inesperado");
     } finally {
       setIsSubmitting(false);

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 
 import { defineHandler } from "@/lib/defineHandler";
 import { env } from "@/lib/env";
+import { logger, safeError } from "@/lib/logger";
 import { isAppInitialized } from "@/lib/startup";
 import { getCronSchedulerStatus } from "@/services/cronScheduler";
 import * as userRepository from "@/application/repositories/userRepository";
@@ -23,7 +24,7 @@ export const GET = defineHandler({
     allowCronSecret: true,
   },
   onError: (error) => {
-    console.error("Health check error:", error);
+    logger.error(safeError(error), "Health check error:");
     return NextResponse.json(
       {
         status: "unhealthy",
@@ -52,7 +53,7 @@ export const GET = defineHandler({
       dbResponseTime = Date.now() - dbStart;
     } catch (error) {
       dbHealth = "unhealthy";
-      console.error("Database health check failed:", error);
+      logger.error(safeError(error), "Database health check failed:");
     }
     const responseTime = Date.now() - startTime;
     const healthData = {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { defineHandler } from "@/lib/defineHandler";
+import { logger, safeError } from "@/lib/logger";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import {
@@ -53,9 +54,9 @@ function handleRouteError(error: unknown, contextDescription: string) {
   if (error instanceof SwapRequestError) {
     const status = mapSwapRequestErrorToHttpStatus(error);
     if (status === 500) {
-      console.error(
-        `Unhandled swap request error in ${contextDescription}:`,
-        error
+      logger.error(
+        { ...safeError(error), operation: contextDescription },
+        "Unhandled swap request error"
       );
       return NextResponse.json(
         { error: "Erro interno do servidor" },
@@ -84,7 +85,10 @@ function handleRouteError(error: unknown, contextDescription: string) {
     );
   }
 
-  console.error(`Error in ${contextDescription}:`, error);
+  logger.error(
+    { ...safeError(error), operation: contextDescription },
+    "Swap request error"
+  );
   return NextResponse.json(
     { error: "Erro interno do servidor" },
     { status: 500 }

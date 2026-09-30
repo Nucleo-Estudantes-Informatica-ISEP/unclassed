@@ -1,13 +1,14 @@
 "use client";
 
-import { httpClient } from "@/lib/httpClient";
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { ArrowRight, UserPlus } from "lucide-react";
+import { signIn } from "next-auth/react";
 
+import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
+import { httpClient } from "@/lib/httpClient";
 
 const Register: React.FC = () => {
   const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
@@ -15,14 +16,19 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl =
-    searchParams.get("callbackUrl") || searchParams.get("redirectTo") || "/profile";
+    searchParams.get("callbackUrl") ||
+    searchParams.get("redirectTo") ||
+    "/profile";
 
   useEffect(() => {
     let mounted = true;
 
     const checkAuthConfig = async () => {
       try {
-        const data = await httpClient.get<{ configured?: boolean }>("/api/auth/configured", { cache: "no-store" });
+        const data = await httpClient.get<{ configured?: boolean }>(
+          "/api/auth/configured",
+          { cache: "no-store" }
+        );
 
         if (mounted) {
           setAuthConfigured(data.configured !== false);
@@ -52,8 +58,8 @@ const Register: React.FC = () => {
 
     try {
       await signIn("zitadel", { callbackUrl });
-    } catch (error) {
-      console.error("Register error:", error);
+    } catch {
+      logger.error("Register error:");
       setIsLoading(false);
     } finally {
       setIsLoading(false);
@@ -61,23 +67,27 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center w-full px-6 py-12 sm:px-12 sm:py-16 min-h-[36rem]">
+    <div className="flex min-h-[36rem] w-full flex-col items-center justify-center px-6 py-12 sm:px-12 sm:py-16">
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-3">
-          <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary inline-flex size-12 items-center justify-center rounded-2xl">
             <UserPlus className="size-6" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Criar conta</h1>
-          <p className="text-sm leading-6 text-muted-foreground">
-            O registo passou para o portal oficial de autenticação do NEI. Continua no portal e
-            cria lá a tua conta para regressares automaticamente ao Unclassed.
+          <p className="text-muted-foreground text-sm leading-6">
+            O registo passou para o portal oficial de autenticação do NEI.
+            Continua no portal e cria lá a tua conta para regressares
+            automaticamente ao Unclassed.
           </p>
         </div>
 
         {authConfigLoaded && !authConfigured ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm">
             <p className="font-semibold">Autenticação indisponível</p>
-            <p className="mt-1 opacity-90">Por favor, contacta a equipa técnica para configurar as variáveis de ambiente.</p>
+            <p className="mt-1 opacity-90">
+              Por favor, contacta a equipa técnica para configurar as variáveis
+              de ambiente.
+            </p>
           </div>
         ) : null}
 
@@ -85,7 +95,7 @@ const Register: React.FC = () => {
           <Button
             onClick={handleRegister}
             size="lg"
-            className="w-full shadow-md shadow-primary/20"
+            className="shadow-primary/20 w-full shadow-md"
             disabled={isLoading || !authConfigLoaded || !authConfigured}
           >
             {isLoading ? "Aguarde..." : "Continuar para o portal"}
@@ -93,7 +103,7 @@ const Register: React.FC = () => {
           </Button>
         </div>
 
-        <div className="border-t border-border" />
+        <div className="border-border border-t" />
 
         <div className="text-center text-sm">
           <Link

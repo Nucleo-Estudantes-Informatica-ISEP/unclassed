@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { authorizeRequest } from "@/lib/apiAccess";
 import { defineHandler } from "@/lib/defineHandler";
+import { getLogContext, logger } from "@/lib/logger";
 
 vi.mock("@/lib/apiAccess", () => ({ authorizeRequest: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
@@ -111,7 +112,7 @@ test("default validation response keeps schema details private", async () => {
 });
 
 test("unexpected failures do not leak internals; custom errors and redirects survive", async () => {
-  vi.spyOn(console, "error").mockImplementation(() => {});
+  const errorLog = vi.spyOn(logger, "error").mockImplementation(() => {});
   const route = defineHandler({
     auth: false,
     handler: () => {
@@ -120,10 +121,43 @@ test("unexpected failures do not leak internals; custom errors and redirects sur
   });
   const response = await route(request("{}"));
   expect(response.status).toBe(500);
+  expect(errorLog).toHaveBeenCalledWith(
+    { errorType: "Error" },
+    "HTTP handler failed:"
+  );
   expect(await response.json()).toEqual({ error: "Erro interno do servidor" });
   const redirect = NextResponse.redirect("http://localhost/login");
   expect(
     await defineHandler({ auth: false, handler: () => redirect })(request("{}"))
   ).toBe(redirect);
   expect(authorizeRequest).not.toHaveBeenCalled();
+});
+
+test("request context spans authorization, handlers and error mapping without leaking", async () => {
+  const id = "a3761e30-5f12-41aa-aea3-773c345abdcd";
+  const req = new NextRequest("http://localhost/api/test", {
+    headers: { "x-request-id": id },
+  });
+  vi.mocked(authorizeRequest).mockImplementationOnce(async () => {
+    expect(getLogContext().requestId).toBe(id);
+    return {
+      ok: true,
+      authenticatedBy: "session",
+      session: { id: "owner" },
+    } as never;
+  });
+  const response = NextResponse.json({ error: "mapped" }, { status: 409 });
+  const result = await defineHandler({
+    handler: async () => {
+      await Promise.resolve();
+      expect(getLogContext().requestId).toBe(id);
+      throw new Error("private details");
+    },
+    onError: () => {
+      expect(getLogContext().requestId).toBe(id);
+      return response;
+    },
+  })(req);
+  expect(result).toBe(response);
+  expect(getLogContext()).toEqual({});
 });
