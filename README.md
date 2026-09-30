@@ -295,6 +295,12 @@ Key API routes:
 - `/api/admin/cron` - cron monitoring and controls
 - `/api/health` - health endpoint
 
+### HTTP request handling
+
+API routes share `defineHandler`, backed by the existing `apiAccess` authorization layer. JSON-body routes return `400` for malformed JSON or invalid input; default validation failures use `{ error: string }` without exposing schema details. Domain-specific error messages and existing response contracts remain intact. Session writes always enforce same-origin checks, and admin/cron routes keep their distinct permissions and rate limits. Match actions delegate to the application lifecycle service; the admin dashboard loads statistics server-side and uses `httpClient` for its batch-processing mutation.
+
+Browser components and hooks use the typed `httpClient` for JSON requests and shared HTTP error handling. This change requires no new environment variables or database migration. See `AGENTS.md` for wrapper/client usage and the application-layer boundary.
+
 ## Matching Engine Overview
 
 Pure graph storage and cycle logic live in [`src/domain`](./src/domain), while [`MatchingOrchestrator`](./src/application/matchingOrchestrator.ts) adapts Prisma and notifications to that core. At a high level, it:

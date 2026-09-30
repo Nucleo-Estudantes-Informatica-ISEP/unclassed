@@ -1,3 +1,4 @@
+import { httpClient } from "@/lib/httpClient";
 import { useState, useEffect } from "react";
 
 import type { MatchDto } from "@/types/match";
@@ -49,18 +50,7 @@ export function useApi<T>(url: string, pollIntervalMs?: number): ApiState<T> {
           setState((prev) => ({ ...prev, loading: true, error: null }));
         }
 
-        const response = await fetch(url, {
-          credentials: "include", // Include cookies for authentication
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Erro: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await httpClient.get<T>(url, { credentials: "include" });
 
         if (!isCancelled) {
           setState({ data, loading: false, error: null });

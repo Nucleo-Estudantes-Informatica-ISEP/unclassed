@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -54,17 +55,7 @@ export function useSwapRequestWizardForm<T extends FieldValues & SwapRequestForm
   const onSubmit = async (data: T) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao criar pedido de permuta");
-      }
+      const result = await httpClient.post<{ id: string }>(endpoint, data, { credentials: "include" });
 
       toast.success(successMessage);
       form.reset();

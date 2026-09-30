@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card";
 import { Badge } from "@/lib/components/ui/badge";
@@ -59,18 +60,7 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
         ? `/api/swap-requests/single/${request.id}`
         : `/api/swap-requests/bundle/${request.id}`;
       
-      const response = await fetch(endpoint, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao cancelar pedido");
-      }
+      await httpClient.put(endpoint, { status: "CANCELLED" });
 
       toast.success("Pedido cancelado com sucesso!");
       onUpdate?.();
@@ -91,14 +81,7 @@ export default function SwapRequestCard({ request, type, onUpdate, showActions =
         ? `/api/swap-requests/single/${request.id}`
         : `/api/swap-requests/bundle/${request.id}`;
       
-      const response = await fetch(endpoint, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao eliminar pedido");
-      }
+      await httpClient.delete(endpoint);
 
       toast.success("Pedido eliminado com sucesso!");
       onUpdate?.();

@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { 
-  updateSwapRequestSchema,
-  singleSwapRequestSchema,
-  bundleSwapRequestSchema
-} from "@/schemas/swapRequestSchema";
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 
-import { authorizeRequest } from "@/lib/apiAccess";
+import { defineHandler } from "@/lib/defineHandler";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import {
-  SwapRequestError,
-  SwapRequestNotFoundError,
-  SwapRequestForbiddenError,
-  SwapRequestValidationError,
-  SwapRequestConflictError,
-  listSwapRequests,
-  getSwapRequestById,
-  createSingleSwapRequest,
-  createBundleSwapRequest,
-  updateSwapRequestPreferredClasses,
   cancelSwapRequest,
+  createBundleSwapRequest,
+  createSingleSwapRequest,
   deleteSwapRequest,
+  getSwapRequestById,
+  listSwapRequests,
+  SwapRequestConflictError,
+  SwapRequestError,
+  SwapRequestForbiddenError,
+  SwapRequestNotFoundError,
+  SwapRequestValidationError,
+  updateSwapRequestPreferredClasses,
 } from "@/application/services/swapRequestService";
+import {
+  bundleSwapRequestSchema,
+  singleSwapRequestSchema,
+  updateSwapRequestSchema,
+} from "@/schemas/swapRequestSchema";
 
 export type SwapType = "single" | "bundle";
 
@@ -42,7 +42,7 @@ function mapSwapRequestErrorToHttpStatus(error: SwapRequestError): number {
   if (error instanceof SwapRequestForbiddenError) return 403;
   if (error instanceof SwapRequestValidationError) return 400;
   if (error instanceof SwapRequestConflictError) return 409;
-  
+
   return 500; // default for unknown business errors
 }
 
@@ -53,7 +53,10 @@ function handleRouteError(error: unknown, contextDescription: string) {
   if (error instanceof SwapRequestError) {
     const status = mapSwapRequestErrorToHttpStatus(error);
     if (status === 500) {
-      console.error(`Unhandled swap request error in ${contextDescription}:`, error);
+      console.error(
+        `Unhandled swap request error in ${contextDescription}:`,
+        error
+      );
       return NextResponse.json(
         { error: "Erro interno do servidor" },
         { status: 500 }
@@ -63,11 +66,14 @@ function handleRouteError(error: unknown, contextDescription: string) {
     const body: { error: string; details?: unknown } = {
       error: error.message,
     };
-    
-    if (error instanceof SwapRequestValidationError && error.details !== undefined) {
+
+    if (
+      error instanceof SwapRequestValidationError &&
+      error.details !== undefined
+    ) {
       body.details = error.details;
     }
-    
+
     return NextResponse.json(body, { status });
   }
 
@@ -85,145 +91,139 @@ function handleRouteError(error: unknown, contextDescription: string) {
   );
 }
 
-export async function handleGetSwapRequests(
-  request: NextRequest,
-  type: SwapType
-) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) return authResult.response;
-    const { session } = authResult;
+// Defaulting belongs to the HTTP contract; the form schemas stay strict.
+const singleCreateSchema = singleSwapRequestSchema.extend({
+  preferenceOrderMatters: z.boolean().default(true),
+});
+const bundleCreateSchema = bundleSwapRequestSchema.extend({
+  preferenceOrderMatters: z.boolean().default(true),
+});
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-    const status = searchParams.get("status");
-
-    const requests = await listSwapRequests({
-      session,
-      queryUserId: userId,
-      queryStatus: status,
-      repo: getRepository(type),
-    });
-
-    return NextResponse.json(requests);
-  } catch (error) {
-    return handleRouteError(error, `fetching ${type} swap requests`);
-  }
+export function createSwapRequestHandlers(type: SwapType) {
+  const repo = getRepository(type);
+  return {
+    list: defineHandler({
+      onError: (error) =>
+        handleRouteError(error, `fetching ${type} swap requests`),
+      handler: async ({ request, session }) => {
+        const query = request.nextUrl.searchParams;
+        return NextResponse.json(
+          await listSwapRequests({
+            session,
+            queryUserId: query.get("userId"),
+            queryStatus: query.get("status"),
+            repo,
+          })
+        );
+      },
+    }),
+    create:
+      type === "single"
+        ? defineHandler({
+            auth: { rateLimit: "create" },
+            schema: singleCreateSchema,
+            onError: (error) =>
+              handleRouteError(error, "creating single swap request"),
+            handler: async ({ session, body }) =>
+              NextResponse.json(
+                {
+                  ...(await createSingleSwapRequest(
+                    session,
+                    body,
+                    singleSwapRequestRepo
+                  )),
+                  message:
+                    "Pedido criado com sucesso! A procurar matches imediatos...",
+                },
+                { status: 201 }
+              ),
+          })
+        : defineHandler({
+            auth: { rateLimit: "create" },
+            schema: bundleCreateSchema,
+            onError: (error) =>
+              handleRouteError(error, "creating bundle swap request"),
+            handler: async ({ session, body }) =>
+              NextResponse.json(
+                {
+                  ...(await createBundleSwapRequest(
+                    session,
+                    body,
+                    bundleSwapRequestRepo
+                  )),
+                  message:
+                    "Pedido de permuta completa criado! A procurar matches imediatos...",
+                },
+                { status: 201 }
+              ),
+          }),
+    get: defineHandler({
+      onError: (error) =>
+        handleRouteError(error, `fetching ${type} swap request by id`),
+      handler: async ({ session, params }) =>
+        NextResponse.json(
+          await getSwapRequestById(session, params.id as string, repo)
+        ),
+    }),
+    update: defineHandler({
+      schema: updateSwapRequestSchema,
+      onError: (error) =>
+        handleRouteError(error, `updating ${type} swap request`),
+      handler: async ({ session, params, body }) => {
+        const id = params.id as string;
+        if (body.status === "CANCELLED") {
+          return NextResponse.json(await cancelSwapRequest(session, id, repo));
+        }
+        if (body.preferredClassIds !== undefined) {
+          return NextResponse.json(
+            await updateSwapRequestPreferredClasses(
+              session,
+              id,
+              type,
+              repo,
+              body.preferredClassIds
+            )
+          );
+        }
+        throw new SwapRequestValidationError("Input inválido para atualização");
+      },
+    }),
+    delete: defineHandler({
+      onError: (error) =>
+        handleRouteError(error, `deleting ${type} swap request`),
+      handler: async ({ session, params }) => {
+        await deleteSwapRequest(session, params.id as string, repo);
+        return NextResponse.json({
+          message:
+            type === "single"
+              ? "Pedido de permuta eliminado com sucesso"
+              : "Pedido de permuta completa eliminado com sucesso",
+        });
+      },
+    }),
+  };
 }
 
-export async function handleCreateSwapRequest(
-  request: NextRequest,
-  type: SwapType
-) {
-  try {
-    const authResult = await authorizeRequest(request, {
-      enforceSameOriginForSessionWrites: true,
-      rateLimit: "create",
-    });
-    if (!authResult.ok) return authResult.response;
-    const { session } = authResult;
-
-    const rawBody = await request.json();
-    if (rawBody && typeof rawBody === "object" && rawBody.preferenceOrderMatters === undefined) {
-      rawBody.preferenceOrderMatters = true;
-    }
-
-    if (type === "single") {
-      const body = singleSwapRequestSchema.parse(rawBody);
-      const result = await createSingleSwapRequest(session, body, singleSwapRequestRepo);
-      return NextResponse.json(
-        {
-          ...result,
-          message: "Pedido criado com sucesso! A procurar matches imediatos...",
-        },
-        { status: 201 }
-      );
-    } else {
-      const body = bundleSwapRequestSchema.parse(rawBody);
-      const result = await createBundleSwapRequest(session, body, bundleSwapRequestRepo);
-      return NextResponse.json(
-        {
-          ...result,
-          message: "Pedido de permuta completa criado! A procurar matches imediatos...",
-        },
-        { status: 201 }
-      );
-    }
-  } catch (error) {
-    return handleRouteError(error, `creating ${type} swap request`);
-  }
-}
-
-export async function handleGetSwapRequestById(
+const handlers = {
+  single: createSwapRequestHandlers("single"),
+  bundle: createSwapRequestHandlers("bundle"),
+};
+export const handleGetSwapRequests = (request: NextRequest, type: SwapType) =>
+  handlers[type].list(request);
+export const handleCreateSwapRequest = (request: NextRequest, type: SwapType) =>
+  handlers[type].create(request);
+export const handleGetSwapRequestById = (
   request: NextRequest,
   context: RouteContext,
   type: SwapType
-) {
-  try {
-    const { id } = await context.params;
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) return authResult.response;
-    const { session } = authResult;
-
-    const dto = await getSwapRequestById(session, id, getRepository(type));
-    return NextResponse.json(dto);
-  } catch (error) {
-    return handleRouteError(error, `fetching ${type} swap request by id`);
-  }
-}
-
-export async function handleUpdateSwapRequest(
+) => handlers[type].get(request, context);
+export const handleUpdateSwapRequest = (
   request: NextRequest,
   context: RouteContext,
   type: SwapType
-) {
-  try {
-    const { id } = await context.params;
-    const authResult = await authorizeRequest(request, {
-      enforceSameOriginForSessionWrites: true,
-    });
-    if (!authResult.ok) return authResult.response;
-    const { session } = authResult;
-
-    const body = await request.json();
-    const validatedBody = updateSwapRequestSchema.parse(body);
-    
-    if (validatedBody.status === "CANCELLED") {
-      const result = await cancelSwapRequest(session, id, getRepository(type));
-      return NextResponse.json(result);
-    }
-    
-    if (validatedBody.preferredClassIds !== undefined) {
-      const result = await updateSwapRequestPreferredClasses(session, id, type, getRepository(type), validatedBody.preferredClassIds);
-      return NextResponse.json(result);
-    }
-
-    throw new SwapRequestValidationError("Input inválido para atualização");
-  } catch (error) {
-    return handleRouteError(error, `updating ${type} swap request`);
-  }
-}
-
-export async function handleDeleteSwapRequest(
+) => handlers[type].update(request, context);
+export const handleDeleteSwapRequest = (
   request: NextRequest,
   context: RouteContext,
   type: SwapType
-) {
-  try {
-    const { id } = await context.params;
-    const authResult = await authorizeRequest(request, {
-      enforceSameOriginForSessionWrites: true,
-    });
-    if (!authResult.ok) return authResult.response;
-    const { session } = authResult;
-
-    await deleteSwapRequest(session, id, getRepository(type));
-    return NextResponse.json({ 
-      message: type === "single"
-        ? "Pedido de permuta eliminado com sucesso"
-        : "Pedido de permuta completa eliminado com sucesso"
-    });
-  } catch (error) {
-    return handleRouteError(error, `deleting ${type} swap request`);
-  }
-}
+) => handlers[type].delete(request, context);

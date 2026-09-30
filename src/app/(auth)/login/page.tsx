@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -23,10 +24,7 @@ const Login: React.FC = () => {
 
     const checkAuthConfig = async () => {
       try {
-        const response = await fetch("/api/auth/configured", {
-          cache: "no-store",
-        });
-        const data = (await response.json()) as { configured?: boolean };
+        const data = await httpClient.get<{ configured?: boolean }>("/api/auth/configured", { cache: "no-store" });
 
         if (mounted) {
           setAuthConfigured(data.configured !== false);
