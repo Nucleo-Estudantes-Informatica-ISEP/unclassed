@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { JWT } from "next-auth/jwt";
 
+import { defineHandler } from "@/lib/defineHandler";
 import { env } from "@/lib/env";
 import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
 
@@ -17,7 +18,9 @@ async function getJwtTokenFromRequest(request: NextRequest) {
   const req = {
     cookies: request.cookies,
     headers: {
-      cookie: allCookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; "),
+      cookie: allCookies
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join("; "),
     },
   } as unknown as Parameters<typeof getToken>[0]["req"];
 
@@ -40,7 +43,8 @@ async function getJwtTokenFromRequest(request: NextRequest) {
     },
   ].filter(({ cookieName }) =>
     allCookies.some(
-      (cookie) => cookie.name === cookieName || cookie.name.startsWith(`${cookieName}.`)
+      (cookie) =>
+        cookie.name === cookieName || cookie.name.startsWith(`${cookieName}.`)
     )
   );
 
@@ -63,8 +67,14 @@ async function getJwtTokenFromRequest(request: NextRequest) {
   })) as JWT | null;
 }
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = defineHandler({
+  auth: false,
+  onError: (error) => {
+    console.error("Failed to build logout URL:", error);
+    return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
+  },
+  handler: async (context) => {
+    const { request } = context;
     const token = await getJwtTokenFromRequest(request);
     const idTokenHint =
       typeof token?.idTokenHint === "string"
@@ -73,7 +83,6 @@ export async function GET(request: NextRequest) {
           ? token.idToken
           : null;
     const logoutHint = typeof token?.email === "string" ? token.email : null;
-
     if (authDebugEnabled) {
       console.info("[auth][logout-url]", {
         hasJwt: Boolean(token),
@@ -85,9 +94,7 @@ export async function GET(request: NextRequest) {
         hasZitadelSub: typeof token?.zitadelSub === "string",
       });
     }
-
     const redirectTo = await buildZitadelLogoutUrl(idTokenHint, logoutHint);
-
     if (authDebugEnabled) {
       const url = new URL(redirectTo);
       console.info("[auth][logout-url-generated]", {
@@ -99,15 +106,9 @@ export async function GET(request: NextRequest) {
         hasPostLogoutRedirectUri: url.searchParams.has(
           "post_logout_redirect_uri"
         ),
-        postLogoutRedirectUri: url.searchParams.get(
-          "post_logout_redirect_uri"
-        ),
+        postLogoutRedirectUri: url.searchParams.get("post_logout_redirect_uri"),
       });
     }
-
     return NextResponse.json({ redirectTo });
-  } catch (error) {
-    console.error("Failed to build logout URL:", error);
-    return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
-  }
-}
+  },
+});

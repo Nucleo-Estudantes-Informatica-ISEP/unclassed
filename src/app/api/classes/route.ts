@@ -1,34 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-
-import { authorizeRequest } from "@/lib/apiAccess";
+import { defineHandler } from "@/lib/defineHandler";
 import * as classRepo from "@/application/repositories/classRepository";
 
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
+export const GET = defineHandler({
+  auth: {},
 
+  handler: async (context) => {
+    const { request } = context;
     const { searchParams } = new URL(request.url);
     const year = searchParams.get("year");
-
-    // Build where clause
     const where: { year?: number } = {};
-    
     if (year) {
       where.year = parseInt(year);
     }
-
-    const classes = await classRepo.findClasses({ year: where.year as number | undefined });
-
+    const classes = await classRepo.findClasses({
+      year: where.year as number | undefined,
+    });
     return NextResponse.json(classes);
-  } catch (error) {
-    console.error("Error fetching classes:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});
