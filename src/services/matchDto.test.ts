@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
+import type { MatchParticipant } from "@/types/match";
+
 import { toMatchDto } from "./matchDto";
 
 const now = new Date("2026-08-16T00:00:00.000Z");
 
-const participants = [
+const participants: MatchParticipant[] = [
   {
     userId: "user-1",
     fromClass: "class-1",
     toClass: "class-2",
     requestId: "request-1",
-    requestType: "single" as const,
+    requestType: "single",
     satisfactionScore: 5,
-    status: "pending" as const,
+    status: "pending",
     user: {
       id: "user-1",
       name: "User",
@@ -52,6 +54,7 @@ test("match DTO excludes matching internals", () => {
   const dto = toMatchDto(common, participants, subject);
 
   assert.equal("graphPartition" in dto, false);
+  assert.equal("processingTime" in dto, false);
   assert.deepEqual(dto.participants, participants);
   assert.deepEqual(dto.subject, subject);
 });

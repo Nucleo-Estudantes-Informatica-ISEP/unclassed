@@ -25,6 +25,10 @@ interface RawParticipant {
   userId?: string;
   fromClass?: string;
   toClass?: string;
+  requestId: string;
+  requestType: "single" | "bundle";
+  satisfactionScore: number;
+  status?: "pending" | "accepted" | "rejected" | "completed";
 }
 
 const matchStatuses = [
@@ -188,10 +192,15 @@ export async function GET(request: NextRequest) {
           const toClass = classes.find((c) => c.id === p.toClass);
 
           return {
-            ...p,
+            userId: p.userId!,
+            fromClass: fromClass ?? p.fromClass!,
+            toClass: toClass ?? p.toClass!,
+            requestId: p.requestId!,
+            requestType: p.requestType as "single" | "bundle",
+            satisfactionScore: p.satisfactionScore!,
+            status: p.status as
+              "pending" | "accepted" | "rejected" | "completed" | undefined,
             user: sanitizeUserForMatch(user, session.id),
-            fromClass,
-            toClass,
           };
         });
 

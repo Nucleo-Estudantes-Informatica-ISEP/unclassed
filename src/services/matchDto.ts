@@ -1,10 +1,25 @@
 import type { Match } from "@/application/repositories/matchRepository";
 
-import { MatchDto } from "../types/match.js";
+import { MatchDto, MatchParticipant } from "../types/match.js";
+
+function toMatchParticipantDto(
+  participant: MatchParticipant
+): MatchParticipant {
+  return {
+    userId: participant.userId,
+    fromClass: participant.fromClass,
+    toClass: participant.toClass,
+    requestId: participant.requestId,
+    requestType: participant.requestType,
+    satisfactionScore: participant.satisfactionScore,
+    status: participant.status,
+    user: participant.user,
+  };
+}
 
 export function toMatchDto(
   match: Match,
-  participants: unknown[],
+  participants: MatchParticipant[],
   subject?: MatchDto["subject"]
 ): MatchDto {
   return {
@@ -17,7 +32,7 @@ export function toMatchDto(
       ? match.provisionalUntil.toISOString()
       : null,
     satisfactionScore: match.satisfactionScore,
-    participants: participants as MatchDto["participants"],
+    participants: participants.map(toMatchParticipantDto),
     singleSwapRequestIds: match.singleSwapRequestIds,
     bundleSwapRequestIds: match.bundleSwapRequestIds,
     createdAt: match.createdAt.toISOString(),
