@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import * as apiAccess from "@/lib/apiAccess";
 import * as matchRepo from "@/application/repositories/matchRepository";
+import * as matchActionService from "@/application/services/matchActionService";
 
 import { GET, PATCH } from "./route";
 
@@ -31,6 +32,7 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
       );
 
       const res = await PATCH(req, { params });
+
       expect(res.status).toBe(404);
 
       const json = await res.json();
@@ -64,6 +66,7 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
       );
 
       const res = await PATCH(req, { params });
+
       expect(res.status).toBe(403);
 
       const json = await res.json();
@@ -97,6 +100,7 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
       );
 
       const res = await PATCH(req, { params });
+
       expect(res.status).toBe(409);
 
       const json = await res.json();
@@ -118,10 +122,77 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
       );
 
       const res = await PATCH(req, { params });
+
       expect(res.status).toBe(400);
 
       const json = await res.json();
       expect(json).toEqual({ error: "Ação inválida" });
+    });
+
+    it("returns the public DTO without internal match fields on success", async () => {
+      vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
+        ok: true,
+        session: { id: "user-1", role: "USER" },
+      } as never);
+
+      vi.spyOn(matchActionService, "processMatchAction").mockResolvedValueOnce({
+        updatedMatch: {
+          id: "match-123",
+          participants: [],
+        },
+        message: "Match aceite com sucesso",
+      } as never);
+
+      vi.spyOn(matchRepo, "findUnique").mockResolvedValueOnce({
+        id: "match-123",
+        matchType: "SINGLE",
+        swapPattern: "DIRECT",
+        status: "ACCEPTED",
+        isProvisional: false,
+        provisionalUntil: null,
+        satisfactionScore: null,
+        singleSwapRequestIds: [],
+        bundleSwapRequestIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        graphPartition: "internal-partition",
+        processingTime: 123,
+        participants: [
+          {
+            userId: "user-1",
+            fromClass: "class-1",
+            toClass: "class-2",
+            requestId: "request-1",
+            requestType: "single",
+            satisfactionScore: 5,
+            status: "accepted",
+          },
+        ],
+      } as never);
+
+      const req = new NextRequest(
+        "http://localhost:3000/api/matches/match-123",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ action: "accept" }),
+        }
+      );
+
+      const res = await PATCH(req, { params });
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+
+      expect(json.success).toBe(true);
+      expect(json.message).toBe("Match aceite com sucesso");
+
+      expect(json.match.id).toBe("match-123");
+      expect(json.match.status).toBe("ACCEPTED");
+
+      // Internal Match fields must not be exposed.
+      expect(json.match.graphPartition).toBeUndefined();
+      expect(json.match.processingTime).toBeUndefined();
     });
   });
 

@@ -28,6 +28,21 @@ type MatchRouteContext = {
   params: Promise<{ matchId: string }>;
 };
 
+function enrichParticipants(
+  participants: ReturnType<typeof coerceParticipants>
+) {
+  return participants.map((participant) => ({
+    userId: participant.userId!,
+    fromClass: participant.fromClass!,
+    toClass: participant.toClass!,
+    requestId: participant.requestId!,
+    requestType: participant.requestType as "single" | "bundle",
+    satisfactionScore: participant.satisfactionScore!,
+    status: participant.status as
+      "pending" | "accepted" | "rejected" | "completed" | undefined,
+  }));
+}
+
 /**
  * GET /api/matches/[matchId]
  * Get match details
@@ -60,19 +75,8 @@ export async function GET(request: NextRequest, { params }: MatchRouteContext) {
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
 
-    const enrichedParticipants = participants.map((participant) => ({
-      userId: participant.userId!,
-      fromClass: participant.fromClass!,
-      toClass: participant.toClass!,
-      requestId: participant.requestId!,
-      requestType: participant.requestType as "single" | "bundle",
-      satisfactionScore: participant.satisfactionScore!,
-      status: participant.status as
-        "pending" | "accepted" | "rejected" | "completed" | undefined,
-    }));
-
     return NextResponse.json(
-      toMatchDto(match, enrichedParticipants, undefined)
+      toMatchDto(match, enrichParticipants(participants), undefined)
     );
   } catch (error) {
     console.error("Error fetching match:", error);
@@ -103,15 +107,21 @@ export async function PATCH(
 
     const { action } = matchActionSchema.parse(await request.json());
 
-    const { updatedMatch, message } = await processMatchAction(
-      matchId,
-      session.id,
-      action
+    const { message } = await processMatchAction(matchId, session.id, action);
+
+    const updatedMatch = await matchRepo.findUnique({
+      where: { id: matchId },
+    });
+
+    const matchDto = toMatchDto(
+      updatedMatch!,
+      enrichParticipants(coerceParticipants(updatedMatch!.participants)),
+      undefined
     );
 
     return NextResponse.json({
       success: true,
-      match: updatedMatch,
+      match: matchDto,
       message,
     });
   } catch (error) {
