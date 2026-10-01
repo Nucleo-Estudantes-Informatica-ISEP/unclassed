@@ -20,13 +20,35 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
         ok: true,
         session: { id: "user-1", role: "USER" },
       } as never);
-      const updatedMatch = { id: "match-123", status: "ACCEPTED" };
+
+      const updatedMatch = {
+        id: "match-123",
+        matchType: "SINGLE",
+        swapPattern: "DIRECT",
+        status: "ACCEPTED",
+        isProvisional: false,
+        provisionalUntil: null,
+        satisfactionScore: null,
+        singleSwapRequestIds: [],
+        bundleSwapRequestIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        graphPartition: "internal-partition",
+        processingTime: 123,
+        participants: [],
+      };
+
       const process = vi
         .spyOn(matchActionService, "processMatchAction")
         .mockResolvedValueOnce({
           updatedMatch,
           message: "Match aceite!",
         } as never);
+
+      vi.spyOn(matchRepo, "findUnique").mockResolvedValueOnce(
+        updatedMatch as never
+      );
+
       try {
         const response = await PATCH(
           new NextRequest("http://localhost:3000/api/matches/match-123", {
@@ -35,17 +57,38 @@ describe("GET & PATCH /api/matches/[matchId]", () => {
           }),
           { params }
         );
+
         expect(process).toHaveBeenCalledWith("match-123", "user-1", "accept");
+
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
+
+        const json = await response.json();
+
+        expect(json).toEqual({
           success: true,
-          match: updatedMatch,
+          match: expect.objectContaining({
+            id: "match-123",
+            matchType: "SINGLE",
+            swapPattern: "DIRECT",
+            status: "ACCEPTED",
+            isProvisional: false,
+            provisionalUntil: null,
+            satisfactionScore: null,
+            singleSwapRequestIds: [],
+            bundleSwapRequestIds: [],
+            participants: [],
+          }),
           message: "Match aceite!",
         });
+
+        // Internal Match fields must not be exposed.
+        expect(json.match.graphPartition).toBeUndefined();
+        expect(json.match.processingTime).toBeUndefined();
       } finally {
         process.mockRestore();
       }
     });
+
     it("returns 404 when match is not found", async () => {
       vi.mocked(apiAccess.authorizeRequest).mockResolvedValueOnce({
         ok: true,

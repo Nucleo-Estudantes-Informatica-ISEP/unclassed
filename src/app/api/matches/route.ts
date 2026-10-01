@@ -1,6 +1,12 @@
+/**
+ * Match Management API
+ *
+ * Handles listing and filtering matches.
+ */
+
 import { NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
+import { defineHandler } from "@/lib/defineHandler";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
@@ -128,6 +134,7 @@ export const GET = defineHandler({
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
       };
     }
+
     if (
       matchType &&
       matchTypes.includes(matchType as (typeof matchTypes)[number])
@@ -135,11 +142,14 @@ export const GET = defineHandler({
       const validatedMatchType = matchType as (typeof matchTypes)[number];
       where.matchType = validatedMatchType;
     }
+
     const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
+
     let filteredMatches = matches;
+
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
         coerceParticipants(match.participants).some(
@@ -163,6 +173,7 @@ export const GET = defineHandler({
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
+
         const users = await userRepository.findMany({
           where: { id: { in: userIds } },
           select: {
@@ -173,11 +184,13 @@ export const GET = defineHandler({
             sharePhoneOnMatch: true,
           },
         });
+
         // Get class information
         const classIds = [
           ...participants.map((p) => p.fromClass),
           ...participants.map((p) => p.toClass),
         ].filter((id): id is string => id !== undefined);
+
         const classes = await classRepo.findManyByIds(classIds);
 
         const enrichedParticipants = participants.map((p) => {
@@ -202,6 +215,7 @@ export const GET = defineHandler({
         return result;
       })
     );
+
     const response = NextResponse.json(enrichedMatches);
     response.headers.set(
       "Cache-Control",
