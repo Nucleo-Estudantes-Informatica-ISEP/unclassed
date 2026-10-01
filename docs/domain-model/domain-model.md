@@ -10,11 +10,8 @@ erDiagram
         String id PK
         String name
         String email UK
-        String password
         String phone "optional"
         Boolean emailVerified
-        String verificationToken "optional"
-        DateTime verificationTokenExpiry "optional"
         Boolean emailNotifications
         Boolean sharePhoneOnMatch
         DateTime createdAt
