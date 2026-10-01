@@ -1,3 +1,5 @@
+import { logger, safeError } from "@/lib/logger";
+
 import "server-only";
 
 import { AlertTriangle } from "lucide-react";
@@ -33,7 +35,7 @@ async function loadCronData() {
 
     return { cronStats, cronHistory };
   } catch (error) {
-    console.warn("Failed to load cron dashboard data:", error);
+    logger.warn(safeError(error), "Failed to load cron dashboard data:");
     return null;
   }
 }
@@ -47,7 +49,7 @@ export async function loadDashboardData() {
 
     return { stats, cronData, loadedAt: new Date() };
   } catch (error) {
-    console.error("Failed to load matching dashboard:", error);
+    logger.error(safeError(error), "Failed to load matching dashboard:");
     return null;
   }
 }

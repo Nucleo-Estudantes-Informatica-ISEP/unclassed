@@ -100,7 +100,12 @@ docs/domain-model/ # Mermaid domain diagram
 
 ### Request and data layers
 
-Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
+Routes use `defineHandler` (`src/lib/defineHandler.ts`) to authenticate through `authorizeRequest`, parse JSON with a Zod `schema`, optionally apply resource `authorize` checks, and map errors. Handlers call application services/repositories and return a `Response`; status codes, headers, cookies and redirects are preserved. Swap routes share this wrapper through `createSwapRequestHandlers`.
+
+- Session writes always enforce same-origin validation through `defineHandler`; route options cannot disable it. Preserve every route's admin/cron/rate-limit policy and service ownership checks.
+- Use `auth: false` only for public endpoints or NextAuth protocol handlers that own authentication. `auth: { requireAuth: false }` still resolves optional session/cron identity (for example, detailed health status).
+- Use `schema` for JSON bodies. Malformed JSON returns 400; default schema failures return `{ error: "Validação falhou" }` without Zod issues. `onError` maps domain errors or existing response contracts and may return undefined to use the shared mapping. Unexpected errors return a generic 500.
+- Browser components and hooks use `httpClient` (`src/lib/httpClient.ts`) with a response type, such as `httpClient.get<MyDto>(url)`. Its get/post/patch/put/delete methods serialize JSON, preserve request options and throw `HttpError` with status, parsed body and response headers for HTTP failures. A 204 response resolves to undefined; use `void` when expecting no body. Generic response types describe the contract; they do not validate server data at runtime.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
 - `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
@@ -131,9 +136,11 @@ Rules:
 
 - Preserve the ZITADEL `email_verified` gate.
 - Local `User.password` exists for compatibility but active sign-in is OIDC. Do not add a parallel password-login flow without an explicit product decision.
-- Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
-- For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
+- Use `defineHandler()` backed by `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. `apiAccess` remains the single authorization layer; do not hand-roll `getServerSession()`/role checks inline in a route.
+- For session-authenticated writes, retain the wrapper default `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
+- GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary for exceptions and forwarded Pino logs; preserve exception stacks and correlation IDs while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
+- Use `src/lib/logger.ts` for server logs. `defineHandler` supplies request context through `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
 
 ## API conventions
 
@@ -193,3 +200,13 @@ Before finishing a change:
 - `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

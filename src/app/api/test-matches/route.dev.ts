@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-
-import { authorizeRequest } from "@/lib/apiAccess";
+import { NextResponse } from "next/server";
+import { defineHandler } from "@/lib/defineHandler";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import type { Class } from "@/application/repositories/classRepository";
@@ -12,30 +11,26 @@ import * as subjectRepo from "@/application/repositories/subjectRepository";
 import type { User } from "@/application/repositories/userRepository";
 import * as userRepo from "@/application/repositories/userRepository";
 
-export async function POST(request: NextRequest) {
-  const authResult = await authorizeRequest(request, {
+export const POST = defineHandler({
+  auth: {
     devOnly: true,
     requireAdmin: true,
     enforceSameOriginForSessionWrites: true,
-  });
-  if (!authResult.ok) return authResult.response;
+  },
 
-  try {
+  handler: async () => {
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-
     await matchRepo.deleteMany({});
     await singleSwapRequestRepo.deleteMany();
     await bundleSwapRequestRepo.deleteMany();
-
     const swapRequests = await createSampleSwapRequests(
       users,
       classes,
       subject
     );
     const matches = await createSampleMatches(users, classes, swapRequests);
-
     return NextResponse.json({
       success: true,
       created: {
@@ -47,14 +42,8 @@ export async function POST(request: NextRequest) {
       },
       message: "Matches de exemplo criados com sucesso!",
     });
-  } catch (error) {
-    console.error("Error creating test matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});
 
 async function createSampleUsers(): Promise<User[]> {
   return Promise.all(

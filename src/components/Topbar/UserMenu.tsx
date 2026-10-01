@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
 import { switchAuthNeiAccount } from "@/lib/client-auth-actions";
+import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 
 interface UserMenuProps {
@@ -40,21 +42,13 @@ export default function UserMenu({ user }: UserMenuProps) {
     setShowMenu(false);
 
     try {
-      const response = await fetch("/api/logout-url", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Falha no logout");
-      }
-
-      const data = (await response.json()) as { redirectTo?: string };
+      const data = await httpClient.get<{ redirectTo?: string }>("/api/logout-url", { cache: "no-store" });
       const redirectTo = data.redirectTo || "/";
 
       await signOut({ redirect: false });
       window.location.href = redirectTo;
-    } catch (error) {
-      console.error("Logout error:", error);
+    } catch {
+      logger.error("Logout error:");
       toast.error("Erro ao terminar sessão");
       router.push("/");
       router.refresh();

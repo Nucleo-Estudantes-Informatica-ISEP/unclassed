@@ -26,6 +26,9 @@ const environmentSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    LOG_LEVEL: z
+      .enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"])
+      .optional(),
     NEXT_PHASE: optionalString,
     npm_lifecycle_event: optionalString,
     npm_package_version: optionalString,
@@ -50,6 +53,10 @@ const environmentSchema = z
     AUTH_POST_LOGOUT_REDIRECT_URI: optionalUrl,
     AUTH_TRUST_HOST: optionalBoolean(false),
     AUTH_DEBUG: optionalBoolean(false),
+    SENTRY_DSN: optionalUrl,
+    NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
+    SENTRY_ENVIRONMENT: optionalString,
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
     CRON_SECRET: optionalSecret,
     ENABLE_CRON_SCHEDULER: optionalBoolean(false),
     CRON_BATCH_MATCHING: z.preprocess(

@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
+import { defineHandler } from "@/lib/defineHandler";
 import { resolveSafeLogoutTarget } from "@/lib/zitadel";
 
-export async function GET(request: NextRequest) {
-  const target = request.nextUrl.searchParams.get("target");
-  return NextResponse.redirect(resolveSafeLogoutTarget(target));
-}
+export const GET = defineHandler({
+  auth: false,
+  handler: async (context) => {
+    const { request } = context;
+    const target = request.nextUrl.searchParams.get("target");
+    return NextResponse.redirect(resolveSafeLogoutTarget(target));
+  },
+});

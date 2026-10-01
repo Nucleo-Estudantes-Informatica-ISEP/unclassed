@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+import { logger, safeError } from "@/lib/logger";
 /**
  * Application Startup Initialization
  *
@@ -6,7 +8,6 @@
  */
 
 import { initializeCronScheduler } from "@/services/cronScheduler";
-import { env } from "@/lib/env";
 
 let isInitialized = false;
 
@@ -18,19 +19,18 @@ export function initializeApplication(): void {
     return; // Prevent multiple initializations
   }
 
-  console.log('Initializing application...');
+  logger.info("Initializing application...");
 
   try {
     // Initialize cron scheduler for self-hosted deployments
     initializeCronScheduler();
 
     isInitialized = true;
-    console.log('Application initialization completed');
-
+    logger.info("Application initialization completed");
   } catch (error) {
-    console.error('Application initialization failed:', error);
+    logger.error(safeError(error), "Application initialization failed:");
     // Don't exit in production, just log the error
-    if (env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== "production") {
       process.exit(1);
     }
   }

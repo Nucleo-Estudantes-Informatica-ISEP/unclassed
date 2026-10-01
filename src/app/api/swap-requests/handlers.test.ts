@@ -1,19 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-
-vi.mock("@/lib/apiAccess", () => ({
-  authorizeRequest: vi.fn(),
-}));
+import { describe, expect, it, vi } from "vitest";
 
 import * as apiAccess from "@/lib/apiAccess";
+import { logger } from "@/lib/logger";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as SwapRequestService from "@/application/services/swapRequestService";
 import {
   SwapRequestError,
   SwapRequestForbiddenError,
   SwapRequestNotFoundError,
 } from "@/application/services/swapRequestService";
-
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 
 import {
   handleCreateSwapRequest,
@@ -23,6 +19,10 @@ import {
   handleUpdateSwapRequest,
 } from "./handlers";
 
+vi.mock("@/lib/apiAccess", () => ({
+  authorizeRequest: vi.fn(),
+}));
+
 describe("swap-requests HTTP handlers", () => {
   describe("handleGetSwapRequests", () => {
     it("returns 401 when authorizeRequest fails", async () => {
@@ -31,7 +31,9 @@ describe("swap-requests HTTP handlers", () => {
         response: new Response("Unauthorized", { status: 401 }) as never,
       });
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single");
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single"
+      );
       const res = await handleGetSwapRequests(req, "single");
       expect(res.status).toBe(401);
     });
@@ -66,7 +68,9 @@ describe("swap-requests HTTP handlers", () => {
           },
         ] as never);
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single");
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single"
+      );
       const res = await handleGetSwapRequests(req, "single");
 
       expect(res.status).toBe(200);
@@ -88,7 +92,10 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      vi.spyOn(SwapRequestService, "createSingleSwapRequest").mockResolvedValueOnce({
+      vi.spyOn(
+        SwapRequestService,
+        "createSingleSwapRequest"
+      ).mockResolvedValueOnce({
         id: "sr-1",
         userId: "user-1",
         subjectId: "sub-1",
@@ -108,21 +115,26 @@ describe("swap-requests HTTP handlers", () => {
         preferredClasses: [],
       } as never);
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single", {
-        method: "POST",
-        body: JSON.stringify({
-          subjectId: "sub-1",
-          currentClassId: "c1",
-          preferredClassIds: ["c2"],
-          preferenceOrderMatters: true,
-        }),
-      });
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            subjectId: "sub-1",
+            currentClassId: "c1",
+            preferredClassIds: ["c2"],
+            preferenceOrderMatters: true,
+          }),
+        }
+      );
 
       const res = await handleCreateSwapRequest(req, "single");
       expect(res.status).toBe(201);
       const json = await res.json();
       expect(json.id).toBe("sr-1");
-      expect(json.message).toBe("Pedido criado com sucesso! A procurar matches imediatos...");
+      expect(json.message).toBe(
+        "Pedido criado com sucesso! A procurar matches imediatos..."
+      );
     });
 
     it("creates bundle swap request via use case and returns 201", async () => {
@@ -131,7 +143,10 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      vi.spyOn(SwapRequestService, "createBundleSwapRequest").mockResolvedValueOnce({
+      vi.spyOn(
+        SwapRequestService,
+        "createBundleSwapRequest"
+      ).mockResolvedValueOnce({
         id: "br-1",
         userId: "user-1",
         currentClassId: "c1",
@@ -149,14 +164,17 @@ describe("swap-requests HTTP handlers", () => {
         preferredClasses: [],
       } as never);
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/bundle", {
-        method: "POST",
-        body: JSON.stringify({
-          currentClassId: "c1",
-          preferredClassIds: ["c2"],
-          preferenceOrderMatters: true,
-        }),
-      });
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/bundle",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            currentClassId: "c1",
+            preferredClassIds: ["c2"],
+            preferenceOrderMatters: true,
+          }),
+        }
+      );
 
       const res = await handleCreateSwapRequest(req, "bundle");
       expect(res.status).toBe(201);
@@ -173,39 +191,44 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      const createSpy = vi.spyOn(SwapRequestService, "createSingleSwapRequest").mockResolvedValueOnce({
-        id: "sr-1",
-        userId: "user-1",
-        subjectId: "sub-1",
-        currentClassId: "c1",
-        preferredClassIds: ["c2"],
-        preferenceOrderMatters: true,
-        ticketType: "SPECIFIC_CLASS",
-        status: "ACTIVE",
-        priority: 1,
-        satisfactionScore: null,
-        provisionalUntil: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        user: { id: "user-1", name: "User", email: "user@example.com" },
-        subject: { id: "sub-1", code: "PROG", name: "Prog", year: 1 },
-        currentClass: { id: "c1", name: "LEI11", year: 1 },
-        preferredClasses: [],
-      } as never);
-
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single", {
-        method: "POST",
-        body: JSON.stringify({
+      const createSpy = vi
+        .spyOn(SwapRequestService, "createSingleSwapRequest")
+        .mockResolvedValueOnce({
+          id: "sr-1",
+          userId: "user-1",
           subjectId: "sub-1",
           currentClassId: "c1",
           preferredClassIds: ["c2"],
-          // Omit preferenceOrderMatters
-        }),
-      });
+          preferenceOrderMatters: true,
+          ticketType: "SPECIFIC_CLASS",
+          status: "ACTIVE",
+          priority: 1,
+          satisfactionScore: null,
+          provisionalUntil: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-1", name: "User", email: "user@example.com" },
+          subject: { id: "sub-1", code: "PROG", name: "Prog", year: 1 },
+          currentClass: { id: "c1", name: "LEI11", year: 1 },
+          preferredClasses: [],
+        } as never);
+
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            subjectId: "sub-1",
+            currentClassId: "c1",
+            preferredClassIds: ["c2"],
+            // Omit preferenceOrderMatters
+          }),
+        }
+      );
 
       const res = await handleCreateSwapRequest(req, "single");
       expect(res.status).toBe(201);
-      
+
       expect(createSpy).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ preferenceOrderMatters: true }),
@@ -219,14 +242,17 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single", {
-        method: "POST",
-        body: JSON.stringify({
-          subjectId: "sub-1",
-          currentClassId: "c1",
-          preferredClassIds: [], // Empty array should fail Zod validation
-        }),
-      });
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            subjectId: "sub-1",
+            currentClassId: "c1",
+            preferredClassIds: [], // Empty array should fail Zod validation
+          }),
+        }
+      );
 
       const res = await handleCreateSwapRequest(req, "single");
       expect(res.status).toBe(400);
@@ -249,7 +275,9 @@ describe("swap-requests HTTP handlers", () => {
         new SwapRequestNotFoundError()
       );
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1");
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single/req-1"
+      );
       const res = await handleGetSwapRequestById(req, context, "single");
       expect(res.status).toBe(404);
       const json = await res.json();
@@ -266,9 +294,13 @@ describe("swap-requests HTTP handlers", () => {
         new SwapRequestError("Sensitive internal database query failure")
       );
 
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(logger, "error")
+        .mockImplementation(() => undefined);
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1");
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single/req-1"
+      );
       const res = await handleGetSwapRequestById(req, context, "single");
       expect(res.status).toBe(500);
       const json = await res.json();
@@ -293,10 +325,13 @@ describe("swap-requests HTTP handlers", () => {
         new SwapRequestForbiddenError()
       );
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1", {
-        method: "PUT",
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single/req-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ status: "CANCELLED" }),
+        }
+      );
 
       const res = await handleUpdateSwapRequest(req, context, "single");
       expect(res.status).toBe(403);
@@ -314,11 +349,16 @@ describe("swap-requests HTTP handlers", () => {
         session: { id: "user-1", role: "USER" },
       } as never);
 
-      vi.spyOn(SwapRequestService, "deleteSwapRequest").mockResolvedValueOnce(undefined);
+      vi.spyOn(SwapRequestService, "deleteSwapRequest").mockResolvedValueOnce(
+        undefined
+      );
 
-      const req = new NextRequest("http://localhost:3000/api/swap-requests/single/req-1", {
-        method: "DELETE",
-      });
+      const req = new NextRequest(
+        "http://localhost:3000/api/swap-requests/single/req-1",
+        {
+          method: "DELETE",
+        }
+      );
 
       const res = await handleDeleteSwapRequest(req, context, "single");
       expect(res.status).toBe(200);
