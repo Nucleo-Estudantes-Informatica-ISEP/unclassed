@@ -73,7 +73,6 @@ export async function createTestUser(
     data: {
       name: `Test User ${suffix}`,
       email: `test_user_${suffix}@example.test`,
-      password: "hashed_test_password_for_integration",
       role: "USER",
       ...overrides,
     },
