@@ -1,31 +1,36 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import * as singleSwapRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as matchRepo from "@/application/repositories/matchRepository";
-import * as cronLockRepo from "@/application/repositories/cronLockRepository";
-import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
-import {
-  createSingleSwapRequest,
-  createBundleSwapRequest,
-  cancelSwapRequest,
-  updateSwapRequestPreferredClasses,
-  SwapRequestConflictError,
-  SwapRequestForbiddenError,
-} from "@/application/services/swapRequestService";
-import { JobLock } from "@/services/cron/jobLock";
-import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
-import {
-  processMatchAction,
-  MatchActionConflictError,
-} from "@/application/services/matchActionService";
-import { SessionUser } from "@/application/services/userService";
 import {
   assertSafeTestDatabaseUrl,
   clearTestDatabase,
-  createTestUser,
-  createTestSubject,
   createTestClass,
+  createTestSubject,
+  createTestUser,
 } from "@tests/helpers/db";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { JobLock } from "@/services/cron/jobLock";
+import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
+import * as bundleSwapRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as cronLockRepo from "@/application/repositories/cronLockRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import * as matchRepo from "@/application/repositories/matchRepository";
+import * as singleSwapRepo from "@/application/repositories/singleSwapRequestRepository";
+import {
+  MatchActionConflictError,
+  processMatchAction,
+} from "@/application/services/matchActionService";
+import {
+  cancelSwapRequest,
+  createBundleSwapRequest,
+  createSingleSwapRequest,
+  SwapRequestConflictError,
+  SwapRequestForbiddenError,
+  updateSwapRequestPreferredClasses,
+} from "@/application/services/swapRequestService";
+import { SessionUser } from "@/application/services/userService";
+
+vi.mock("@/services/matchingTriggers", () => ({
+  triggerImmediateMatching: vi.fn().mockResolvedValue(undefined),
+}));
 
 function toSessionUser(user: Omit<SessionUser, "role" | "roles">): SessionUser {
   return {
@@ -68,12 +73,16 @@ describe("Concurrency invariants", () => {
     const results = await Promise.all(promises);
 
     const successes = results.filter((r) => !(r instanceof Error));
-    const conflicts = results.filter((r) => r instanceof SwapRequestConflictError);
+    const conflicts = results.filter(
+      (r) => r instanceof SwapRequestConflictError
+    );
 
     expect(successes.length).toBe(1);
     expect(conflicts.length).toBe(4);
 
-    const allRequests = await singleSwapRepo.findMany({ where: { userId: user.id } });
+    const allRequests = await singleSwapRepo.findMany({
+      where: { userId: user.id },
+    });
     expect(allRequests.length).toBe(1);
     expect(allRequests[0].status).toBe("ACTIVE");
   });
@@ -99,12 +108,16 @@ describe("Concurrency invariants", () => {
     const results = await Promise.all(promises);
 
     const successes = results.filter((r) => !(r instanceof Error));
-    const conflicts = results.filter((r) => r instanceof SwapRequestConflictError);
+    const conflicts = results.filter(
+      (r) => r instanceof SwapRequestConflictError
+    );
 
     expect(successes.length).toBe(1);
     expect(conflicts.length).toBe(4);
 
-    const allRequests = await bundleSwapRepo.findMany({ where: { userId: user.id } });
+    const allRequests = await bundleSwapRepo.findMany({
+      where: { userId: user.id },
+    });
     expect(allRequests.length).toBe(1);
     expect(allRequests[0].status).toBe("ACTIVE");
   });
@@ -114,13 +127,10 @@ describe("Concurrency invariants", () => {
     const lock2 = new JobLock(5000);
     const jobId = "concurrent-job-lock";
 
-    const promises = [
-      lock1.acquire(jobId, 5000),
-      lock2.acquire(jobId, 5000)
-    ];
+    const promises = [lock1.acquire(jobId, 5000), lock2.acquire(jobId, 5000)];
 
     const results = await Promise.all(promises);
-    const successfulLeases = results.filter(r => r !== null);
+    const successfulLeases = results.filter((r) => r !== null);
 
     expect(successfulLeases.length).toBe(1);
 
@@ -130,7 +140,9 @@ describe("Concurrency invariants", () => {
     const lockInDb = await cronLockRepo.findUnique({ where: { jobId } });
     expect(lockInDb).not.toBeNull();
     expect(lockInDb?.jobId).toBe(jobId);
-    expect(lockInDb?.expiresAt.getTime()).toBe(successfulLeases[0]!.acquiredAt.getTime() + 5000);
+    expect(lockInDb?.expiresAt.getTime()).toBe(
+      successfulLeases[0]!.acquiredAt.getTime() + 5000
+    );
   });
 
   it("Lock lease renewal while another worker attempts acquisition", async () => {
@@ -150,7 +162,7 @@ describe("Concurrency invariants", () => {
 
     const [renewResult, acquireResult] = await Promise.all([
       lock1.renew(lease1!),
-      lock2.acquire(jobId, 5000)
+      lock2.acquire(jobId, 5000),
     ]);
 
     expect(renewResult).toBe(true);
@@ -171,6 +183,15 @@ describe("Concurrency invariants", () => {
     const class1 = await createTestClass();
     const class2 = await createTestClass();
 
+    await graphPartitionRepo.create({
+      data: {
+        partitionKey: `subject-${subject.id}`,
+        ticketType: "SPECIFIC_CLASS",
+        subjectId: subject.id,
+        activeRequests: 0,
+      },
+    });
+
     // Set up directly to avoid fire-and-forget background matching side effects
     const req1 = await singleSwapRepo.createRaw({
       data: {
@@ -183,7 +204,7 @@ describe("Concurrency invariants", () => {
         status: "ACTIVE",
         graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     const req2 = await singleSwapRepo.createRaw({
@@ -197,20 +218,22 @@ describe("Concurrency invariants", () => {
         status: "ACTIVE",
         graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     const orchestrator = new MatchingOrchestrator();
 
     const promises = [
-      orchestrator.processImmediateMatches(req1.id).catch(e => e),
-      orchestrator.processImmediateMatches(req2.id).catch(e => e),
-      orchestrator.processImmediateMatches(req1.id).catch(e => e),
+      orchestrator.processImmediateMatches(req1.id).catch((e) => e),
+      orchestrator.processImmediateMatches(req2.id).catch((e) => e),
+      orchestrator.processImmediateMatches(req1.id).catch((e) => e),
     ];
 
     const results = await Promise.all(promises);
 
-    const processedCounts = results.filter(r => Array.isArray(r) && r.length > 0).length;
+    const processedCounts = results.filter(
+      (r) => Array.isArray(r) && r.length > 0
+    ).length;
 
     // Exactly one match must be generated and strictly exactly one processing run succeeds
     expect(processedCounts).toBe(1);
@@ -224,15 +247,21 @@ describe("Concurrency invariants", () => {
     expect(matchesInDb[0].singleSwapRequestIds).toContain(req2.id);
 
     // Invariant: No partially-applied state transitions on requests
-    const updatedReq1 = await singleSwapRepo.findUnique({ where: { id: req1.id } });
-    const updatedReq2 = await singleSwapRepo.findUnique({ where: { id: req2.id } });
+    const updatedReq1 = await singleSwapRepo.findUnique({
+      where: { id: req1.id },
+    });
+    const updatedReq2 = await singleSwapRepo.findUnique({
+      where: { id: req2.id },
+    });
     expect(updatedReq1?.status).toBe("MATCHED");
     expect(updatedReq2?.status).toBe("MATCHED");
     expect(updatedReq1?.provisionalMatchId).toBe(matchesInDb[0].id);
     expect(updatedReq2?.provisionalMatchId).toBe(matchesInDb[0].id);
 
     // Invariant: Partition lock is cleanly released, not stuck
-    const partition = await graphPartitionRepo.findUnique({ where: { partitionKey: `subject-${subject.id}` } });
+    const partition = await graphPartitionRepo.findUnique({
+      where: { partitionKey: `subject-${subject.id}` },
+    });
     expect(partition?.isLocked).toBe(false);
     expect(partition?.lockedBy).toBeNull();
   });
@@ -246,17 +275,29 @@ describe("Concurrency invariants", () => {
 
     const req1 = await singleSwapRepo.createRaw({
       data: {
-        userId: user1.id, subjectId: subject.id, currentClassId: class1.id, preferredClassIds: [class2.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user1.id,
+        subjectId: subject.id,
+        currentClassId: class1.id,
+        preferredClassIds: [class2.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
     const req2 = await singleSwapRepo.createRaw({
       data: {
-        userId: user2.id, subjectId: subject.id, currentClassId: class2.id, preferredClassIds: [class1.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user2.id,
+        subjectId: subject.id,
+        currentClassId: class2.id,
+        preferredClassIds: [class1.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     await graphPartitionRepo.create({
@@ -277,9 +318,9 @@ describe("Concurrency invariants", () => {
         singleSwapRequestIds: [req1.id, req2.id],
         participants: [
           { userId: user1.id, requestId: req1.id, status: "pending" },
-          { userId: user2.id, requestId: req2.id, status: "pending" }
+          { userId: user2.id, requestId: req2.id, status: "pending" },
         ],
-      }
+      },
     });
 
     await singleSwapRepo.updateMany({
@@ -289,14 +330,16 @@ describe("Concurrency invariants", () => {
 
     // Concurrent accept and reject from the same user
     const promises = [
-      processMatchAction(match.id, user1.id, "accept").catch(e => e),
-      processMatchAction(match.id, user1.id, "reject").catch(e => e)
+      processMatchAction(match.id, user1.id, "accept").catch((e) => e),
+      processMatchAction(match.id, user1.id, "reject").catch((e) => e),
     ];
 
     const results = await Promise.all(promises);
 
     const successes = results.filter((r) => !(r instanceof Error));
-    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
+    const conflicts = results.filter(
+      (r) => r instanceof MatchActionConflictError
+    );
 
     expect(successes.length).toBe(1);
     expect(conflicts.length).toBe(1);
@@ -304,8 +347,12 @@ describe("Concurrency invariants", () => {
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
     expect(["PROPOSED", "REJECTED"]).toContain(finalMatch?.status);
 
-    const finalReq1 = await singleSwapRepo.findUnique({ where: { id: req1.id } });
-    const finalReq2 = await singleSwapRepo.findUnique({ where: { id: req2.id } });
+    const finalReq1 = await singleSwapRepo.findUnique({
+      where: { id: req1.id },
+    });
+    const finalReq2 = await singleSwapRepo.findUnique({
+      where: { id: req2.id },
+    });
 
     if (finalMatch?.status === "REJECTED") {
       // Both requests should revert to ACTIVE with no provisionalMatchId
@@ -315,8 +362,9 @@ describe("Concurrency invariants", () => {
       expect(finalReq2?.provisionalMatchId).toBeNull();
     } else {
       expect(finalMatch?.status).toBe("PROPOSED");
-      const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
-      const p1 = participants?.find(p => p.userId === user1.id);
+      const participants = finalMatch?.participants as
+        Array<{ userId: string; status: string }> | undefined;
+      const p1 = participants?.find((p) => p.userId === user1.id);
       expect(p1?.status).toBe("accepted");
       expect(finalReq1?.status).toBe("MATCHED");
       expect(finalReq1?.provisionalMatchId).toBe(match.id);
@@ -325,7 +373,7 @@ describe("Concurrency invariants", () => {
     }
   });
 
-  it("Same user operating from multiple concurrent sessions (cancel)", async () => {
+  it("Concurrent non-atomic cancels from the same user succeed gracefully", async () => {
     const user = await createTestUser();
     const subject = await createTestSubject();
     const currentClass = await createTestClass();
@@ -334,19 +382,27 @@ describe("Concurrency invariants", () => {
 
     const req = await singleSwapRepo.createRaw({
       data: {
-        userId: user.id, subjectId: subject.id, currentClassId: currentClass.id, preferredClassIds: [targetClass.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "ACTIVE", graphPartition: `subject-${subject.id}`,
+        userId: user.id,
+        subjectId: subject.id,
+        currentClassId: currentClass.id,
+        preferredClassIds: [targetClass.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "ACTIVE",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     const promises = Array.from({ length: 3 }).map(() =>
-      cancelSwapRequest(session, req.id, singleSwapRepo).catch(e => e)
+      cancelSwapRequest(session, req.id, singleSwapRepo).catch((e) => e)
     );
 
     const results = await Promise.all(promises);
-    const successes = results.filter(r => !(r instanceof Error));
-    const conflicts = results.filter(r => r instanceof SwapRequestConflictError);
+    const successes = results.filter((r) => !(r instanceof Error));
+    const conflicts = results.filter(
+      (r) => r instanceof SwapRequestConflictError
+    );
 
     expect(successes.length).toBeGreaterThanOrEqual(1);
     expect(successes.length + conflicts.length).toBe(3);
@@ -367,49 +423,69 @@ describe("Concurrency invariants", () => {
 
     const req1 = await singleSwapRepo.createRaw({
       data: {
-        userId: user1.id, subjectId: subject.id, currentClassId: class1.id, preferredClassIds: [class2.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user1.id,
+        subjectId: subject.id,
+        currentClassId: class1.id,
+        preferredClassIds: [class2.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
     const req2 = await singleSwapRepo.createRaw({
       data: {
-        userId: user2.id, subjectId: subject.id, currentClassId: class2.id, preferredClassIds: [class1.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user2.id,
+        subjectId: subject.id,
+        currentClassId: class2.id,
+        preferredClassIds: [class1.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     const match = await matchRepo.create({
       data: {
-        matchType: "SINGLE", swapPattern: "DIRECT", status: "PROPOSED", graphPartition: `subject-${subject.id}`,
+        matchType: "SINGLE",
+        swapPattern: "DIRECT",
+        status: "PROPOSED",
+        graphPartition: `subject-${subject.id}`,
         singleSwapRequestIds: [req1.id, req2.id],
         participants: [
           { userId: user1.id, requestId: req1.id, status: "pending" },
-          { userId: user2.id, requestId: req2.id, status: "pending" }
+          { userId: user2.id, requestId: req2.id, status: "pending" },
         ],
-      }
+      },
     });
 
     // Run multiple accept match operations exactly concurrently
     const promises = Array.from({ length: 3 }).map(() =>
-      processMatchAction(match.id, user1.id, "accept").catch(e => e)
+      processMatchAction(match.id, user1.id, "accept").catch((e) => e)
     );
     const results = await Promise.all(promises);
 
     const successes = results.filter((r) => !(r instanceof Error));
-    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
+    const conflicts = results.filter(
+      (r) => r instanceof MatchActionConflictError
+    );
     expect(successes.length).toBe(1);
     expect(conflicts.length).toBe(2);
 
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
 
-    const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
-    const participant = participants?.find(p => p.userId === user1.id);
+    const participants = finalMatch?.participants as
+      Array<{ userId: string; status: string }> | undefined;
+    const participant = participants?.find((p) => p.userId === user1.id);
     expect(participant?.status).toBe("accepted");
 
     // Invariant: Idempotent operations have exactly one effective result, no duplicate participant entries
-    const participantEntries = participants?.filter(p => p.userId === user1.id);
+    const participantEntries = participants?.filter(
+      (p) => p.userId === user1.id
+    );
     expect(participantEntries?.length).toBe(1);
 
     const matchCount = await matchRepo.count({ where: { id: match.id } });
@@ -425,17 +501,29 @@ describe("Concurrency invariants", () => {
 
     const req1 = await singleSwapRepo.createRaw({
       data: {
-        userId: user1.id, subjectId: subject.id, currentClassId: class1.id, preferredClassIds: [class2.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user1.id,
+        subjectId: subject.id,
+        currentClassId: class1.id,
+        preferredClassIds: [class2.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
     const req2 = await singleSwapRepo.createRaw({
       data: {
-        userId: user2.id, subjectId: subject.id, currentClassId: class2.id, preferredClassIds: [class1.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "MATCHED", graphPartition: `subject-${subject.id}`,
+        userId: user2.id,
+        subjectId: subject.id,
+        currentClassId: class2.id,
+        preferredClassIds: [class1.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "MATCHED",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     await graphPartitionRepo.create({
@@ -456,9 +544,9 @@ describe("Concurrency invariants", () => {
         singleSwapRequestIds: [req1.id, req2.id],
         participants: [
           { userId: user1.id, requestId: req1.id, status: "pending" },
-          { userId: user2.id, requestId: req2.id, status: "pending" }
+          { userId: user2.id, requestId: req2.id, status: "pending" },
         ],
-      }
+      },
     });
 
     await singleSwapRepo.updateMany({
@@ -468,23 +556,32 @@ describe("Concurrency invariants", () => {
 
     // User 1 accepts while User 2 rejects concurrently
     const promises = [
-      processMatchAction(match.id, user1.id, "accept").catch(e => e),
-      processMatchAction(match.id, user2.id, "reject").catch(e => e)
+      processMatchAction(match.id, user1.id, "accept").catch((e) => e),
+      processMatchAction(match.id, user2.id, "reject").catch((e) => e),
     ];
 
     const results = await Promise.all(promises);
 
     const successes = results.filter((r) => !(r instanceof Error));
-    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
+    const conflicts = results.filter(
+      (r) => r instanceof MatchActionConflictError
+    );
 
     expect(successes.length).toBeGreaterThanOrEqual(1);
-    expect([0, 1]).toContain(conflicts.length);
+    expect(successes.length + conflicts.length).toBe(2);
 
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
-    expect(["PROPOSED", "REJECTED"]).toContain(finalMatch?.status);
+    const finalReq1 = await singleSwapRepo.findUnique({
+      where: { id: req1.id },
+    });
+    const finalReq2 = await singleSwapRepo.findUnique({
+      where: { id: req2.id },
+    });
 
-    const finalReq1 = await singleSwapRepo.findUnique({ where: { id: req1.id } });
-    const finalReq2 = await singleSwapRepo.findUnique({ where: { id: req2.id } });
+    const participants = finalMatch?.participants as
+      Array<{ userId: string; status: string }> | undefined;
+    const p1 = participants?.find((p) => p.userId === user1.id);
+    const p2 = participants?.find((p) => p.userId === user2.id);
 
     // Invariant: No partially-applied state transitions or orphaned references
     if (finalMatch?.status === "REJECTED") {
@@ -492,14 +589,16 @@ describe("Concurrency invariants", () => {
       expect(finalReq1?.provisionalMatchId).toBeNull();
       expect(finalReq2?.status).toBe("ACTIVE");
       expect(finalReq2?.provisionalMatchId).toBeNull();
-      const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
-      const p1 = participants?.find(p => p.userId === user1.id);
-      expect(["accepted", "pending"]).toContain(p1?.status);
+      expect(p2?.status).toBe("rejected");
+      if (successes.length === 2) {
+        expect(p1?.status).toBe("accepted");
+      } else {
+        expect(p1?.status).toBe("pending");
+      }
     } else {
       expect(finalMatch?.status).toBe("PROPOSED");
-      const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
-      const p1 = participants?.find(p => p.userId === user1.id);
       expect(p1?.status).toBe("accepted");
+      expect(p2?.status).toBe("pending");
       expect(finalReq1?.status).toBe("MATCHED");
       expect(finalReq1?.provisionalMatchId).toBe(match.id);
       expect(finalReq2?.status).toBe("MATCHED");
@@ -517,16 +616,28 @@ describe("Concurrency invariants", () => {
 
     const req = await singleSwapRepo.createRaw({
       data: {
-        userId: user.id, subjectId: subject.id, currentClassId: currentClass.id, preferredClassIds: [targetClass1.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "ACTIVE", graphPartition: `subject-${subject.id}`,
+        userId: user.id,
+        subjectId: subject.id,
+        currentClassId: currentClass.id,
+        preferredClassIds: [targetClass1.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "ACTIVE",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     // Session 1 attempts to cancel while Session 2 attempts to update preferences
     const [cancelRes, updateRes] = await Promise.all([
-      cancelSwapRequest(session, req.id, singleSwapRepo).catch(e => e),
-      updateSwapRequestPreferredClasses(session, req.id, "single", singleSwapRepo, [targetClass2.id]).catch(e => e)
+      cancelSwapRequest(session, req.id, singleSwapRepo).catch((e) => e),
+      updateSwapRequestPreferredClasses(
+        session,
+        req.id,
+        "single",
+        singleSwapRepo,
+        [targetClass2.id]
+      ).catch((e) => e),
     ]);
 
     // Either cancel executed first (then update failed with SwapRequestConflictError)
@@ -537,12 +648,9 @@ describe("Concurrency invariants", () => {
     const count = await singleSwapRepo.count({ where: { id: req.id } });
     expect(count).toBe(1);
 
-    if (cancelRes instanceof Error) {
-      expect(cancelRes).toBeInstanceOf(SwapRequestConflictError);
-      expect(updateRes).not.toBeInstanceOf(Error);
-      expect(finalReq?.status).toBe("ACTIVE");
-      expect(finalReq?.preferredClassIds).toContain(targetClass2.id);
-    } else if (updateRes instanceof Error) {
+    expect(cancelRes).not.toBeInstanceOf(Error);
+
+    if (updateRes instanceof Error) {
       expect(updateRes).toBeInstanceOf(SwapRequestConflictError);
       expect(finalReq?.status).toBe("CANCELLED");
     } else {
@@ -560,10 +668,16 @@ describe("Concurrency invariants", () => {
 
     const reqA = await singleSwapRepo.createRaw({
       data: {
-        userId: userA.id, subjectId: subject.id, currentClassId: class1.id, preferredClassIds: [class2.id],
-        ticketType: "SPECIFIC_CLASS", priority: 1, status: "ACTIVE", graphPartition: `subject-${subject.id}`,
+        userId: userA.id,
+        subjectId: subject.id,
+        currentClassId: class1.id,
+        preferredClassIds: [class2.id],
+        ticketType: "SPECIFIC_CLASS",
+        priority: 1,
+        status: "ACTIVE",
+        graphPartition: `subject-${subject.id}`,
         preferenceOrderMatters: false,
-      }
+      },
     });
 
     const sessionA = toSessionUser(userA);
@@ -571,8 +685,8 @@ describe("Concurrency invariants", () => {
 
     // Both attempt to cancel the same request simultaneously
     const promises = [
-      cancelSwapRequest(sessionB, reqA.id, singleSwapRepo).catch(e => e),
-      cancelSwapRequest(sessionA, reqA.id, singleSwapRepo).catch(e => e),
+      cancelSwapRequest(sessionB, reqA.id, singleSwapRepo).catch((e) => e),
+      cancelSwapRequest(sessionA, reqA.id, singleSwapRepo).catch((e) => e),
     ];
 
     const results = await Promise.all(promises);
@@ -584,7 +698,9 @@ describe("Concurrency invariants", () => {
     expect(ownerResult).not.toBeInstanceOf(Error);
 
     // Verify DB integrity: cancelled correctly and only once, B made no mutations
-    const finalReq = await singleSwapRepo.findUnique({ where: { id: reqA.id } });
+    const finalReq = await singleSwapRepo.findUnique({
+      where: { id: reqA.id },
+    });
     expect(finalReq?.status).toBe("CANCELLED");
   });
 });
