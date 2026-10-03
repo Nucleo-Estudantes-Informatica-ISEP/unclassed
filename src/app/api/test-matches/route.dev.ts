@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-
 import { defineHandler } from "@/lib/defineHandler";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
 import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
@@ -11,8 +10,6 @@ import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 import type { User } from "@/application/repositories/userRepository";
 import * as userRepo from "@/application/repositories/userRepository";
-
-import bcrypt from "bcryptjs";
 
 export const POST = defineHandler({
   auth: {
@@ -49,7 +46,6 @@ export const POST = defineHandler({
 });
 
 async function createSampleUsers(): Promise<User[]> {
-  const password = await bcrypt.hash("password123", 10);
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
@@ -59,7 +55,6 @@ async function createSampleUsers(): Promise<User[]> {
           create: {
             name,
             email: `test-match-${index + 1}@isep.ipp.pt`,
-            password,
             phone: `91${index + 2}345678`,
           },
         })

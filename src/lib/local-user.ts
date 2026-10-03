@@ -1,12 +1,8 @@
-import crypto from "node:crypto";
-
-
 import * as txRepo from "@/application/repositories/transactionRepository";
-import * as userRepo from "@/application/repositories/userRepository";
 import * as userIdentityRepo from "@/application/repositories/userIdentityRepository";
+import * as userRepo from "@/application/repositories/userRepository";
 
 const AUTH_PROVIDER = "zitadel";
-const OIDC_PASSWORD_PREFIX = "__OIDC_MANAGED__";
 
 type SyncOidcUserInput = {
   sub: string;
@@ -33,30 +29,28 @@ function normalizeName(name?: string | null, email?: string | null) {
   return "Utilizador";
 }
 
-function buildManagedPassword(sub: string) {
-  const digest = crypto.createHash("sha256").update(sub).digest("hex");
-  return `${OIDC_PASSWORD_PREFIX}:${digest}`;
-}
-
 async function ensureNoEmailConflict(
   tx: txRepo.Transaction,
   userId: string,
   email: string
 ) {
-  const conflictingUser = await userRepo.findFirst({
-    where: {
-      id: {
-        not: userId,
+  const conflictingUser = await userRepo.findFirst(
+    {
+      where: {
+        id: {
+          not: userId,
+        },
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
       },
-      email: {
-        equals: email,
-        mode: "insensitive",
+      select: {
+        id: true,
       },
     },
-    select: {
-      id: true,
-    },
-  }, tx);
+    tx
+  );
 
   if (conflictingUser) {
     throw new Error(
@@ -86,86 +80,96 @@ export async function syncLocalUserFromOidc({
   }
 
   return txRepo.executeInTransaction(async (tx) => {
-    const existingIdentity = await userIdentityRepo.findUnique({
-      where: {
-        provider_providerSubject: {
-          provider: AUTH_PROVIDER,
-          providerSubject: sub,
+    const existingIdentity = await userIdentityRepo.findUnique(
+      {
+        where: {
+          provider_providerSubject: {
+            provider: AUTH_PROVIDER,
+            providerSubject: sub,
+          },
+        },
+        include: {
+          user: true,
         },
       },
-      include: {
-        user: true,
-      },
-    }, tx);
+      tx
+    );
 
     if (existingIdentity) {
       await ensureNoEmailConflict(tx, existingIdentity.userId, normalizedEmail);
 
-      return userRepo.update({
-        where: { id: existingIdentity.userId },
-        data: {
-          email: normalizedEmail,
-          name: normalizedName,
-          ...(resolvedEmailVerified !== null
-            ? { emailVerified: resolvedEmailVerified }
-            : {}),
-          verificationToken: null,
-          verificationTokenExpiry: null,
+      return userRepo.update(
+        {
+          where: { id: existingIdentity.userId },
+          data: {
+            email: normalizedEmail,
+            name: normalizedName,
+            ...(resolvedEmailVerified !== null
+              ? { emailVerified: resolvedEmailVerified }
+              : {}),
+          },
         },
-      }, tx);
+        tx
+      );
     }
 
     // First AuthNei/ZITADEL login should attach to an existing local account
     // when the email already exists in Unclassed, even if the IdP account was
     // created later.
-    const existingUser = await userRepo.findFirst({
-      where: {
-        email: {
-          equals: normalizedEmail,
-          mode: "insensitive",
-        },
-      },
-    }, tx);
-
-    if (existingUser) {
-      await userIdentityRepo.create({
-        data: {
-          provider: AUTH_PROVIDER,
-          providerSubject: sub,
-          userId: existingUser.id,
-        },
-      }, tx);
-
-      return userRepo.update({
-        where: { id: existingUser.id },
-        data: {
-          email: normalizedEmail,
-          name: normalizedName,
-          ...(resolvedEmailVerified !== null
-            ? { emailVerified: resolvedEmailVerified }
-            : {}),
-          verificationToken: null,
-          verificationTokenExpiry: null,
-        },
-      }, tx);
-    }
-
-    return userRepo.create({
-      data: {
-        email: normalizedEmail,
-        name: normalizedName,
-        password: buildManagedPassword(sub),
-        emailVerified: true,
-        verificationToken: null,
-        verificationTokenExpiry: null,
-        identities: {
-          create: {
-            provider: AUTH_PROVIDER,
-            providerSubject: sub,
+    const existingUser = await userRepo.findFirst(
+      {
+        where: {
+          email: {
+            equals: normalizedEmail,
+            mode: "insensitive",
           },
         },
       },
-    }, tx);
+      tx
+    );
+
+    if (existingUser) {
+      await userIdentityRepo.create(
+        {
+          data: {
+            provider: AUTH_PROVIDER,
+            providerSubject: sub,
+            userId: existingUser.id,
+          },
+        },
+        tx
+      );
+
+      return userRepo.update(
+        {
+          where: { id: existingUser.id },
+          data: {
+            email: normalizedEmail,
+            name: normalizedName,
+            ...(resolvedEmailVerified !== null
+              ? { emailVerified: resolvedEmailVerified }
+              : {}),
+          },
+        },
+        tx
+      );
+    }
+
+    return userRepo.create(
+      {
+        data: {
+          email: normalizedEmail,
+          name: normalizedName,
+          emailVerified: true,
+          identities: {
+            create: {
+              provider: AUTH_PROVIDER,
+              providerSubject: sub,
+            },
+          },
+        },
+      },
+      tx
+    );
   });
 }
-
