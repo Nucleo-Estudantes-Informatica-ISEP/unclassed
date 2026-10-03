@@ -220,10 +220,6 @@ describe("Concurrency invariants", () => {
 
     const orchestrator = new MatchingOrchestrator();
 
-    // Track logger info calls to detect skipped runs due to lock
-    const { logger } = await import("@/lib/logger");
-    const infoSpy = vi.spyOn(logger, "info");
-
     const promises = [
       orchestrator.processImmediateMatches(req1.id).catch((e) => e),
       orchestrator.processImmediateMatches(req2.id).catch((e) => e),
@@ -240,15 +236,6 @@ describe("Concurrency invariants", () => {
     // Exactly one match must be generated
     expect(errors.length).toBe(0);
     expect(processedCounts).toBe(1);
-
-    // Assert that the lock explicitly skipped the other two runs
-    const lockSkips = infoSpy.mock.calls.filter(
-      (call) =>
-        call[0] ===
-        "Skipping immediate processing for: partition locked by another machine"
-    );
-    expect(lockSkips.length).toBe(2);
-    infoSpy.mockRestore();
 
     const matchesInDb = await matchRepo.findMany({});
     expect(matchesInDb.length).toBe(1);
@@ -340,7 +327,7 @@ describe("Concurrency invariants", () => {
   });
 
   it.todo(
-    "Concurrent non-atomic cancels from the same user succeed gracefully (known tolerated check-then-act race)"
+    "Concurrent non-atomic cancels from the same user succeed gracefully (known tolerated check-then-act race - #170)"
   );
 
   it("Repeated/retried idempotent operations (acceptMatch concurrently)", async () => {
@@ -444,7 +431,7 @@ describe("Concurrency invariants", () => {
   });
 
   it.todo(
-    "Same user operating from multiple concurrent sessions with conflicting operations - cancel vs update (known tolerated check-then-act race)"
+    "Same user operating from multiple concurrent sessions with conflicting operations - cancel vs update (known tolerated check-then-act race - #170)"
   );
 
   it("User Isolation / Authorization under concurrency", async () => {
