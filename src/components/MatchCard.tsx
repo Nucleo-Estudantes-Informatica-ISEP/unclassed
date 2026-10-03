@@ -204,7 +204,7 @@ export function MatchCard({
               </span>
             </div>
             <p className="text-muted-foreground text-xs">
-              Satisfação: {Math.round(participant.satisfactionScore * 100)}%
+              Satisfação: {Math.round((participant.satisfactionScore ?? 0) * 100)}%
             </p>
             {/* Contact Information */}
             {!isCurrentUser &&

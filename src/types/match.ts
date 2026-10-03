@@ -14,12 +14,12 @@ export type MatchUser = {
 
 export type MatchParticipant = {
   userId: string;
-  fromClass: string | MatchClass;
-  toClass: string | MatchClass;
-  requestId: string;
-  requestType: "single" | "bundle";
-  satisfactionScore: number;
-  status?: "pending" | "accepted" | "rejected" | "completed";
+  fromClass?: string | MatchClass;
+  toClass?: string | MatchClass;
+  requestId?: string;
+  requestType?: "single" | "bundle";
+  satisfactionScore?: number;
+  status?: "pending" | "accepted" | "rejected" | "completed" | "revoked";
   user?: MatchUser;
 };
 

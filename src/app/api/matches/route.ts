@@ -1,3 +1,9 @@
+/**
+ * Match Management API
+ *
+ * Handles listing and filtering matches.
+ */
+
 import { NextResponse } from "next/server";
 
 import { defineHandler } from "@/lib/defineHandler";
@@ -6,9 +12,10 @@ import {
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
-import * as classRepo from "@/application/repositories/classRepository";
+import { toMatchDto } from "@/services/matchDto";
 import * as matchRepository from "@/application/repositories/matchRepository";
 import * as userRepository from "@/application/repositories/userRepository";
+import { coerceParticipants } from "@/application/services/matchActionService";
 
 interface MatchLike {
   id: string;
@@ -18,12 +25,6 @@ interface MatchLike {
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
   participants: unknown;
-}
-
-interface RawParticipant {
-  userId?: string;
-  fromClass?: string;
-  toClass?: string;
 }
 
 const matchStatuses = [
@@ -36,11 +37,6 @@ const matchStatuses = [
 ] as const;
 
 const matchTypes = ["SINGLE", "BUNDLE"] as const;
-
-function coerceParticipants(value: unknown): RawParticipant[] {
-  if (!Array.isArray(value)) return [];
-  return value as RawParticipant[];
-}
 
 function sanitizeUserForMatch(
   user:
@@ -106,9 +102,12 @@ export const GET = defineHandler({
     const status = searchParams.get("status");
     const matchType = searchParams.get("matchType");
     const userId = searchParams.get("userId");
+
+    // Build where clause
     const where: NonNullable<
       Parameters<typeof matchRepository.findMany>[0]
     >["where"] = {};
+
     if (
       status &&
       matchStatuses.includes(status as (typeof matchStatuses)[number])
@@ -120,6 +119,7 @@ export const GET = defineHandler({
         in: ["PROPOSED", "PROVISIONAL", "ACCEPTED", "COMPLETED"],
       };
     }
+
     if (
       matchType &&
       matchTypes.includes(matchType as (typeof matchTypes)[number])
@@ -127,11 +127,14 @@ export const GET = defineHandler({
       const validatedMatchType = matchType as (typeof matchTypes)[number];
       where.matchType = validatedMatchType;
     }
+
     const matches = await matchRepository.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
+
     let filteredMatches = matches;
+
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
         coerceParticipants(match.participants).some(
@@ -143,9 +146,10 @@ export const GET = defineHandler({
         coerceParticipants(match.participants).some((p) => p.userId === userId)
       );
     }
-    const dedupedMatches = dedupeMatches(
-      filteredMatches as unknown as MatchLike[]
-    );
+
+    const dedupedMatches = dedupeMatches(filteredMatches);
+
+    // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
       dedupedMatches.map(async (match) => {
         const participants = coerceParticipants(match.participants);
@@ -154,6 +158,7 @@ export const GET = defineHandler({
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
+
         const users = await userRepository.findMany({
           where: { id: { in: userIds } },
           select: {
@@ -164,33 +169,23 @@ export const GET = defineHandler({
             sharePhoneOnMatch: true,
           },
         });
-        // Get class information
-        const classIds = [
-          ...participants.map((p) => p.fromClass),
-          ...participants.map((p) => p.toClass),
-        ].filter((id): id is string => id !== undefined);
-        const classes = await classRepo.findManyByIds(classIds);
 
-        const enrichedParticipants = participants.map((p) => {
-          const user = users.find((u) => u.id === p.userId);
-          const fromClass = classes.find((c) => c.id === p.fromClass);
-          const toClass = classes.find((c) => c.id === p.toClass);
+        const sanitizedUsers = users
+          .map((user) => sanitizeUserForMatch(user, session.id))
+          .filter(
+            (user): user is NonNullable<typeof user> => user !== undefined
+          );
 
-          return {
-            ...p,
-            user: sanitizeUserForMatch(user, session.id),
-            fromClass,
-            toClass,
-          };
-        });
-
-        const result = {
-          ...match,
-          participants: enrichedParticipants,
-        };
+        const result = toMatchDto(
+          match,
+          participants,
+          sanitizedUsers,
+          undefined
+        );
         return result;
       })
     );
+
     const response = NextResponse.json(enrichedMatches);
     response.headers.set(
       "Cache-Control",
