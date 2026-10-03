@@ -34,6 +34,13 @@ vi.mock("@/services/matchingTriggers", () => ({
   triggerImmediateMatching: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/services/emailService", () => ({
+  emailService: {
+    sendMatchNotification: vi.fn().mockResolvedValue(undefined),
+    sendMatchStatusUpdate: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 function toSessionUser(user: Omit<SessionUser, "role" | "roles">): SessionUser {
   return {
     ...user,
@@ -159,6 +166,9 @@ describe("Concurrency invariants", () => {
     expect(preRenewalLock).not.toBeNull();
     const preRenewalExpiry = preRenewalLock!.expiresAt.getTime();
 
+    // Ensure clock advances past initial acquire timestamp to guarantee deterministic expiry extension
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
     const [renewResult, acquireResult] = await Promise.all([
       lock1.renew(lease1!),
       lock2.acquire(jobId, 5000),
@@ -189,7 +199,7 @@ describe("Concurrency invariants", () => {
         partitionKey: `subject-${subject.id}`,
         ticketType: "SPECIFIC_CLASS",
         subjectId: subject.id,
-        activeRequests: 0,
+        activeRequests: 2,
       },
     });
 
@@ -271,6 +281,8 @@ describe("Concurrency invariants", () => {
     });
     expect(partition?.isLocked).toBe(false);
     expect(partition?.lockedBy).toBeNull();
+    // activeRequests becomes 0 because the requests transitioned from ACTIVE to MATCHED
+    expect(partition?.activeRequests).toBe(0);
   });
 
   it("Concurrent accept/reject actions against the same Match", async () => {
@@ -353,6 +365,8 @@ describe("Concurrency invariants", () => {
       (r) => r instanceof SwapRequestConflictError
     );
 
+    // We expect >= 1 success. This is a known tolerated race condition (check-then-act)
+    // where multiple cancels can succeed because repo.cancel is unconditional.
     expect(successes.length).toBeGreaterThanOrEqual(1);
     expect(successes.length + conflicts.length).toBe(3);
 
@@ -497,6 +511,7 @@ describe("Concurrency invariants", () => {
     expect(cancelRes).not.toBeInstanceOf(Error);
 
     // Valid check-then-act outcome: the request was updated before cancel completed, so the final state correctly reflects both operations.
+    // This race outcome is explicitly accepted and does not guard against check-then-act.
     if (updateRes instanceof Error) {
       expect(updateRes).toBeInstanceOf(SwapRequestConflictError);
       expect(finalReq?.status).toBe("CANCELLED");
