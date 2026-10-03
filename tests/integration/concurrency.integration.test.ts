@@ -14,7 +14,10 @@ import {
 } from "@/application/services/swapRequestService";
 import { JobLock } from "@/services/cron/jobLock";
 import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
-import { processMatchAction } from "@/application/services/matchActionService";
+import {
+  processMatchAction,
+  MatchActionConflictError,
+} from "@/application/services/matchActionService";
 import { SessionUser } from "@/application/services/userService";
 import {
   assertSafeTestDatabaseUrl,
@@ -138,6 +141,13 @@ describe("Concurrency invariants", () => {
     const lease1 = await lock1.acquire(jobId, 5000);
     expect(lease1).not.toBeNull();
 
+    const preRenewalLock = await cronLockRepo.findUnique({ where: { jobId } });
+    expect(preRenewalLock).not.toBeNull();
+    const preRenewalExpiry = preRenewalLock!.expiresAt.getTime();
+
+    // Ensure clock advances past initial acquire timestamp to guarantee deterministic expiry extension
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
     const [renewResult, acquireResult] = await Promise.all([
       lock1.renew(lease1!),
       lock2.acquire(jobId, 5000)
@@ -151,7 +161,7 @@ describe("Concurrency invariants", () => {
     expect(lockCount).toBe(1);
     const lockInDb = await cronLockRepo.findUnique({ where: { jobId } });
     expect(lockInDb).not.toBeNull();
-    expect(lockInDb?.expiresAt.getTime()).toBeGreaterThan(lease1!.acquiredAt.getTime() + 4000);
+    expect(lockInDb?.expiresAt.getTime()).toBeGreaterThan(preRenewalExpiry);
   });
 
   it("Concurrent matching runs against the same graph partition", async () => {
@@ -285,11 +295,11 @@ describe("Concurrency invariants", () => {
 
     const results = await Promise.all(promises);
 
-    const successes = results.filter(r => !(r instanceof Error));
-    const errors = results.filter(r => r instanceof Error);
+    const successes = results.filter((r) => !(r instanceof Error));
+    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
 
     expect(successes.length).toBe(1);
-    expect(errors.length).toBe(1);
+    expect(conflicts.length).toBe(1);
 
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
     expect(["PROPOSED", "REJECTED"]).toContain(finalMatch?.status);
@@ -308,6 +318,10 @@ describe("Concurrency invariants", () => {
       const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
       const p1 = participants?.find(p => p.userId === user1.id);
       expect(p1?.status).toBe("accepted");
+      expect(finalReq1?.status).toBe("MATCHED");
+      expect(finalReq1?.provisionalMatchId).toBe(match.id);
+      expect(finalReq2?.status).toBe("MATCHED");
+      expect(finalReq2?.provisionalMatchId).toBe(match.id);
     }
   });
 
@@ -381,8 +395,10 @@ describe("Concurrency invariants", () => {
     );
     const results = await Promise.all(promises);
 
-    const successes = results.filter(r => !(r instanceof Error));
-    expect(successes.length).toBeGreaterThanOrEqual(1);
+    const successes = results.filter((r) => !(r instanceof Error));
+    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
+    expect(successes.length).toBe(1);
+    expect(conflicts.length).toBe(2);
 
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
 
@@ -456,12 +472,12 @@ describe("Concurrency invariants", () => {
 
     const results = await Promise.all(promises);
 
-    const successes = results.filter(r => !(r instanceof Error));
-    const errors = results.filter(r => r instanceof Error);
+    const successes = results.filter((r) => !(r instanceof Error));
+    const conflicts = results.filter((r) => r instanceof MatchActionConflictError);
 
     // Exactly one action wins atomic update; the other encounters optimistic concurrency conflict
     expect(successes.length).toBe(1);
-    expect(errors.length).toBe(1);
+    expect(conflicts.length).toBe(1);
 
     const finalMatch = await matchRepo.findUnique({ where: { id: match.id } });
     expect(["PROPOSED", "REJECTED"]).toContain(finalMatch?.status);
@@ -480,6 +496,10 @@ describe("Concurrency invariants", () => {
       const participants = finalMatch?.participants as Array<{ userId: string, status: string }> | undefined;
       const p1 = participants?.find(p => p.userId === user1.id);
       expect(p1?.status).toBe("accepted");
+      expect(finalReq1?.status).toBe("MATCHED");
+      expect(finalReq1?.provisionalMatchId).toBe(match.id);
+      expect(finalReq2?.status).toBe("MATCHED");
+      expect(finalReq2?.provisionalMatchId).toBe(match.id);
     }
   });
 
