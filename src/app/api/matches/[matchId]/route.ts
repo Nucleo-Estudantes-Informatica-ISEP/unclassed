@@ -19,21 +19,6 @@ import {
 
 const matchActionSchema = z.object({ action: z.enum(matchActions) });
 
-function enrichParticipants(
-  participants: ReturnType<typeof coerceParticipants>
-) {
-  return participants.map((participant) => ({
-    userId: participant.userId!,
-    fromClass: participant.fromClass!,
-    toClass: participant.toClass!,
-    requestId: participant.requestId!,
-    requestType: participant.requestType as "single" | "bundle",
-    satisfactionScore: participant.satisfactionScore!,
-    status: participant.status as
-      "pending" | "accepted" | "rejected" | "completed" | undefined,
-  }));
-}
-
 /**
  * GET /api/matches/[matchId]
  * Get match details
@@ -58,9 +43,7 @@ export const GET = defineHandler({
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
 
-    return NextResponse.json(
-      toMatchDto(match, enrichParticipants(participants), undefined)
-    );
+    return NextResponse.json(toMatchDto(match, participants, undefined));
   },
 });
 
@@ -102,11 +85,7 @@ export const PATCH = defineHandler({
 
     const participants = coerceParticipants(match.participants);
 
-    const matchDto = toMatchDto(
-      match,
-      enrichParticipants(participants),
-      undefined
-    );
+    const matchDto = toMatchDto(match, participants, undefined);
 
     return NextResponse.json({
       success: true,

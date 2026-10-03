@@ -1,5 +1,4 @@
 import { logger, safeError } from "@/lib/logger";
-import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 import { emailService } from "@/services/emailService";
 import {
   assertMatchActionAllowed,
@@ -14,6 +13,7 @@ import * as matchRepo from "@/application/repositories/matchRepository";
 import type { JsonValue } from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import * as userRepo from "@/application/repositories/userRepository";
+import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 
 export {
   MatchActionError,
@@ -27,9 +27,9 @@ export interface MatchParticipant {
   fromClass?: string;
   toClass?: string;
   requestId?: string;
-  requestType?: string;
+  requestType?: "single" | "bundle";
   satisfactionScore?: number;
-  status?: string;
+  status?: "pending" | "accepted" | "rejected" | "completed" | "revoked";
   acceptedAt?: Date | string | null;
   rejectedAt?: Date | string | null;
   completedAt?: Date | string | null;
@@ -111,14 +111,14 @@ export async function processMatchAction(
 // =============================================================================
 
 async function handleMatchAccept(match: MatchRecord, userId: string) {
-  const updatedParticipants = coerceParticipants(match.participants).map(
-    (p) => {
-      if (p.userId === userId) {
-        return { ...p, status: "accepted", acceptedAt: new Date() };
-      }
-      return p;
+  const updatedParticipants: MatchParticipant[] = coerceParticipants(
+    match.participants
+  ).map((p) => {
+    if (p.userId === userId) {
+      return { ...p, status: "accepted", acceptedAt: new Date() };
     }
-  );
+    return p;
+  });
 
   const allAccepted = updatedParticipants.every((p) => p.status === "accepted");
 
@@ -163,14 +163,14 @@ async function handleMatchReject(match: MatchRecord, userId: string) {
 async function handleMatchComplete(match: MatchRecord, userId: string) {
   logger.info("User completed match - finalizing swap");
 
-  const updatedParticipants = coerceParticipants(match.participants).map(
-    (p) => {
-      if (p.userId === userId) {
-        return { ...p, status: "completed", completedAt: new Date() };
-      }
-      return p;
+  const updatedParticipants: MatchParticipant[] = coerceParticipants(
+    match.participants
+  ).map((p) => {
+    if (p.userId === userId) {
+      return { ...p, status: "completed", completedAt: new Date() };
     }
-  );
+    return p;
+  });
 
   const allCompleted = updatedParticipants.every(
     (p) => p.status === "completed"

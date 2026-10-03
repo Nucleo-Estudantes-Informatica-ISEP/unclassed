@@ -13,9 +13,9 @@ import {
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
 import { toMatchDto } from "@/services/matchDto";
-import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepository from "@/application/repositories/matchRepository";
 import * as userRepository from "@/application/repositories/userRepository";
+import { coerceParticipants } from "@/application/services/matchActionService";
 
 interface MatchLike {
   id: string;
@@ -25,16 +25,6 @@ interface MatchLike {
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
   participants: unknown;
-}
-
-interface RawParticipant {
-  userId?: string;
-  fromClass?: string;
-  toClass?: string;
-  requestId: string;
-  requestType: "single" | "bundle";
-  satisfactionScore: number;
-  status?: "pending" | "accepted" | "rejected" | "completed";
 }
 
 const matchStatuses = [
@@ -47,11 +37,6 @@ const matchStatuses = [
 ] as const;
 
 const matchTypes = ["SINGLE", "BUNDLE"] as const;
-
-function coerceParticipants(value: unknown): RawParticipant[] {
-  if (!Array.isArray(value)) return [];
-  return value as RawParticipant[];
-}
 
 function sanitizeUserForMatch(
   user:
@@ -185,33 +170,18 @@ export const GET = defineHandler({
           },
         });
 
-        // Get class information
-        const classIds = [
-          ...participants.map((p) => p.fromClass),
-          ...participants.map((p) => p.toClass),
-        ].filter((id): id is string => id !== undefined);
+        const sanitizedUsers = users
+          .map((user) => sanitizeUserForMatch(user, session.id))
+          .filter(
+            (user): user is NonNullable<typeof user> => user !== undefined
+          );
 
-        const classes = await classRepo.findManyByIds(classIds);
-
-        const enrichedParticipants = participants.map((p) => {
-          const user = users.find((u) => u.id === p.userId);
-          const fromClass = classes.find((c) => c.id === p.fromClass);
-          const toClass = classes.find((c) => c.id === p.toClass);
-
-          return {
-            userId: p.userId!,
-            fromClass: fromClass ?? p.fromClass!,
-            toClass: toClass ?? p.toClass!,
-            requestId: p.requestId!,
-            requestType: p.requestType as "single" | "bundle",
-            satisfactionScore: p.satisfactionScore!,
-            status: p.status as
-              "pending" | "accepted" | "rejected" | "completed" | undefined,
-            user: sanitizeUserForMatch(user, session.id),
-          };
-        });
-
-        const result = toMatchDto(match, enrichedParticipants, undefined);
+        const result = toMatchDto(
+          match,
+          participants,
+          sanitizedUsers,
+          undefined
+        );
         return result;
       })
     );

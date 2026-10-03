@@ -33,7 +33,7 @@ interface UserDashboardProps {
 }
 
 function getClassName(value: MatchParticipant["fromClass"]): string {
-  return typeof value === "string" ? value : value.name;
+  return typeof value === "string" ? value : value?.name || "";
 }
 
 function getMatchSignature(match: MatchDto): string {
