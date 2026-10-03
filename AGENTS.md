@@ -135,7 +135,7 @@ Three distinct mechanisms coexist. Do not conflate them:
 Rules:
 
 - Preserve the ZITADEL `email_verified` gate.
-- Local `User.password` exists for compatibility but active sign-in is OIDC. Do not add a parallel password-login flow without an explicit product decision.
+- Authentication is OIDC-only through AuthNEI/ZITADEL. Do not reintroduce local password authentication or a `User.password` field without an explicit product decision.
 - Use `defineHandler()` backed by `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. `apiAccess` remains the single authorization layer; do not hand-roll `getServerSession()`/role checks inline in a route.
 - For session-authenticated writes, retain the wrapper default `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
