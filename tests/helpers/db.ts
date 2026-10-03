@@ -172,3 +172,24 @@ export async function seedProposedMatch() {
 
   return { user1, user2, subject, class1, class2, req1, req2, match };
 }
+
+export async function createActiveSingleRequest(
+  userId: string,
+  subjectId: string,
+  currentClassId: string,
+  preferredClassId: string
+) {
+  return singleSwapRepo.createRaw({
+    data: {
+      userId,
+      subjectId,
+      currentClassId,
+      preferredClassIds: [preferredClassId],
+      ticketType: "SPECIFIC_CLASS",
+      priority: 1,
+      status: "ACTIVE",
+      graphPartition: `subject-${subjectId}`,
+      preferenceOrderMatters: false,
+    },
+  });
+}
