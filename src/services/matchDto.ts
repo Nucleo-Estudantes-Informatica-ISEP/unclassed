@@ -1,4 +1,5 @@
 import type {
+  MatchClass,
   MatchDto,
   MatchParticipant as MatchParticipantDto,
   MatchUser,
@@ -8,13 +9,18 @@ import type { MatchParticipant } from "@/application/services/matchActionService
 
 function toMatchParticipantsDto(
   participants: MatchParticipant[],
-  users?: MatchUser[]
+  users?: MatchUser[],
+  classes?: MatchClass[]
 ): MatchParticipantDto[] {
   return participants.map((participant) => {
     return {
       userId: participant.userId,
-      fromClass: participant.fromClass,
-      toClass: participant.toClass,
+      fromClass:
+        classes?.find((cls) => cls.id === participant.fromClass) ??
+        participant.fromClass,
+      toClass:
+        classes?.find((cls) => cls.id === participant.toClass) ??
+        participant.toClass,
       requestId: participant.requestId,
       requestType: participant.requestType,
       satisfactionScore: participant.satisfactionScore,
@@ -27,6 +33,7 @@ function toMatchParticipantsDto(
 export function toMatchDto(
   match: Match,
   participants: MatchParticipant[],
+  classes?: MatchClass[],
   users?: MatchUser[],
   subject?: MatchDto["subject"]
 ): MatchDto {
@@ -40,11 +47,11 @@ export function toMatchDto(
       ? match.provisionalUntil.toISOString()
       : null,
     satisfactionScore: match.satisfactionScore,
-    participants: toMatchParticipantsDto(participants, users),
+    participants: toMatchParticipantsDto(participants, users, classes),
     singleSwapRequestIds: match.singleSwapRequestIds,
     bundleSwapRequestIds: match.bundleSwapRequestIds,
     createdAt: match.createdAt.toISOString(),
     updatedAt: match.updatedAt.toISOString(),
-    subject,
+    subject: subject,
   };
 }

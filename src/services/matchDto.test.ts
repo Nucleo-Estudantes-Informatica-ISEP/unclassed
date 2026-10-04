@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import type { MatchUser } from "@/types/match";
+import type { MatchClass, MatchUser } from "@/types/match";
 import type { MatchParticipant } from "@/application/services/matchActionService";
 
 import { toMatchDto } from "./matchDto";
@@ -30,6 +30,19 @@ const users: MatchUser[] = [
   },
 ];
 
+const classes: MatchClass[] = [
+  {
+    id: "class-1",
+    name: "Computer Science",
+    year: 1,
+  },
+  {
+    id: "class-2",
+    name: "Software Engineering",
+    year: 2,
+  },
+];
+
 const subject = {
   id: "subject-1",
   code: "TEST",
@@ -55,14 +68,14 @@ const common = {
   participants: [],
 };
 
-test("match DTO maps participants to the public DTO shape", () => {
-  const dto = toMatchDto(common, participants, users, subject);
+test("match DTO maps participants and class information to the public DTO shape", () => {
+  const dto = toMatchDto(common, participants, classes, users, subject);
 
   assert.deepEqual(dto.participants, [
     {
       userId: "user-1",
-      fromClass: "class-1",
-      toClass: "class-2",
+      fromClass: classes[0],
+      toClass: classes[1],
       requestId: "request-1",
       requestType: "single",
       satisfactionScore: 5,
@@ -74,11 +87,24 @@ test("match DTO maps participants to the public DTO shape", () => {
   assert.deepEqual(dto.subject, subject);
 });
 
+test("match DTO preserves class IDs when class information is unavailable", () => {
+  const dto = toMatchDto(common, participants);
+
+  assert.equal(dto.participants[0].fromClass, "class-1");
+  assert.equal(dto.participants[0].toClass, "class-2");
+});
+
 test("match DTO excludes internal match fields", () => {
   const dto = toMatchDto(common, participants);
 
-  assert.equal("graphPartition" in dto, false);
-  assert.equal("processingTime" in dto, false);
+  assert.strictEqual(
+    (dto as { graphPartition?: unknown }).graphPartition,
+    undefined
+  );
+  assert.strictEqual(
+    (dto as { processingTime?: unknown }).processingTime,
+    undefined
+  );
 });
 
 test("match DTO excludes participant internal fields", () => {
@@ -113,10 +139,10 @@ test("match DTO excludes participant internal fields", () => {
     },
   ]);
 
-  assert.equal("acceptedAt" in dto.participants[0], false);
-  assert.equal("rejectedAt" in dto.participants[0], false);
-  assert.equal("completedAt" in dto.participants[0], false);
-  assert.equal("revokedAt" in dto.participants[0], false);
+  assert.strictEqual("acceptedAt" in dto.participants[0], false);
+  assert.strictEqual("rejectedAt" in dto.participants[0], false);
+  assert.strictEqual("completedAt" in dto.participants[0], false);
+  assert.strictEqual("revokedAt" in dto.participants[0], false);
 });
 
 test("match DTO maps dates to ISO strings", () => {

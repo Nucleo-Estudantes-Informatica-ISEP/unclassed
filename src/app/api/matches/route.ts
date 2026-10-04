@@ -13,6 +13,7 @@ import {
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
 import { toMatchDto } from "@/services/matchDto";
+import * as classRepository from "@/application/repositories/classRepository";
 import * as matchRepository from "@/application/repositories/matchRepository";
 import * as userRepository from "@/application/repositories/userRepository";
 import { coerceParticipants } from "@/application/services/matchActionService";
@@ -103,7 +104,6 @@ export const GET = defineHandler({
     const matchType = searchParams.get("matchType");
     const userId = searchParams.get("userId");
 
-    // Build where clause
     const where: NonNullable<
       Parameters<typeof matchRepository.findMany>[0]
     >["where"] = {};
@@ -149,12 +149,10 @@ export const GET = defineHandler({
 
     const dedupedMatches = dedupeMatches(filteredMatches);
 
-    // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
       dedupedMatches.map(async (match) => {
         const participants = coerceParticipants(match.participants);
 
-        // Get user information for participants
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
@@ -176,13 +174,20 @@ export const GET = defineHandler({
             (user): user is NonNullable<typeof user> => user !== undefined
           );
 
-        const result = toMatchDto(
+        const classIds = [
+          ...participants.map((participant) => participant.fromClass),
+          ...participants.map((participant) => participant.toClass),
+        ].filter((id): id is string => id !== undefined);
+
+        const classes = await classRepository.findManyByIds(classIds);
+
+        return toMatchDto(
           match,
           participants,
+          classes,
           sanitizedUsers,
           undefined
         );
-        return result;
       })
     );
 
@@ -193,6 +198,7 @@ export const GET = defineHandler({
     );
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Expires", "0");
+
     return response;
   },
 });
