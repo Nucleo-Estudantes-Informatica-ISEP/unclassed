@@ -4,6 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { findUnique } from "@/application/repositories/matchRepository";
 import getServerSession from "@/services/getServerSession";
 import { checkRateLimit } from "@/services/rateLimit";
+import { updatePreferences } from "@/application/repositories/userRepository";
 
 import * as cron from "./admin/cron/route";
 import { GET as classes } from "./classes/route";
@@ -169,6 +170,31 @@ test("preferences preserve successful and domain validation responses", async ()
     error: "Número de telemóvel inválido",
   });
   expect((await preferences.PATCH(req("PATCH", "{"))).status).toBe(400);
+});
+
+test("preferences only update application-owned fields", async () => {
+  vi.mocked(getServerSession).mockResolvedValue(user as never);
+
+  const response = await preferences.PATCH(
+    req(
+      "PATCH",
+      JSON.stringify({
+        name: "Changed Name",
+        email: "changed@example.test",
+        emailVerified: false,
+        phone: "912345678",
+        emailNotifications: false,
+        sharePhoneOnMatch: true,
+      })
+    )
+  );
+
+  expect(response.status).toBe(200);
+  expect(updatePreferences).toHaveBeenCalledWith("user-1", {
+    phone: "912345678",
+    emailNotifications: false,
+    sharePhoneOnMatch: true,
+  });
 });
 
 test("development-only destructive route remains unavailable outside development", async () => {

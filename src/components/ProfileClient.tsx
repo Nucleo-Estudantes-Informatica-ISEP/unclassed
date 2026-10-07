@@ -143,6 +143,26 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
                 </div>
               </div>
 
+              <div className="flex items-center justify-between rounded-md border p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Dados da conta
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    O nome, o email e o estado de verificação são geridos pelo AuthNEI.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    router.push("/api/auth/profile-url");
+                  }}
+                >
+                  Gerir conta no AuthNEI
+                </Button>
+              </div>
+
               {!preferences.emailVerified && (
                 <Alert className="border-yellow-200 bg-yellow-50">
                   <Mail className="h-4 w-4 text-yellow-600" />
