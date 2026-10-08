@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export const AUTH_NEI_ROLES = ["admin"] as const;
 
 export type AuthNeiRole = (typeof AUTH_NEI_ROLES)[number];
@@ -14,7 +16,7 @@ function rolesFromValue(value: unknown): string[] {
 
 export function getAuthNeiRoles(
   claims: Record<string, unknown> | undefined,
-  configuredClaim = process.env.AUTH_ROLE_CLAIM
+  configuredClaim = env.AUTH_ROLE_CLAIM
 ): AuthNeiRole[] {
   if (!claims || !configuredClaim) return [];
 

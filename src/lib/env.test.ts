@@ -41,12 +41,14 @@ test("allows secretless production builds but not malformed SMTP config", () => 
 
 test("parses typed booleans, ports, and refresh-token auth defaults", () => {
   const parsed = parseEnvironment({
+    AUTH_ROLE_CLAIM: "  urn:zitadel:roles  ",
     AUTH_TRUST_HOST: "true",
     ENABLE_CRON_SCHEDULER: "false",
     EMAIL_PORT: "465",
   });
 
   assert.equal(parsed.AUTH_TRUST_HOST, true);
+  assert.equal(parsed.AUTH_ROLE_CLAIM, "urn:zitadel:roles");
   assert.equal(parsed.ENABLE_CRON_SCHEDULER, false);
   assert.equal(parsed.EMAIL_PORT, 465);
   assert.equal(parsed.AUTH_SCOPES, "openid email profile offline_access");
