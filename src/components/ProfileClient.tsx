@@ -156,7 +156,9 @@ export function ProfileClient({ user: initialUser, preferences: initialPreferenc
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    router.push("/api/auth/profile-url");
+                      // Full navigation required: this API route redirects to external AuthNEI.
+                      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                      window.location.href = "/api/auth/profile-url";
                   }}
                 >
                   Gerir conta no AuthNEI
