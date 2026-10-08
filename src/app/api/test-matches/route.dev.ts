@@ -1,43 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
-import type { Class } from "@/application/repositories/classRepository";
-import type { Subject } from "@/application/repositories/subjectRepository";
-import type { User } from "@/application/repositories/userRepository";
+import { NextResponse } from "next/server";
+import { defineHandler } from "@/lib/defineHandler";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
-
-import { authorizeRequest } from "@/lib/apiAccess";
-import * as userRepo from "@/application/repositories/userRepository";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import type { Class } from "@/application/repositories/classRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as classRepo from "@/application/repositories/classRepository";
+import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import type { User } from "@/application/repositories/userRepository";
+import * as userRepo from "@/application/repositories/userRepository";
 
-import bcrypt from "bcryptjs";
-
-export async function POST(request: NextRequest) {
-  const authResult = await authorizeRequest(request, {
+export const POST = defineHandler({
+  auth: {
     devOnly: true,
     requireAdmin: true,
     enforceSameOriginForSessionWrites: true,
-  });
-  if (!authResult.ok) return authResult.response;
+  },
 
-  try {
+  handler: async () => {
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-
     await matchRepo.deleteMany({});
     await singleSwapRequestRepo.deleteMany();
     await bundleSwapRequestRepo.deleteMany();
-
     const swapRequests = await createSampleSwapRequests(
       users,
       classes,
       subject
     );
     const matches = await createSampleMatches(users, classes, swapRequests);
-
     return NextResponse.json({
       success: true,
       created: {
@@ -49,17 +42,10 @@ export async function POST(request: NextRequest) {
       },
       message: "Matches de exemplo criados com sucesso!",
     });
-  } catch (error) {
-    console.error("Error creating test matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});
 
 async function createSampleUsers(): Promise<User[]> {
-  const password = await bcrypt.hash("password123", 10);
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
@@ -69,7 +55,6 @@ async function createSampleUsers(): Promise<User[]> {
           create: {
             name,
             email: `test-match-${index + 1}@isep.ipp.pt`,
-            password,
             phone: `91${index + 2}345678`,
           },
         })

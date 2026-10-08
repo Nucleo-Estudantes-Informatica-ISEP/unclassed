@@ -2,16 +2,13 @@ import { toast } from "sonner";
 import useSWRMutation from "swr/mutation";
 
 import type { BatchResult } from "./types";
-
-async function triggerBatch(url: string) {
-  const response = await fetch(url, { method: "PUT" });
-  return response.json();
-}
+import { logger } from "@/lib/clientLogger";
+import { httpClient } from "@/lib/httpClient";
 
 export function useBatchProcessing(onSuccess: () => void) {
   return useSWRMutation<BatchResult, Error, string, never>(
     "/api/matching",
-    triggerBatch,
+    (url) => httpClient.put<BatchResult>(url),
     {
       throwOnError: false,
       onSuccess: (result) => {
@@ -22,8 +19,8 @@ export function useBatchProcessing(onSuccess: () => void) {
           toast.error("Falha no processamento em lote");
         }
       },
-      onError: (error) => {
-        console.error("Error running batch processing:", error);
+      onError: () => {
+        logger.error("Error running batch processing:");
         toast.error("Erro ao executar processamento em lote");
       },
     }

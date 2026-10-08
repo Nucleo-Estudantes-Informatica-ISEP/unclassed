@@ -1,6 +1,6 @@
-import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
-
 import type { CronStats, ScheduledJob } from "./types";
+import { logger, safeError } from "@/lib/logger";
+import type { CronExecution } from "@/application/repositories/cronExecutionRepository";
 import * as cronExecutionRepo from "@/application/repositories/cronExecutionRepository";
 
 export class CronExecutionStore {
@@ -17,16 +17,19 @@ export class CronExecutionStore {
         },
       });
     } catch (error) {
-      console.warn("Failed to create cron execution record:", error);
+      logger.warn(safeError(error), "Failed to create cron execution record:");
       return null;
     }
   }
 
-  async update(id: string, data: Parameters<typeof cronExecutionRepo.update>[0]["data"]) {
+  async update(
+    id: string,
+    data: Parameters<typeof cronExecutionRepo.update>[0]["data"]
+  ) {
     try {
       await cronExecutionRepo.update({ where: { id }, data });
     } catch (error) {
-      console.warn("Failed to update cron execution record:", error);
+      logger.warn(safeError(error), "Failed to update cron execution record:");
     }
   }
 
@@ -37,7 +40,7 @@ export class CronExecutionStore {
         take: limit,
       });
     } catch (error) {
-      console.error("Failed to get execution history:", error);
+      logger.error(safeError(error), "Failed to get execution history:");
       return [];
     }
   }
@@ -104,7 +107,7 @@ export class CronExecutionStore {
         nextScheduledRuns,
       };
     } catch (error) {
-      console.error("Failed to get cron stats:", error);
+      logger.error(safeError(error), "Failed to get cron stats:");
       return {
         lastRunTime: null,
         totalExecutions24h: 0,

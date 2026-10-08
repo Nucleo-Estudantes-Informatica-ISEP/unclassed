@@ -73,7 +73,6 @@ export async function createTestUser(
     data: {
       name: `Test User ${suffix}`,
       email: `test_user_${suffix}@example.test`,
-      password: "hashed_test_password_for_integration",
       role: "USER",
       ...overrides,
     },
@@ -104,6 +103,92 @@ export async function createTestClass(
       name: `CLS_${suffix}`,
       year: 1,
       ...overrides,
+    },
+  });
+}
+
+export async function seedProposedMatch() {
+  const user1 = await createTestUser();
+  const user2 = await createTestUser();
+  const subject = await createTestSubject();
+  const class1 = await createTestClass();
+  const class2 = await createTestClass();
+
+  const req1 = await singleSwapRepo.createRaw({
+    data: {
+      userId: user1.id,
+      subjectId: subject.id,
+      currentClassId: class1.id,
+      preferredClassIds: [class2.id],
+      ticketType: "SPECIFIC_CLASS",
+      priority: 1,
+      status: "MATCHED",
+      graphPartition: `subject-${subject.id}`,
+      preferenceOrderMatters: false,
+    },
+  });
+  const req2 = await singleSwapRepo.createRaw({
+    data: {
+      userId: user2.id,
+      subjectId: subject.id,
+      currentClassId: class2.id,
+      preferredClassIds: [class1.id],
+      ticketType: "SPECIFIC_CLASS",
+      priority: 1,
+      status: "MATCHED",
+      graphPartition: `subject-${subject.id}`,
+      preferenceOrderMatters: false,
+    },
+  });
+
+  await graphPartitionRepo.create({
+    data: {
+      partitionKey: `subject-${subject.id}`,
+      ticketType: "SPECIFIC_CLASS",
+      subjectId: subject.id,
+      activeRequests: 0,
+    },
+  });
+
+  const match = await matchRepo.create({
+    data: {
+      matchType: "SINGLE",
+      swapPattern: "DIRECT",
+      status: "PROPOSED",
+      graphPartition: `subject-${subject.id}`,
+      singleSwapRequestIds: [req1.id, req2.id],
+      participants: [
+        { userId: user1.id, requestId: req1.id, status: "pending" },
+        { userId: user2.id, requestId: req2.id, status: "pending" },
+      ],
+    },
+  });
+
+  await singleSwapRepo.updateMany({
+    where: { id: { in: [req1.id, req2.id] } },
+    data: { provisionalMatchId: match.id },
+  });
+
+  return { user1, user2, subject, class1, class2, req1, req2, match };
+}
+
+export async function createActiveSingleRequest(
+  userId: string,
+  subjectId: string,
+  currentClassId: string,
+  preferredClassId: string
+) {
+  return singleSwapRepo.createRaw({
+    data: {
+      userId,
+      subjectId,
+      currentClassId,
+      preferredClassIds: [preferredClassId],
+      ticketType: "SPECIFIC_CLASS",
+      priority: 1,
+      status: "ACTIVE",
+      graphPartition: `subject-${subjectId}`,
+      preferenceOrderMatters: false,
     },
   });
 }

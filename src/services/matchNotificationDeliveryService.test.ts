@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test, vi } from "vitest";
 
+import { logger } from "@/lib/logger";
 import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
 
 import {
@@ -34,7 +35,7 @@ test("markMatchNotificationDeliverySent swallows repository errors", async () =>
   vi.spyOn(matchNotificationDeliveryRepo, "updateMany").mockRejectedValue(
     new Error("db unavailable")
   );
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
   await assert.doesNotReject(
     markMatchNotificationDeliverySent("match-1", "user-1")
@@ -58,14 +59,17 @@ test("markMatchNotificationDeliveryFailed only updates a SENDING reservation and
     notificationType: "MATCH_FOUND",
     status: "SENDING",
   });
-  assert.equal((call?.data as { lastError: string }).lastError, "x".repeat(500));
+  assert.equal(
+    (call?.data as { lastError: string }).lastError,
+    "x".repeat(500)
+  );
 });
 
 test("markMatchNotificationDeliveryFailed swallows repository errors", async () => {
   vi.spyOn(matchNotificationDeliveryRepo, "updateMany").mockRejectedValue(
     new Error("db unavailable")
   );
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
   await assert.doesNotReject(
     markMatchNotificationDeliveryFailed("match-1", "user-1", "reason")
@@ -77,16 +81,10 @@ test("reserveMatchNotificationDelivery rethrows a non-P2002 create error", async
   const dbError = Object.assign(new Error("connection reset"), {
     code: "P1001",
   });
-  vi.spyOn(matchNotificationDeliveryRepo, "create").mockRejectedValue(
-    dbError
-  );
+  vi.spyOn(matchNotificationDeliveryRepo, "create").mockRejectedValue(dbError);
 
   await assert.rejects(
-    reserveMatchNotificationDelivery(
-      "match-1",
-      "user-1",
-      "user@example.com"
-    ),
+    reserveMatchNotificationDelivery("match-1", "user-1", "user@example.com"),
     dbError
   );
 });
@@ -165,7 +163,9 @@ test("deliverMatchNotificationOnce marks the reservation failed with the error m
     .mockResolvedValue({ count: 1 } as never);
   const thrown = new Error("SMTP timeout");
   const send = vi.fn().mockRejectedValue(thrown);
-  const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const errorLog = vi
+    .spyOn(logger, "error")
+    .mockImplementation(() => undefined);
 
   const outcome = await deliverMatchNotificationOnce(
     "match-1",
@@ -176,12 +176,9 @@ test("deliverMatchNotificationOnce marks the reservation failed with the error m
 
   assert.equal(outcome, "failed");
   const call = updateMany.mock.calls[0][0];
-  assert.equal(
-    (call?.data as { lastError: string }).lastError,
-    "SMTP timeout"
-  );
+  assert.equal((call?.data as { lastError: string }).lastError, "SMTP timeout");
   assert.deepEqual(errorLog.mock.calls[0], [
-    "Error sending notification to user@example.com for match match-1:",
-    thrown,
+    { errorType: "Error" },
+    "Error sending notification to for match:",
   ]);
 });

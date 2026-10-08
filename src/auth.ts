@@ -6,6 +6,7 @@ import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { getAuthNeiRoles, isAdmin } from "@/lib/auth-nei-roles";
 import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
+import { logger, safeError } from "@/lib/logger";
 
 const REFRESH_SKEW_MS = 30_000;
 
@@ -138,7 +139,10 @@ async function refreshProviderToken(token: JWT): Promise<JWT> {
     };
   } catch (error) {
     if (authDebugEnabled) {
-      console.error("[auth][refresh] Failed to refresh ZITADEL session", error);
+      logger.error(
+        safeError(error),
+        "[auth][refresh] Failed to refresh ZITADEL session"
+      );
     }
     return invalidateProviderSession(token);
   }
@@ -183,7 +187,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const claims = (profile ?? {}) as Record<string, unknown>;
       if (parseEmailVerifiedClaim(claims) !== true) {
-        console.warn(
+        logger.warn(
           "Blocking ZITADEL sign-in because email_verified claim is missing or false."
         );
         return false;
@@ -193,7 +197,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return Boolean(sub);
     },
     async jwt({ token, account, profile, trigger }) {
-      if (typeof account?.id_token === "string" && account.id_token.length > 0) {
+      if (
+        typeof account?.id_token === "string" &&
+        account.id_token.length > 0
+      ) {
         token.idTokenHint = account.id_token;
         token.idToken = account.id_token;
       }
@@ -208,21 +215,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (authDebugEnabled && account) {
-        console.info("[auth][jwt]", {
-          trigger,
-          provider: account.provider,
-          hasProfile: Boolean(profile),
-          hasIdToken: typeof account.id_token === "string",
-          hasAccessToken: typeof account.access_token === "string",
-          hasRefreshToken: typeof account.refresh_token === "string",
-          accessTokenExpiresAt: account.expires_at ?? null,
-          hasStoredIdTokenHint: typeof token.idTokenHint === "string",
-          hasStoredIdToken: typeof token.idToken === "string",
-          hasTokenEmail: typeof token.email === "string",
-          hasProfileEmail:
-            typeof (profile as Record<string, unknown> | undefined)?.email ===
-            "string",
-        });
+        logger.info({ trigger }, "[auth][jwt]");
       }
 
       if (account && profile) {
@@ -269,16 +262,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (authDebugEnabled) {
-        console.info("[auth][session]", {
-          hasUser: Boolean(session.user),
-          hasLocalUserId: typeof token.localUserId === "string",
-          hasRole: typeof token.role === "string",
-          hasZitadelSub: typeof token.zitadelSub === "string",
-          hasTokenEmail: typeof token.email === "string",
-          hasIdTokenHint: typeof token.idTokenHint === "string",
-          hasIdToken: typeof token.idToken === "string",
-          error: token.error ?? null,
-        });
+        logger.info("[auth][session]");
       }
 
       const authNeiRoles = token.error ? [] : (token.authNeiRoles ?? []);

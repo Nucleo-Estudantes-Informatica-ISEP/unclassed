@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import * as classRepo from "@/application/repositories/classRepository";
 import { authorizeRequest } from "@/lib/apiAccess";
+import { defineHandler } from "@/lib/defineHandler";
 import {
   createClassSchema,
   classNameMatchesYear,
@@ -43,31 +44,31 @@ async function readBody(request: NextRequest): Promise<unknown> {
   return request.json();
 }
 
-export async function GET(request: NextRequest) {
-  const access = await authorizeRequest(request);
+export const GET = defineHandler({
+  auth: {},
 
-  if (!access.ok) {
-    return access.response;
-  }
-
-  try {
+  handler: async (context) => {
+    const { request } = context;
     const yearParam = new URL(request.url).searchParams.get("year");
     let year: number | undefined;
 
     if (yearParam !== null) {
       year = Number(yearParam);
+
       if (!Number.isInteger(year) || year < 1 || year > 3) {
         return errorResponse("Invalid academic year.", 400);
       }
     }
 
-    const classes = await classRepo.findClasses({ year });
-    return NextResponse.json(classes);
-  } catch (error) {
-    console.error("Failed to load classes:", error);
-    return errorResponse("Failed to load classes.", 500);
-  }
-}
+    try {
+      const classes = await classRepo.findClasses({ year });
+      return NextResponse.json(classes);
+    } catch (error) {
+      console.error("Failed to load classes:", error);
+      return errorResponse("Failed to load classes.", 500);
+    }
+  },
+});
 
 export async function POST(request: NextRequest) {
   const access = await authorizeRequest(request, {
@@ -145,14 +146,20 @@ export async function PATCH(request: NextRequest) {
     const finalYear = data.year ?? existingClass.year;
 
     if (!classNameMatchesYear(finalName, finalYear)) {
-      return errorResponse("Class name must start with the selected year.", 400);
+      return errorResponse(
+        "Class name must start with the selected year.",
+        400,
+      );
     }
 
     if (
       data.name !== undefined &&
       (await classRepo.hasNameConflict(data.name, id))
     ) {
-      return errorResponse("A class with this name already exists.", 409);
+      return errorResponse(
+        "A class with this name already exists.",
+        409,
+      );
     }
 
     const updated = await classRepo.update({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { defineHandler } from "@/lib/defineHandler";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
 import { authorizeRequest } from "@/lib/apiAccess";
 import {
@@ -42,22 +43,22 @@ async function readBody(request: NextRequest): Promise<unknown> {
   return request.json();
 }
 
-export async function GET(request: NextRequest) {
-  const access = await authorizeRequest(request);
+export const GET = defineHandler({
+  auth: {},
 
-  if (!access.ok) {
-    return access.response;
-  }
-
-  try {
+  handler: async (context) => {
+    const { request } = context;
     const { searchParams } = new URL(request.url);
+
     const yearParam = searchParams.get("year");
     const semesterParam = searchParams.get("semester");
+
     let year: number | undefined;
     let semester: number | undefined;
 
     if (yearParam !== null) {
       year = Number(yearParam);
+
       if (!Number.isInteger(year) || year < 1 || year > 3) {
         return errorResponse("Invalid academic year.", 400);
       }
@@ -65,18 +66,29 @@ export async function GET(request: NextRequest) {
 
     if (semesterParam !== null) {
       semester = Number(semesterParam);
-      if (!Number.isInteger(semester) || semester < 1 || semester > 2) {
+
+      if (
+        !Number.isInteger(semester) ||
+        semester < 1 ||
+        semester > 2
+      ) {
         return errorResponse("Invalid semester.", 400);
       }
     }
 
-    const subjects = await subjectRepo.findSubjects({ year, semester });
-    return NextResponse.json(subjects);
-  } catch (error) {
-    console.error("Failed to load subjects:", error);
-    return errorResponse("Failed to load subjects.", 500);
-  }
-}
+    try {
+      const subjects = await subjectRepo.findSubjects({
+        year,
+        semester,
+      });
+
+      return NextResponse.json(subjects);
+    } catch (error) {
+      console.error("Failed to load subjects:", error);
+      return errorResponse("Failed to load subjects.", 500);
+    }
+  },
+});
 
 export async function POST(request: NextRequest) {
   const access = await authorizeRequest(request, {

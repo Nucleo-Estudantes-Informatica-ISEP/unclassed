@@ -1,15 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * Match Management API
+ *
+ * Handles listing and filtering matches.
+ */
 
+import { NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
-import * as classRepo from "@/application/repositories/classRepository";
-import * as matchRepository from "@/application/repositories/matchRepository";
-import * as userRepository from "@/application/repositories/userRepository";
+import { defineHandler } from "@/lib/defineHandler";
 import {
   buildMatchSignature,
   compareMatchesByRecencyDesc,
   shouldReplaceMatchByRecency,
 } from "@/lib/matchDedup";
+import { toMatchDto } from "@/services/matchDto";
+import * as classRepository from "@/application/repositories/classRepository";
+import * as matchRepository from "@/application/repositories/matchRepository";
+import * as userRepository from "@/application/repositories/userRepository";
+import { coerceParticipants } from "@/application/services/matchActionService";
 
 interface MatchLike {
   id: string;
@@ -19,12 +26,6 @@ interface MatchLike {
   singleSwapRequestIds: string[];
   bundleSwapRequestIds: string[];
   participants: unknown;
-}
-
-interface RawParticipant {
-  userId?: string;
-  fromClass?: string;
-  toClass?: string;
 }
 
 const matchStatuses = [
@@ -38,20 +39,15 @@ const matchStatuses = [
 
 const matchTypes = ["SINGLE", "BUNDLE"] as const;
 
-function coerceParticipants(value: unknown): RawParticipant[] {
-  if (!Array.isArray(value)) return [];
-  return value as RawParticipant[];
-}
-
 function sanitizeUserForMatch(
   user:
     | {
-      id: string;
-      name: string;
-      email: string;
-      phone: string | null;
-      sharePhoneOnMatch: boolean | null;
-    }
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        sharePhoneOnMatch: boolean | null;
+      }
     | undefined,
   sessionUserId: string
 ) {
@@ -97,21 +93,20 @@ function dedupeMatches<T extends MatchLike>(matches: T[]): T[] {
   return Array.from(bySignature.values()).sort(compareMatchesByRecencyDesc);
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const authResult = await authorizeRequest(request);
-    if (!authResult.ok) {
-      return authResult.response;
-    }
-    const { session } = authResult;
+export const GET = defineHandler({
+  auth: {},
 
+  handler: async (context) => {
+    const { request } = context;
+    const { session } = context;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const matchType = searchParams.get("matchType");
     const userId = searchParams.get("userId");
 
-    // Build where clause
-    const where: NonNullable<Parameters<typeof matchRepository.findMany>[0]>["where"] = {};
+    const where: NonNullable<
+      Parameters<typeof matchRepository.findMany>[0]
+    >["where"] = {};
 
     if (
       status &&
@@ -138,8 +133,8 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Filter matches that involve the user (if not admin)
     let filteredMatches = matches;
+
     if (session.role !== "ADMIN") {
       filteredMatches = matches.filter((match) =>
         coerceParticipants(match.participants).some(
@@ -152,19 +147,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dedupedMatches = dedupeMatches(
-      filteredMatches as unknown as MatchLike[]
-    );
+    const dedupedMatches = dedupeMatches(filteredMatches);
 
-    // Enrich matches with user and class information
     const enrichedMatches = await Promise.all(
       dedupedMatches.map(async (match) => {
         const participants = coerceParticipants(match.participants);
 
-        // Get user information for participants
         const userIds = participants
           .map((p) => p.userId)
           .filter((id): id is string => id !== undefined);
+
         const users = await userRepository.findMany({
           where: { id: { in: userIds } },
           select: {
@@ -175,48 +167,38 @@ export async function GET(request: NextRequest) {
             sharePhoneOnMatch: true,
           },
         });
-        // Get class information
+
+        const sanitizedUsers = users
+          .map((user) => sanitizeUserForMatch(user, session.id))
+          .filter(
+            (user): user is NonNullable<typeof user> => user !== undefined
+          );
+
         const classIds = [
-          ...participants.map((p) => p.fromClass),
-          ...participants.map((p) => p.toClass),
+          ...participants.map((participant) => participant.fromClass),
+          ...participants.map((participant) => participant.toClass),
         ].filter((id): id is string => id !== undefined);
-        const classes = await classRepo.findManyByIds(classIds);
 
-        const enrichedParticipants = participants.map((p) => {
-          const user = users.find((u) => u.id === p.userId);
-          const fromClass = classes.find((c) => c.id === p.fromClass);
-          const toClass = classes.find((c) => c.id === p.toClass);
+        const classes = await classRepository.findManyByIds(classIds);
 
-          return {
-            ...p,
-            user: sanitizeUserForMatch(user, session.id),
-            fromClass,
-            toClass,
-          };
-        });
-
-        const result = {
-          ...match,
-          participants: enrichedParticipants,
-        };
-        return result;
+        return toMatchDto(
+          match,
+          participants,
+          classes,
+          sanitizedUsers,
+          undefined
+        );
       })
     );
 
     const response = NextResponse.json(enrichedMatches);
-    // Prevent caching to ensure fresh data
     response.headers.set(
       "Cache-Control",
       "no-cache, no-store, must-revalidate"
     );
     response.headers.set("Pragma", "no-cache");
     response.headers.set("Expires", "0");
+
     return response;
-  } catch (error) {
-    console.error("Error fetching matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
-    );
-  }
-}
+  },
+});
