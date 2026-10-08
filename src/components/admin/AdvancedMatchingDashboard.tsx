@@ -13,6 +13,7 @@ import { DashboardTabs } from "./matching-dashboard/DashboardTabs";
 import { OverviewTab } from "./matching-dashboard/OverviewTab";
 import { PartitionsTab } from "./matching-dashboard/PartitionsTab";
 import { SettingsTab } from "./matching-dashboard/SettingsTab";
+import { ReferenceDataTab } from "./matching-dashboard/ReferenceDataTab";
 
 export function MatchingDashboardSkeleton() {
   return (
@@ -108,6 +109,7 @@ export default async function AdvancedMatchingDashboard() {
         }
         partitions={<PartitionsTab partitionStats={stats.partitionStats} />}
         batch={<BatchTab />}
+        referenceData={<ReferenceDataTab />}
         settings={
           <SettingsTab
             partitions={stats.partitions}

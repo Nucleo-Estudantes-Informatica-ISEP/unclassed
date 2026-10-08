@@ -117,6 +117,39 @@ describe("classRepository", () => {
     spy.mockRestore();
   });
 
+  it("update calls prisma.class.update", async () => {
+  const mock = { id: "c1", name: "1DA", year: 1 };
+  const spy = vi
+    .spyOn(prisma.class, "update")
+    .mockResolvedValueOnce(mock as never);
+
+  const args = {
+    where: { id: "c1" },
+    data: { name: "1DB" },
+  };
+  const res = await classRepo.update(args);
+
+  expect(spy).toHaveBeenCalledWith(args);
+  expect(res).toBe(mock);
+
+  spy.mockRestore();
+});
+
+it("remove calls prisma.class.delete", async () => {
+  const mock = { id: "c1", name: "1DA", year: 1 };
+  const spy = vi
+    .spyOn(prisma.class, "delete")
+    .mockResolvedValueOnce(mock as never);
+
+  const args = { where: { id: "c1" } };
+  const res = await classRepo.remove(args);
+
+  expect(spy).toHaveBeenCalledWith(args);
+  expect(res).toBe(mock);
+
+  spy.mockRestore();
+});
+
   it("deleteMany calls prisma.class.deleteMany", async () => {
     const mock = { count: 1 };
     const spy = vi
