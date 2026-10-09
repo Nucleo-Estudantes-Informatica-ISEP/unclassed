@@ -19,6 +19,7 @@ export const GET = defineHandler({
     }
     return NextResponse.json({
       phone: user.phone,
+      emailVerified: user.emailVerified,
       emailNotifications: user.emailNotifications,
       sharePhoneOnMatch: user.sharePhoneOnMatch,
     });
