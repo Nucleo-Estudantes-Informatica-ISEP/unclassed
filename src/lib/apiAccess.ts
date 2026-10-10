@@ -69,7 +69,7 @@ async function enforceRateLimit(
     ok: false,
     response: NextResponse.json(
       {
-        error: "Rate limit exceeded",
+        error: "Limite de pedidos excedido",
         retryAfter: result.retryAfter,
       },
       {
@@ -113,7 +113,7 @@ export async function authorizeRequest(
   if (!isDevOnlyRequestAllowed(devOnly, env.NODE_ENV)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Not found" }, { status: 404 }),
+      response: NextResponse.json({ error: "Não encontrado" }, { status: 404 }),
     };
   }
 
@@ -142,7 +142,7 @@ export async function authorizeRequest(
 
     return {
       ok: false,
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      response: NextResponse.json({ error: "Não autorizado" }, { status: 401 }),
     };
   }
 
@@ -150,7 +150,7 @@ export async function authorizeRequest(
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Administrator access required" },
+        { error: "Acesso de administrador necessário" },
         { status: 403 }
       ),
     };
@@ -164,7 +164,7 @@ export async function authorizeRequest(
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Invalid request origin" },
+        { error: "Origem do pedido inválida" },
         { status: 403 }
       ),
     };
