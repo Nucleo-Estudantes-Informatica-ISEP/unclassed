@@ -1,48 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import * as classRepo from "@/application/repositories/classRepository";
-import { authorizeRequest } from "@/lib/apiAccess";
 import { defineHandler } from "@/lib/defineHandler";
 import {
-  createClassSchema,
+  errorResponse,
+  handleReferenceDataWriteError,
+} from "@/lib/referenceDataApi";
+import * as classRepo from "@/application/repositories/classRepository";
+import {
   classNameMatchesYear,
+  createClassSchema,
   deleteReferenceDataSchema,
   updateClassSchema,
 } from "@/schemas/referenceDataSchema";
-
-function errorResponse(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
-}
-
-function isPrismaErrorWithCode(error: unknown, code: string) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
-}
-
-function handleWriteError(error: unknown) {
-  if (isPrismaErrorWithCode(error, "P2002")) {
-    return errorResponse(
-      "A class with this name already exists.",
-      409,
-    );
-  }
-
-  if (isPrismaErrorWithCode(error, "P2025")) {
-    return errorResponse("Class not found.", 404);
-  }
-
-  console.error("Failed to modify class:", error);
-
-  return errorResponse("An unexpected error occurred.", 500);
-}
-
-async function readBody(request: NextRequest): Promise<unknown> {
-  return request.json();
-}
 
 export const GET = defineHandler({
   auth: {},
@@ -56,7 +25,7 @@ export const GET = defineHandler({
       year = Number(yearParam);
 
       if (!Number.isInteger(year) || year < 1 || year > 3) {
-        return errorResponse("Invalid academic year.", 400);
+        return errorResponse("Ano letivo inválido.", 400);
       }
     }
 
@@ -65,154 +34,148 @@ export const GET = defineHandler({
       return NextResponse.json(classes);
     } catch (error) {
       console.error("Failed to load classes:", error);
-      return errorResponse("Failed to load classes.", 500);
+      return errorResponse("Não foi possível carregar as turmas.", 500);
     }
   },
 });
 
-export async function POST(request: NextRequest) {
-  const access = await authorizeRequest(request, {
-    requireAdmin: true,
-    enforceSameOriginForSessionWrites: true,
-  });
+export const POST = defineHandler({
+  auth: { requireAdmin: true },
+  handler: async ({ request }) => {
+    let body: unknown;
 
-  if (!access.ok) {
-    return access.response;
-  }
-
-  let body: unknown;
-
-  try {
-    body = await readBody(request);
-  } catch {
-    return errorResponse("Invalid JSON body.", 400);
-  }
-
-  const parsed = createClassSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return errorResponse("Invalid class data.", 400);
-  }
-
-  try {
-    if (await classRepo.hasNameConflict(parsed.data.name)) {
-      return errorResponse("A class with this name already exists.", 409);
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("Corpo JSON inválido.", 400);
     }
 
-    const created = await classRepo.create({
-      data: parsed.data,
-    });
+    const parsed = createClassSchema.safeParse(body);
 
-    return NextResponse.json(created, { status: 201 });
-  } catch (error) {
-    return handleWriteError(error);
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  const access = await authorizeRequest(request, {
-    requireAdmin: true,
-    enforceSameOriginForSessionWrites: true,
-  });
-
-  if (!access.ok) {
-    return access.response;
-  }
-
-  let body: unknown;
-
-  try {
-    body = await readBody(request);
-  } catch {
-    return errorResponse("Invalid JSON body.", 400);
-  }
-
-  const parsed = updateClassSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return errorResponse("Invalid class data.", 400);
-  }
-
-  const { id, ...data } = parsed.data;
-
-  try {
-    const existingClass = await classRepo.findById(id);
-
-    if (!existingClass) {
-      return errorResponse("Class not found.", 404);
+    if (!parsed.success) {
+      return errorResponse("Dados da turma inválidos.", 400);
     }
 
-    const finalName = data.name ?? existingClass.name;
-    const finalYear = data.year ?? existingClass.year;
+    try {
+      if (await classRepo.hasNameConflict(parsed.data.name)) {
+        return errorResponse("Já existe uma turma com este nome.", 409);
+      }
 
-    if (!classNameMatchesYear(finalName, finalYear)) {
-      return errorResponse(
-        "Class name must start with the selected year.",
-        400,
-      );
+      const created = await classRepo.create({
+        data: parsed.data,
+      });
+
+      return NextResponse.json(created, { status: 201 });
+    } catch (error) {
+      return handleReferenceDataWriteError(error, "class");
+    }
+  },
+});
+
+export const PATCH = defineHandler({
+  auth: { requireAdmin: true },
+  handler: async ({ request }) => {
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("Corpo JSON inválido.", 400);
     }
 
-    if (
-      data.name !== undefined &&
-      (await classRepo.hasNameConflict(data.name, id))
-    ) {
-      return errorResponse(
-        "A class with this name already exists.",
-        409,
-      );
+    const parsed = updateClassSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return errorResponse("Dados da turma inválidos.", 400);
     }
 
-    const updated = await classRepo.update({
-      where: { id },
-      data,
-    });
+    const { id, ...data } = parsed.data;
 
-    return NextResponse.json(updated);
-  } catch (error) {
-    return handleWriteError(error);
-  }
-}
+    try {
+      const existingClass = await classRepo.findById(id);
 
-export async function DELETE(request: NextRequest) {
-  const access = await authorizeRequest(request, {
-    requireAdmin: true,
-    enforceSameOriginForSessionWrites: true,
-  });
+      if (!existingClass) {
+        return errorResponse("Turma não encontrada.", 404);
+      }
 
-  if (!access.ok) {
-    return access.response;
-  }
+      const finalName = data.name ?? existingClass.name;
+      const finalYear = data.year ?? existingClass.year;
 
-  let body: unknown;
+      const changesName =
+        data.name !== undefined &&
+        data.name.trim().toUpperCase() !==
+          existingClass.name.trim().toUpperCase();
 
-  try {
-    body = await readBody(request);
-  } catch {
-    return errorResponse("Invalid JSON body.", 400);
-  }
+      const changesYear =
+        data.year !== undefined && data.year !== existingClass.year;
 
-  const parsed = deleteReferenceDataSchema.safeParse(body);
+      if ((changesName || changesYear) && (await classRepo.isInUse(id))) {
+        return errorResponse(
+          "Não é possível alterar uma turma que está em utilização.",
+          409
+        );
+      }
 
-  if (!parsed.success) {
-    return errorResponse("Invalid class ID.", 400);
-  }
+      if (!classNameMatchesYear(finalName, finalYear)) {
+        return errorResponse(
+          "O nome da turma deve começar pelo ano selecionado.",
+          400
+        );
+      }
 
-  const { id } = parsed.data;
+      if (
+        data.name !== undefined &&
+        (await classRepo.hasNameConflict(data.name, id))
+      ) {
+        return errorResponse("Já existe uma turma com este nome.", 409);
+      }
 
-  try {
-    if (await classRepo.isInUse(id)) {
-      return errorResponse(
-        "Cannot delete a class that is currently in use.",
-        409,
-      );
+      const updated = await classRepo.update({
+        where: { id },
+        data,
+      });
+
+      return NextResponse.json(updated);
+    } catch (error) {
+      return handleReferenceDataWriteError(error, "class");
+    }
+  },
+});
+
+export const DELETE = defineHandler({
+  auth: { requireAdmin: true },
+  handler: async ({ request }) => {
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("Corpo JSON inválido.", 400);
     }
 
-    await classRepo.remove({
-      where: { id },
-    });
+    const parsed = deleteReferenceDataSchema.safeParse(body);
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return handleWriteError(error);
-  }
-}
+    if (!parsed.success) {
+      return errorResponse("Identificador da turma inválido.", 400);
+    }
+
+    const { id } = parsed.data;
+
+    try {
+      if (await classRepo.isInUse(id)) {
+        return errorResponse(
+          "Não é possível eliminar uma turma que está em utilização.",
+          409
+        );
+      }
+
+      await classRepo.remove({
+        where: { id },
+      });
+
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      return handleReferenceDataWriteError(error, "class");
+    }
+  },
+});

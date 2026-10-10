@@ -84,9 +84,9 @@ async function readError(response: Response) {
       error?: string;
     };
 
-    return data.error ?? "An unexpected error occurred";
+    return data.error ?? "Ocorreu um erro inesperado";
   } catch {
-    return "An unexpected error occurred";
+    return "Ocorreu um erro inesperado";
   }
 }
 
@@ -184,7 +184,7 @@ export function ReferenceDataTab() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Failed to load reference data",
+          : "Não foi possível carregar os dados de referência",
       );
     } finally {
       setLoading(false);
@@ -278,7 +278,7 @@ export function ReferenceDataTab() {
       setDialogError(
         saveError instanceof Error
           ? saveError.message
-          : "Failed to save subject",
+          : "Não foi possível guardar a disciplina",
       );
     } finally {
       setSaving(false);
@@ -326,7 +326,7 @@ export function ReferenceDataTab() {
       setDialogError(
         saveError instanceof Error
           ? saveError.message
-          : "Failed to save class",
+          : "Não foi possível guardar a turma",
       );
     } finally {
       setSaving(false);
@@ -336,7 +336,7 @@ export function ReferenceDataTab() {
   async function deleteSubject(subject: Subject) {
     if (
       !window.confirm(
-        `Delete subject ${subject.code}?`,
+        `Eliminar a disciplina ${subject.code}?`,
       )
     ) {
       return;
@@ -364,7 +364,7 @@ export function ReferenceDataTab() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Failed to delete subject",
+          : "Não foi possível eliminar a disciplina",
       );
     }
   }
@@ -372,7 +372,7 @@ export function ReferenceDataTab() {
   async function deleteClass(classRecord: ClassRecord) {
     if (
       !window.confirm(
-        `Delete class ${classRecord.name}?`,
+        `Eliminar a turma ${classRecord.name}?`,
       )
     ) {
       return;
@@ -400,7 +400,7 @@ export function ReferenceDataTab() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Failed to delete class",
+          : "Não foi possível eliminar a turma",
       );
     }
   }
@@ -409,7 +409,7 @@ export function ReferenceDataTab() {
     return (
       <Card>
         <CardContent className="text-muted-foreground p-8 text-center">
-          Loading reference data...
+          A carregar dados de referência...
         </CardContent>
       </Card>
     );
@@ -426,11 +426,11 @@ export function ReferenceDataTab() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Subjects</CardTitle>
+            <CardTitle>Disciplinas</CardTitle>
 
             <Button size="sm" onClick={openNewSubject}>
               <Plus />
-              Add Subject
+              Adicionar disciplina
             </Button>
           </CardHeader>
 
@@ -438,12 +438,12 @@ export function ReferenceDataTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Year</TableHead>
-                  <TableHead>Semester</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Ano</TableHead>
+                  <TableHead>Semestre</TableHead>
                   <TableHead className="text-right">
-                    Actions
+                    Ações
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -472,7 +472,7 @@ export function ReferenceDataTab() {
                         <Button
                           variant="outline"
                           size="icon"
-                          aria-label={`Edit ${subject.code}`}
+                          aria-label={`Editar ${subject.code}`}
                           onClick={() =>
                             openEditSubject(subject)
                           }
@@ -483,7 +483,7 @@ export function ReferenceDataTab() {
                         <Button
                           variant="destructive"
                           size="icon"
-                          aria-label={`Delete ${subject.code}`}
+                          aria-label={`Eliminar ${subject.code}`}
                           onClick={() =>
                             void deleteSubject(subject)
                           }
@@ -501,7 +501,7 @@ export function ReferenceDataTab() {
                       colSpan={5}
                       className="text-muted-foreground text-center"
                     >
-                      No subjects found
+                      Nenhuma disciplina encontrada
                     </TableCell>
                   </TableRow>
                 )}
@@ -512,11 +512,11 @@ export function ReferenceDataTab() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Classes</CardTitle>
+            <CardTitle>Turmas</CardTitle>
 
             <Button size="sm" onClick={openNewClass}>
               <Plus />
-              Add Class
+              Adicionar turma
             </Button>
           </CardHeader>
 
@@ -524,10 +524,10 @@ export function ReferenceDataTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Year</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Ano</TableHead>
                   <TableHead className="text-right">
-                    Actions
+                    Ações
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -548,7 +548,7 @@ export function ReferenceDataTab() {
                         <Button
                           variant="outline"
                           size="icon"
-                          aria-label={`Edit ${classRecord.name}`}
+                          aria-label={`Editar ${classRecord.name}`}
                           onClick={() =>
                             openEditClass(classRecord)
                           }
@@ -559,7 +559,7 @@ export function ReferenceDataTab() {
                         <Button
                           variant="destructive"
                           size="icon"
-                          aria-label={`Delete ${classRecord.name}`}
+                          aria-label={`Eliminar ${classRecord.name}`}
                           onClick={() =>
                             void deleteClass(classRecord)
                           }
@@ -577,7 +577,7 @@ export function ReferenceDataTab() {
                       colSpan={3}
                       className="text-muted-foreground text-center"
                     >
-                      No classes found
+                      Nenhuma turma encontrada
                     </TableCell>
                   </TableRow>
                 )}
@@ -595,20 +595,20 @@ export function ReferenceDataTab() {
           <DialogHeader>
             <DialogTitle>
               {editingSubject
-                ? "Edit Subject"
-                : "Add Subject"}
+                ? "Editar disciplina"
+                : "Adicionar disciplina"}
             </DialogTitle>
 
             <DialogDescription>
-              Manage the subject reference data used by
-              swap requests.
+              Gerir os dados de referência das disciplinas utilizados nos
+              pedidos de troca.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="subject-code">
-                Code
+                Código
               </Label>
 
               <Input
@@ -625,7 +625,7 @@ export function ReferenceDataTab() {
 
             <div className="grid gap-2">
               <Label htmlFor="subject-name">
-                Name
+                Nome
               </Label>
 
               <Input
@@ -645,13 +645,13 @@ export function ReferenceDataTab() {
                 role="alert"
                 className="text-sm text-destructive"
               >
-                A subject with this code already exists.
+                Já existe uma disciplina com este código.
               </p>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Year</Label>
+                <Label>Ano</Label>
 
                 <Select
                   value={String(subjectForm.year)}
@@ -680,7 +680,7 @@ export function ReferenceDataTab() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Semester</Label>
+                <Label>Semestre</Label>
 
                 <Select
                   value={String(subjectForm.semester)}
@@ -724,7 +724,7 @@ export function ReferenceDataTab() {
               }
               disabled={saving}
             >
-              Cancel
+              Cancelar
             </Button>
 
             <Button
@@ -736,7 +736,7 @@ export function ReferenceDataTab() {
                 !subjectHasChanges
               }
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "A guardar..." : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -750,13 +750,13 @@ export function ReferenceDataTab() {
           <DialogHeader>
             <DialogTitle>
               {editingClass
-                ? "Edit Class"
-                : "Add Class"}
+                ? "Editar turma"
+                : "Adicionar turma"}
             </DialogTitle>
 
             <DialogDescription>
-              Manage the class reference data used by
-              swap requests.
+              Gerir os dados de referência das turmas utilizados nos
+              pedidos de troca.
             </DialogDescription>
           </DialogHeader>
 
@@ -780,12 +780,12 @@ export function ReferenceDataTab() {
                   }
 
                   if (!/^[1-3]$/.test(firstCharacter)) {
-                    setClassNameWarning("Class name must start with 1, 2, or 3.");
+                    setClassNameWarning("O nome da turma deve começar por 1, 2 ou 3.");
                     return;
                   }
 
                   if (classYearChosenFirst && Number(firstCharacter) !== classForm.year) {
-                    setClassNameWarning(`Class name must start with ${classForm.year}.`);
+                    setClassNameWarning(`O nome da turma deve começar por ${classForm.year}.`);
                     return;
                   }
 
@@ -799,7 +799,7 @@ export function ReferenceDataTab() {
 
               {(classNameWarning || (classForm.name.trim() && !classYearMatches)) && (
                 <p role="alert" className="text-sm text-destructive">
-                  {classNameWarning ?? `Class name must start with ${classForm.year}.`}
+                  {classNameWarning ?? `O nome da turma deve começar por ${classForm.year}.`}
                 </p>
               )}
 
@@ -808,13 +808,13 @@ export function ReferenceDataTab() {
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  A class with this name already exists.
+                  Já existe uma turma com este nome.
                 </p>
               )}
             </div>
 
             <div className="grid gap-2">
-              <Label>Year</Label>
+              <Label>Ano</Label>
 
               <Select
                 value={String(classForm.year)}
@@ -861,7 +861,7 @@ export function ReferenceDataTab() {
               }
               disabled={saving}
             >
-              Cancel
+              Cancelar
             </Button>
 
             <Button
@@ -875,7 +875,7 @@ export function ReferenceDataTab() {
                 !classHasChanges
               }
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "A guardar..." : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,7 +4,7 @@ const academicYearSchema = z.number().int().min(1).max(3);
 const semesterSchema = z.number().int().min(1).max(2);
 
 const classNameSchema = z.string().trim().min(1).regex(/^[1-3]/, {
-  message: "Class name must start with 1, 2, or 3.",
+  message: "O nome da turma deve começar por 1, 2 ou 3.",
 });
 
 export function classNameMatchesYear(name: string, year: number): boolean {
@@ -34,7 +34,7 @@ export const updateSubjectSchema = z
       name !== undefined ||
       year !== undefined ||
       semester !== undefined,
-    { message: "At least one field must be updated" },
+    { message: "É necessário atualizar pelo menos um campo" },
   );
 
 // Classes
@@ -44,7 +44,7 @@ export const createClassSchema = z.object({
   year: academicYearSchema,
 }).refine(({ name, year }) => classNameMatchesYear(name, year), {
   path: ["name"],
-  message: "Class name must start with the selected year.",
+  message: "O nome da turma deve começar pelo ano selecionado.",
 });
 
 export const updateClassSchema = z
@@ -55,7 +55,7 @@ export const updateClassSchema = z
   })
   .refine(
     ({ name, year }) => name !== undefined || year !== undefined,
-    { message: "At least one field must be updated" },
+    { message: "É necessário atualizar pelo menos um campo" },
   );
 
 // Delete

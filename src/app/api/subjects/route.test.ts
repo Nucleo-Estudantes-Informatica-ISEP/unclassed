@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { authorizeRequest } from "@/lib/apiAccess";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
+
+import { DELETE, GET, PATCH, POST } from "./route";
+
 vi.mock("@/lib/apiAccess", () => ({ authorizeRequest: vi.fn() }));
 vi.mock("@/application/repositories/subjectRepository", () => ({
   findSubjects: vi.fn(),
@@ -8,17 +13,26 @@ vi.mock("@/application/repositories/subjectRepository", () => ({
   update: vi.fn(),
   remove: vi.fn(),
   isInUse: vi.fn(),
+  findById: vi.fn(),
 }));
-
-import * as subjectRepo from "@/application/repositories/subjectRepository";
-import { authorizeRequest } from "@/lib/apiAccess";
-import { GET, POST, PATCH, DELETE } from "./route";
 
 const apiUrl = "http://localhost:3000/api/subjects";
 const validData = { code: "ALG", name: "Algebra", year: 1, semester: 1 };
-const existing = { id: "item-1", code: "ALG", name: "Algebra", year: 1, semester: 1 };
+const existing = {
+  id: "item-1",
+  code: "ALG",
+  name: "Algebra",
+  year: 1,
+  semester: 1,
+};
 const patchData = { name: "Linear Algebra" };
-const updated = { id: "item-1", code: "ALG", name: "Linear Algebra", year: 1, semester: 1 };
+const updated = {
+  id: "item-1",
+  code: "ALG",
+  name: "Linear Algebra",
+  year: 1,
+  semester: 1,
+};
 
 function authorizeAdmin() {
   vi.mocked(authorizeRequest).mockResolvedValueOnce({
@@ -55,7 +69,9 @@ describe("/api/subjects", () => {
 
   it("returns data for authenticated GET", async () => {
     authorizeAdmin();
-    vi.mocked(subjectRepo.findSubjects).mockResolvedValueOnce([existing] as never);
+    vi.mocked(subjectRepo.findSubjects).mockResolvedValueOnce([
+      existing,
+    ] as never);
     const response = await GET(new NextRequest(apiUrl));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([existing]);
@@ -67,33 +83,43 @@ describe("/api/subjects", () => {
     const request = new NextRequest(`${apiUrl}?year=1&semester=2`);
     const response = await GET(request);
     expect(response.status).toBe(200);
-    expect(subjectRepo.findSubjects).toHaveBeenCalledWith({ year: 1, semester: 2 });
+    expect(subjectRepo.findSubjects).toHaveBeenCalledWith({
+      year: 1,
+      semester: 2,
+    });
   });
 
-  it.each(["year=0", "year=4", "year=abc", "semester=0", "semester=3", "semester=1.5"])(
-    "rejects invalid subject filter %s",
-    async (filter) => {
-      authorizeAdmin();
-      const response = await GET(new NextRequest(`${apiUrl}?${filter}`));
-      expect(response.status).toBe(400);
-      expect(subjectRepo.findSubjects).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "year=0",
+    "year=4",
+    "year=abc",
+    "semester=0",
+    "semester=3",
+    "semester=1.5",
+  ])("rejects invalid subject filter %s", async (filter) => {
+    authorizeAdmin();
+    const response = await GET(new NextRequest(`${apiUrl}?${filter}`));
+    expect(response.status).toBe(400);
+    expect(subjectRepo.findSubjects).not.toHaveBeenCalled();
+  });
 
   it.each([
     ["POST", POST, validData],
     ["PATCH", PATCH, { id: "item-1", ...patchData }],
     ["DELETE", DELETE, { id: "item-1" }],
-  ] as const)("rejects unauthorized %s requests", async (method, handler, body) => {
-    denyAccess();
-    const request = makeRequest(method, body);
-    const response = await handler(request);
-    expect(response.status).toBe(403);
-    expect(authorizeRequest).toHaveBeenCalledWith(request, {
-      requireAdmin: true,
-      enforceSameOriginForSessionWrites: true,
-    });
-  });
+  ] as const)(
+    "rejects unauthorized %s requests",
+    async (method, handler, body) => {
+      denyAccess();
+      const request = makeRequest(method, body);
+      const response = await handler(request);
+      expect(response.status).toBe(403);
+      expect(authorizeRequest).toHaveBeenCalledWith(request, {
+        requireAdmin: true,
+        enforceSameOriginForSessionWrites: true,
+      });
+    }
+  );
 
   it("creates a subject", async () => {
     authorizeAdmin();
@@ -114,7 +140,9 @@ describe("/api/subjects", () => {
   it("updates a subject", async () => {
     authorizeAdmin();
     vi.mocked(subjectRepo.update).mockResolvedValueOnce(updated as never);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", ...patchData }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", ...patchData })
+    );
     expect(response.status).toBe(200);
     expect(subjectRepo.update).toHaveBeenCalledWith({
       where: { id: "item-1" },
@@ -130,12 +158,48 @@ describe("/api/subjects", () => {
     expect(subjectRepo.update).not.toHaveBeenCalled();
   });
 
+  it.each([{ code: "ALG2" }, { year: 2 }, { semester: 2 }])(
+    "rejects structural changes to a subject in use: %j",
+    async (changes) => {
+      authorizeAdmin();
+      vi.mocked(subjectRepo.findById).mockResolvedValueOnce(existing as never);
+      vi.mocked(subjectRepo.isInUse).mockResolvedValueOnce(true);
+
+      const response = await PATCH(
+        makeRequest("PATCH", { id: "item-1", ...changes })
+      );
+
+      expect(response.status).toBe(409);
+      expect(subjectRepo.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it("allows changing the name of a subject in use", async () => {
+    authorizeAdmin();
+
+    vi.mocked(subjectRepo.isInUse).mockResolvedValueOnce(true);
+    vi.mocked(subjectRepo.update).mockResolvedValueOnce(updated as never);
+
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "Linear Algebra" })
+    );
+
+    expect(response.status).toBe(200);
+    expect(subjectRepo.isInUse).not.toHaveBeenCalled();
+    expect(subjectRepo.update).toHaveBeenCalledWith({
+      where: { id: "item-1" },
+      data: { name: "Linear Algebra" },
+    });
+  });
+
   it("deletes a subject", async () => {
     authorizeAdmin();
     vi.mocked(subjectRepo.remove).mockResolvedValueOnce(existing as never);
     const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
     expect(response.status).toBe(200);
-    expect(subjectRepo.remove).toHaveBeenCalledWith({ where: { id: "item-1" } });
+    expect(subjectRepo.remove).toHaveBeenCalledWith({
+      where: { id: "item-1" },
+    });
     expect(await response.json()).toEqual({ success: true });
   });
 
@@ -155,7 +219,7 @@ describe("/api/subjects", () => {
       const handler = { POST, PATCH, DELETE }[method];
       const response = await handler(makeInvalidJsonRequest(method));
       expect(response.status).toBe(400);
-    },
+    }
   );
 
   it("returns 409 on a duplicate", async () => {

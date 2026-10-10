@@ -74,12 +74,7 @@ export async function deleteMany(
   return (tx || prisma).subject.deleteMany(args);
 }
 
-export function isKnownRequestError(error: unknown, code: string) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === code
-  );
-}
+
 
 export async function isInUse(id: string): Promise<boolean> {
   const count = await prisma.singleSwapRequest.count({

@@ -33,7 +33,7 @@ export function DashboardTabs({
         <TabsTrigger value="cron">Cron Monitor</TabsTrigger>
         <TabsTrigger value="partitions">Graph Partitions</TabsTrigger>
         <TabsTrigger value="batch">Batch Processing</TabsTrigger>
-        <TabsTrigger value="reference-data">Reference Data</TabsTrigger>
+        <TabsTrigger value="reference-data">Dados de referência</TabsTrigger>
         <TabsTrigger value="settings">Settings</TabsTrigger>
       </TabsList>
 

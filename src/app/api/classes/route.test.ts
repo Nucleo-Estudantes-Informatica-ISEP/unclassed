@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { authorizeRequest } from "@/lib/apiAccess";
+import * as classRepo from "@/application/repositories/classRepository";
+
+import { DELETE, GET, PATCH, POST } from "./route";
+
 vi.mock("@/lib/apiAccess", () => ({ authorizeRequest: vi.fn() }));
 vi.mock("@/application/repositories/classRepository", () => ({
   findClasses: vi.fn(),
@@ -11,10 +16,6 @@ vi.mock("@/application/repositories/classRepository", () => ({
   remove: vi.fn(),
   isInUse: vi.fn(),
 }));
-
-import * as classRepo from "@/application/repositories/classRepository";
-import { authorizeRequest } from "@/lib/apiAccess";
-import { GET, POST, PATCH, DELETE } from "./route";
 
 const apiUrl = "http://localhost:3000/api/classes";
 const validData = { name: "1DA", year: 1 };
@@ -73,27 +74,33 @@ describe("/api/classes", () => {
     expect(classRepo.findClasses).toHaveBeenCalledWith({ year: 2 });
   });
 
-  it.each(["0", "4", "abc", "1.5"])('rejects invalid class year %s', async (year) => {
-    authorizeAdmin();
-    const response = await GET(new NextRequest(`${apiUrl}?year=${year}`));
-    expect(response.status).toBe(400);
-    expect(classRepo.findClasses).not.toHaveBeenCalled();
-  });
+  it.each(["0", "4", "abc", "1.5"])(
+    "rejects invalid class year %s",
+    async (year) => {
+      authorizeAdmin();
+      const response = await GET(new NextRequest(`${apiUrl}?year=${year}`));
+      expect(response.status).toBe(400);
+      expect(classRepo.findClasses).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ["POST", POST, validData],
     ["PATCH", PATCH, { id: "item-1", ...patchData }],
     ["DELETE", DELETE, { id: "item-1" }],
-  ] as const)("rejects unauthorized %s requests", async (method, handler, body) => {
-    denyAccess();
-    const request = makeRequest(method, body);
-    const response = await handler(request);
-    expect(response.status).toBe(403);
-    expect(authorizeRequest).toHaveBeenCalledWith(request, {
-      requireAdmin: true,
-      enforceSameOriginForSessionWrites: true,
-    });
-  });
+  ] as const)(
+    "rejects unauthorized %s requests",
+    async (method, handler, body) => {
+      denyAccess();
+      const request = makeRequest(method, body);
+      const response = await handler(request);
+      expect(response.status).toBe(403);
+      expect(authorizeRequest).toHaveBeenCalledWith(request, {
+        requireAdmin: true,
+        enforceSameOriginForSessionWrites: true,
+      });
+    }
+  );
 
   it("creates a class", async () => {
     authorizeAdmin();
@@ -115,7 +122,9 @@ describe("/api/classes", () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     vi.mocked(classRepo.update).mockResolvedValueOnce(updated as never);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", ...patchData }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", ...patchData })
+    );
     expect(response.status).toBe(200);
     expect(classRepo.update).toHaveBeenCalledWith({
       where: { id: "item-1" },
@@ -134,26 +143,40 @@ describe("/api/classes", () => {
   it("rejects changing the year without changing the class name", async () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
-    vi.mocked(classRepo.update).mockResolvedValueOnce({ ...existing, year: 2 } as never);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", year: 2 }));
+    vi.mocked(classRepo.update).mockResolvedValueOnce({
+      ...existing,
+      year: 2,
+    } as never);
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", year: 2 })
+    );
     expect(response.status).toBe(400);
     expect(classRepo.update).not.toHaveBeenCalled();
   });
 
   it("accepts a class name with a free-form suffix", async () => {
     authorizeAdmin();
-    vi.mocked(classRepo.create).mockResolvedValueOnce({ id: "item-2", name: "1 Special Group", year: 1 } as never);
-    const response = await POST(makeRequest("POST", { name: "1 Special Group", year: 1 }));
+    vi.mocked(classRepo.create).mockResolvedValueOnce({
+      id: "item-2",
+      name: "1 Special Group",
+      year: 1,
+    } as never);
+    const response = await POST(
+      makeRequest("POST", { name: "1 Special Group", year: 1 })
+    );
     expect(response.status).toBe(201);
   });
 
-  it.each(["1DB", "1db", " 1DB "])("rejects an identical class name on create: %s", async (name) => {
-    authorizeAdmin();
-    vi.mocked(classRepo.hasNameConflict).mockResolvedValueOnce(true);
-    const response = await POST(makeRequest("POST", { name, year: 1 }));
-    expect(response.status).toBe(409);
-    expect(classRepo.create).not.toHaveBeenCalled();
-  });
+  it.each(["1DB", "1db", " 1DB "])(
+    "rejects an identical class name on create: %s",
+    async (name) => {
+      authorizeAdmin();
+      vi.mocked(classRepo.hasNameConflict).mockResolvedValueOnce(true);
+      const response = await POST(makeRequest("POST", { name, year: 1 }));
+      expect(response.status).toBe(409);
+      expect(classRepo.create).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     { name: "2DA", year: 1 },
@@ -169,7 +192,9 @@ describe("/api/classes", () => {
   it("rejects changing the name without changing the stored year", async () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", name: "2DA" }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "2DA" })
+    );
     expect(response.status).toBe(400);
     expect(classRepo.update).not.toHaveBeenCalled();
   });
@@ -178,7 +203,9 @@ describe("/api/classes", () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     vi.mocked(classRepo.hasNameConflict).mockResolvedValueOnce(true);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", name: "1DB" }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+    );
     expect(response.status).toBe(409);
     expect(classRepo.hasNameConflict).toHaveBeenCalledWith("1DB", "item-1");
     expect(classRepo.update).not.toHaveBeenCalled();
@@ -189,7 +216,9 @@ describe("/api/classes", () => {
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     const changed = { id: "item-1", name: "2DA", year: 2 };
     vi.mocked(classRepo.update).mockResolvedValueOnce(changed as never);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", name: "2DA", year: 2 }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "2DA", year: 2 })
+    );
     expect(response.status).toBe(200);
     expect(classRepo.update).toHaveBeenCalledWith({
       where: { id: "item-1" },
@@ -197,10 +226,58 @@ describe("/api/classes", () => {
     });
   });
 
+  it("rejects changing the year of a class in use", async () => {
+    authorizeAdmin();
+    vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
+    vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
+
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "2DA", year: 2 })
+    );
+
+    expect(response.status).toBe(409);
+    expect(classRepo.isInUse).toHaveBeenCalledWith("item-1");
+    expect(classRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects renaming a class in use", async () => {
+    authorizeAdmin();
+
+    vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
+    vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
+
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Não é possível alterar uma turma que está em utilização.",
+    });
+    expect(classRepo.isInUse).toHaveBeenCalledWith("item-1");
+    expect(classRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("allows an unchanged class update without checking usage", async () => {
+  authorizeAdmin();
+
+  vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
+  vi.mocked(classRepo.update).mockResolvedValueOnce(existing as never);
+
+  const response = await PATCH(
+    makeRequest("PATCH", { id: "item-1", name: "1DA", year: 1 })
+  );
+
+  expect(response.status).toBe(200);
+  expect(classRepo.isInUse).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when updating a missing class", async () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(null);
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1", name: "1DB" }));
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+    );
     expect(response.status).toBe(404);
     expect(classRepo.update).not.toHaveBeenCalled();
   });
@@ -230,7 +307,7 @@ describe("/api/classes", () => {
       const handler = { POST, PATCH, DELETE }[method];
       const response = await handler(makeInvalidJsonRequest(method));
       expect(response.status).toBe(400);
-    },
+    }
   );
 
   it("returns 409 on a duplicate", async () => {

@@ -31,7 +31,9 @@ export async function hasNameConflict(name: string, excludeId?: string) {
     where: excludeId ? { id: { not: excludeId } } : {},
     select: { name: true },
   });
-  return classes.some((item) => normalizeClassName(item.name) === normalizedName);
+  return classes.some(
+    (item) => normalizeClassName(item.name) === normalizedName
+  );
 }
 
 export async function findById(id: string) {
@@ -57,59 +59,93 @@ export async function findByNames(names: string[]) {
 
 export async function create(
   args: Parameters<typeof prisma.class.create>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
-  return (tx || prisma).class.create(args);
+  return (tx || prisma).class.create({
+    ...args,
+    data: {
+      ...args.data,
+      name: normalizeClassName(args.data.name),
+    },
+  });
 }
 
 export async function update(
   args: Parameters<typeof prisma.class.update>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
-  return (tx || prisma).class.update(args);
+  return (tx || prisma).class.update({
+    ...args,
+    data: {
+      ...args.data,
+      ...(typeof args.data.name === "string"
+        ? { name: normalizeClassName(args.data.name) }
+        : {}),
+    },
+  });
 }
 
 export async function remove(
   args: Parameters<typeof prisma.class.delete>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).class.delete(args);
 }
 
 export async function deleteMany(
   args: Parameters<typeof prisma.class.deleteMany>[0] = {},
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).class.deleteMany(args);
 }
 
-export function isKnownRequestError(error: unknown, code: string) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === code
-  );
-}
 export async function isInUse(id: string): Promise<boolean> {
-  const [singleCount, bundleCount] = await Promise.all([
+  const existingClass = await prisma.class.findUnique({
+    where: { id },
+    select: { name: true },
+  });
+
+  const classReferences = [id];
+  if (existingClass) {
+    classReferences.push(existingClass.name);
+  }
+
+  const [singleCount, bundleCount, matches] = await Promise.all([
     prisma.singleSwapRequest.count({
       where: {
-        OR: [
-          { currentClassId: id },
-          { preferredClassIds: { has: id } },
-        ],
+        OR: [{ currentClassId: id }, { preferredClassIds: { has: id } }],
       },
     }),
     prisma.bundleSwapRequest.count({
       where: {
-        OR: [
-          { currentClassId: id },
-          { preferredClassIds: { has: id } },
-        ],
+        OR: [{ currentClassId: id }, { preferredClassIds: { has: id } }],
       },
+    }),
+    prisma.match.aggregateRaw({
+      pipeline: [
+        {
+          $match: {
+            participants: {
+              $elemMatch: {
+                $or: [
+                  { fromClass: { $in: classReferences } },
+                  { toClass: { $in: classReferences } },
+                ],
+              },
+            },
+          },
+        },
+        { $limit: 1 },
+        { $project: { _id: 1 } },
+      ],
     }),
   ]);
 
-  return singleCount > 0 || bundleCount > 0;
+  return (
+    singleCount > 0 ||
+    bundleCount > 0 ||
+    (Array.isArray(matches) && matches.length > 0)
+  );
 }
 
 export type { Class } from "@prisma/client";
