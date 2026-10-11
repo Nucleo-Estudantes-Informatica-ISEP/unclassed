@@ -31,7 +31,7 @@ export const PATCH = defineHandler({
     emailNotifications: z.unknown().optional(),
     sharePhoneOnMatch: z.unknown().optional(),
     phone: z.unknown().optional(),
-  }),
+  }).strict(),
   onError: (error) => {
     if (error instanceof ValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

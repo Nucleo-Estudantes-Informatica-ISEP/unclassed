@@ -141,6 +141,7 @@ Rules:
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
 - GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary for exceptions and forwarded Pino logs; preserve exception stacks and correlation IDs while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
 - Use `src/lib/logger.ts` for server logs. `defineHandler` supplies request context through `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
+- AuthNEI is the source of truth for `name`, `email`, and email verification status. Unclassed may retain local copies for synchronization or compatibility, but these fields must not be editable through Unclassed profile preferences. `phone` remains Unclassed-owned and editable because the current OIDC integration does not request or synchronize the `phone` or `phone_verified` claims. `emailNotifications` and `sharePhoneOnMatch` are also Unclassed-owned preferences.
 
 ## API conventions
 

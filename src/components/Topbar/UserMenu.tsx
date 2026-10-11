@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, RefreshCw, UserCog } from "lucide-react";
+import { LogOut, RefreshCw, User, UserCog } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -148,7 +148,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
               onClick={() => setShowMenu(false)}
             >
-              <UserCog className="mr-2 h-4 w-4" />
+              <User className="mr-2 h-4 w-4" />
               <span>Perfil</span>
             </Link>
 

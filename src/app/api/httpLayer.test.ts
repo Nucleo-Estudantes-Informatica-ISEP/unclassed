@@ -172,8 +172,9 @@ test("preferences preserve successful and domain validation responses", async ()
   expect((await preferences.PATCH(req("PATCH", "{"))).status).toBe(400);
 });
 
-test("preferences only update application-owned fields", async () => {
+test("preferences reject fields not owned by Unclassed", async () => {
   vi.mocked(getServerSession).mockResolvedValue(user as never);
+  vi.mocked(updatePreferences).mockClear();
 
   const response = await preferences.PATCH(
     req(
@@ -189,12 +190,8 @@ test("preferences only update application-owned fields", async () => {
     )
   );
 
-  expect(response.status).toBe(200);
-  expect(updatePreferences).toHaveBeenCalledWith("user-1", {
-    phone: "912345678",
-    emailNotifications: false,
-    sharePhoneOnMatch: true,
-  });
+  expect(response.status).toBe(400);
+  expect(updatePreferences).not.toHaveBeenCalled();
 });
 
 test("development-only destructive route remains unavailable outside development", async () => {
