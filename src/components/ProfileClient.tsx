@@ -183,7 +183,7 @@ export function ProfileClient({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-md border p-4">
+              <div className="flex flex-col items-start justify-between gap-4 rounded-md border p-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-foreground text-sm font-medium">
                     Dados da conta
@@ -196,6 +196,7 @@ export function ProfileClient({
                 <Button
                   type="button"
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={navigateToAuthNeiProfile}
                 >
                   Gerir conta no AuthNEI
