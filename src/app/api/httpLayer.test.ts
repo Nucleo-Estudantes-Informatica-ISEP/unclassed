@@ -4,6 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { findUnique } from "@/application/repositories/matchRepository";
 import getServerSession from "@/services/getServerSession";
 import { checkRateLimit } from "@/services/rateLimit";
+import { updatePreferences } from "@/application/repositories/userRepository";
 
 import * as cron from "./admin/cron/route";
 import { GET as classes } from "./classes/route";
@@ -169,6 +170,58 @@ test("preferences preserve successful and domain validation responses", async ()
     error: "Número de telemóvel inválido",
   });
   expect((await preferences.PATCH(req("PATCH", "{"))).status).toBe(400);
+});
+
+test.each([
+  ["name", { name: "Changed Name" }],
+  ["email", { email: "changed@example.test" }],
+  ["emailVerified", { emailVerified: false }],
+])("preferences reject the foreign field %s", async (_field, foreignField) => {
+  vi.mocked(getServerSession).mockResolvedValue(user as never);
+  vi.mocked(updatePreferences).mockClear();
+
+  const response = await preferences.PATCH(
+    req(
+      "PATCH",
+      JSON.stringify({
+        ...foreignField,
+      })
+    )
+  );
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    error: "Validação falhou",
+  });
+  expect(updatePreferences).not.toHaveBeenCalled();
+});
+
+test("preferences accept only Unclassed-owned fields", async () => {
+  vi.mocked(getServerSession).mockResolvedValue(user as never);
+  vi.mocked(updatePreferences).mockResolvedValue({
+    ...user,
+    phone: "912345678",
+    emailNotifications: false,
+    sharePhoneOnMatch: true,
+  } as never);
+
+  const response = await preferences.PATCH(
+    req(
+      "PATCH",
+      JSON.stringify({
+        phone: "912345678",
+        emailNotifications: false,
+        sharePhoneOnMatch: true,
+      })
+    )
+  );
+
+  expect(response.status).toBe(200);
+  expect(updatePreferences).toHaveBeenCalledWith(user.id, {
+    phone: "912345678",
+    emailNotifications: false,
+    sharePhoneOnMatch: true,
+  });
 });
 
 test("development-only destructive route remains unavailable outside development", async () => {
