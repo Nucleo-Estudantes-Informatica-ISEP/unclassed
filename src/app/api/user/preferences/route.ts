@@ -19,8 +19,8 @@ export const GET = defineHandler({
     }
     return NextResponse.json({
       phone: user.phone,
-      emailVerified: user.emailVerified,
       emailNotifications: user.emailNotifications,
+      emailVerified: user.emailVerified,
       sharePhoneOnMatch: user.sharePhoneOnMatch,
     });
   },

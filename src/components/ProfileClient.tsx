@@ -207,7 +207,7 @@ export function ProfileClient({
                   <Mail className="h-4 w-4 text-yellow-600" />
                   <AlertDescription className="text-yellow-800">
                     A verificação do email é gerida pelo sistema central de
-                    autenticação. Atualiza o estado da tua conta no ZITADEL se
+                    autenticação. Atualiza o estado da tua conta no AuthNEI se
                     precisares de acesso total.
                   </AlertDescription>
                 </Alert>

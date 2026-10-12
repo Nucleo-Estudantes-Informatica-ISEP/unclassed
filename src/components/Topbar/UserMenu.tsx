@@ -11,6 +11,7 @@ import { switchAuthNeiAccount } from "@/lib/client-auth-actions";
 import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 import { httpClient } from "@/lib/httpClient";
+import { navigateToAuthNeiProfile } from "@/lib/navigateToAuthNeiProfile";
 
 interface UserMenuProps {
   user: {
@@ -27,9 +28,7 @@ export default function UserMenu({ user }: UserMenuProps) {
 
   const handleManageProfile = () => {
     setShowMenu(false);
-    // Full navigation required: this API route redirects to external AuthNEI.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.href = "/api/auth/profile-url";
+    navigateToAuthNeiProfile();
   };
 
   const handleSwitchAccount = async () => {
@@ -159,7 +158,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
             >
               <UserCog className="mr-2 h-4 w-4" />
-              <span>Gerir Conta</span>
+              <span>Gerir Conta no AuthNEI</span>
             </button>
 
             <button

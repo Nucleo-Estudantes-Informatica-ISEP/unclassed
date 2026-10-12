@@ -172,7 +172,11 @@ test("preferences preserve successful and domain validation responses", async ()
   expect((await preferences.PATCH(req("PATCH", "{"))).status).toBe(400);
 });
 
-test("preferences reject fields not owned by Unclassed", async () => {
+test.each([
+  ["name", { name: "Changed Name" }],
+  ["email", { email: "changed@example.test" }],
+  ["emailVerified", { emailVerified: false }],
+])("preferences reject the foreign field %s", async (_field, foreignField) => {
   vi.mocked(getServerSession).mockResolvedValue(user as never);
   vi.mocked(updatePreferences).mockClear();
 
@@ -180,9 +184,31 @@ test("preferences reject fields not owned by Unclassed", async () => {
     req(
       "PATCH",
       JSON.stringify({
-        name: "Changed Name",
-        email: "changed@example.test",
-        emailVerified: false,
+        ...foreignField,
+      })
+    )
+  );
+
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    error: "Validação falhou",
+  });
+  expect(updatePreferences).not.toHaveBeenCalled();
+});
+
+test("preferences accept only Unclassed-owned fields", async () => {
+  vi.mocked(getServerSession).mockResolvedValue(user as never);
+  vi.mocked(updatePreferences).mockResolvedValue({
+    ...user,
+    phone: "912345678",
+    emailNotifications: false,
+    sharePhoneOnMatch: true,
+  } as never);
+
+  const response = await preferences.PATCH(
+    req(
+      "PATCH",
+      JSON.stringify({
         phone: "912345678",
         emailNotifications: false,
         sharePhoneOnMatch: true,
@@ -190,8 +216,12 @@ test("preferences reject fields not owned by Unclassed", async () => {
     )
   );
 
-  expect(response.status).toBe(400);
-  expect(updatePreferences).not.toHaveBeenCalled();
+  expect(response.status).toBe(200);
+  expect(updatePreferences).toHaveBeenCalledWith(user.id, {
+    phone: "912345678",
+    emailNotifications: false,
+    sharePhoneOnMatch: true,
+  });
 });
 
 test("development-only destructive route remains unavailable outside development", async () => {
