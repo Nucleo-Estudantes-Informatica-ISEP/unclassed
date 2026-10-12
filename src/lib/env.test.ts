@@ -54,6 +54,15 @@ test("parses typed booleans, ports, and refresh-token auth defaults", () => {
   assert.equal(parsed.AUTH_SCOPES, "openid email profile offline_access");
 });
 
+test("treats empty AUTH_ROLE_CLAIM values as undefined", () => {
+  for (const value of ["", "   ", "\t\n"]) {
+    assert.equal(
+      parseEnvironment({ AUTH_ROLE_CLAIM: value }).AUTH_ROLE_CLAIM,
+      undefined
+    );
+  }
+});
+
 test("rejects weak secrets and non-Mongo database URLs", () => {
   assert.throws(
     () => parseEnvironment({ AUTH_SECRET: "too-short" }),
