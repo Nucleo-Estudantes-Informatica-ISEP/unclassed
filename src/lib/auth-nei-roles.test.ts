@@ -40,15 +40,16 @@ test("does not fall back to generic or application project role claims", () => {
 });
 
 test("fails closed when no shared role claim is configured", () => {
-  const roles = getAuthNeiRoles(
-    {
-      [GLOBAL_ADMIN_CLAIM]: {
-        admin: { org: "org" },
-      },
+  const claims = {
+    [GLOBAL_ADMIN_CLAIM]: {
+      admin: { org: "org" },
     },
-    ""
-  );
+  };
 
-  assert.deepEqual(roles, []);
-  assert.equal(isAdmin({ roles }), false);
+  for (const configuredClaim of [undefined, ""]) {
+    const roles = getAuthNeiRoles(claims, configuredClaim);
+
+    assert.deepEqual(roles, []);
+    assert.equal(isAdmin({ roles }), false);
+  }
 });
