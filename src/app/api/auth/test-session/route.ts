@@ -6,15 +6,24 @@ import * as userRepo from "@/application/repositories/userRepository";
 import { env } from "@/lib/env";
 
 function secretsMatch(expected: string, actual: string): boolean {
-  const a = Buffer.from(expected.padEnd(128), "utf8");
-  const b = Buffer.from(actual.padEnd(128), "utf8");
-  return timingSafeEqual(a, b) && expected.length === actual.length;
+  // Fixed-size buffers prevent timingSafeEqual from throwing on inputs longer than the
+  // pad length or on multibyte characters (where char count ≠ byte count).
+  const FIXED = 256;
+  const a = Buffer.alloc(FIXED);
+  const b = Buffer.alloc(FIXED);
+  a.write(expected, 0, FIXED, "utf8");
+  b.write(actual, 0, FIXED, "utf8");
+  return (
+    timingSafeEqual(a, b) &&
+    Buffer.byteLength(expected, "utf8") === Buffer.byteLength(actual, "utf8")
+  );
 }
 
 function checkSecret(request: NextRequest): boolean {
+  // NODE_ENV is "development" when the app runs via `next dev` (CI) and
+  // "production" in every production deployment — this is a structural boundary.
+  if (env.NODE_ENV === "production") return false;
   const e2eSecret = env.E2E_TEST_SECRET;
-  // Absence of E2E_TEST_SECRET is the production guard — next build bakes NODE_ENV=production
-  // so a runtime NODE_ENV check is always true in a built app and blocks CI too.
   if (!e2eSecret) return false;
   return secretsMatch(e2eSecret, request.headers.get("x-e2e-secret") ?? "");
 }

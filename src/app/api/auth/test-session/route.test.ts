@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mockEnv = vi.hoisted(() => ({
   E2E_TEST_SECRET: "a-secret-that-is-long-enough-32c" as string | undefined, // gitleaks:allow
   AUTH_SECRET: "auth-secret-32-chars-long-minimum" as string | undefined, // gitleaks:allow
+  NODE_ENV: "development" as string,
 }));
 
 vi.mock("@/lib/env", () => ({ env: mockEnv }));
@@ -37,6 +38,7 @@ const VALID_SECRET = "a-secret-that-is-long-enough-32c"; // gitleaks:allow
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockEnv.NODE_ENV = "development";
   mockEnv.E2E_TEST_SECRET = VALID_SECRET;
   mockEnv.AUTH_SECRET = "auth-secret-32-chars-long-minimum"; // gitleaks:allow
 });
@@ -54,7 +56,14 @@ describe("POST /api/auth/test-session", () => {
     expect(userRepo.create).not.toHaveBeenCalled();
   });
 
-  test("returns 404 when E2E_TEST_SECRET is not configured (production guard)", async () => {
+  test("returns 404 in production regardless of secret", async () => {
+    mockEnv.NODE_ENV = "production";
+    const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
+    expect(res.status).toBe(404);
+    expect(userRepo.create).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when E2E_TEST_SECRET is not configured", async () => {
     mockEnv.E2E_TEST_SECRET = undefined;
     const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
     expect(res.status).toBe(404);
