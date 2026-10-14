@@ -76,8 +76,13 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Prepare standalone build assets
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+
       - name: Start application server
-        run: nohup pnpm start > /tmp/nextjs.log 2>&1 &
+        run: nohup node .next/standalone/server.js > /tmp/nextjs.log 2>&1 &
 
       - name: Wait for application to be ready
         run: |
