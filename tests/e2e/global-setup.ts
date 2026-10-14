@@ -3,6 +3,7 @@ import path from "node:path";
 import { request } from "@playwright/test";
 
 const AUTH_DIR = path.join(__dirname, ".auth");
+const CLEANUP_FILE = path.join(AUTH_DIR, "cleanup.json");
 
 export default async function globalSetup() {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
@@ -16,10 +17,12 @@ export default async function globalSetup() {
 
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
+  const createdUsers: { id: string }[] = [];
+
   for (const role of ["USER", "ADMIN"] as const) {
     const ctx = await request.newContext({ baseURL });
 
-    const res = await ctx.get(`/api/auth/test-session?role=${role}`, {
+    const res = await ctx.post(`/api/auth/test-session?role=${role}`, {
       headers: { "x-e2e-secret": e2eSecret },
     });
 
@@ -30,10 +33,15 @@ export default async function globalSetup() {
       );
     }
 
+    const { userId } = (await res.json()) as { userId: string; role: string };
+    createdUsers.push({ id: userId });
+
     await ctx.storageState({
       path: path.join(AUTH_DIR, `${role.toLowerCase()}.json`),
     });
 
     await ctx.dispose();
   }
+
+  fs.writeFileSync(CLEANUP_FILE, JSON.stringify({ users: createdUsers }));
 }
