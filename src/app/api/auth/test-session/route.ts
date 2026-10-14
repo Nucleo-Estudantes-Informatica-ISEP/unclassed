@@ -13,7 +13,9 @@ function secretsMatch(expected: string, actual: string): boolean {
 
 function checkSecret(request: NextRequest): boolean {
   const e2eSecret = env.E2E_TEST_SECRET;
-  if (env.NODE_ENV === "production" || !e2eSecret) return false;
+  // Absence of E2E_TEST_SECRET is the production guard — next build bakes NODE_ENV=production
+  // so a runtime NODE_ENV check is always true in a built app and blocks CI too.
+  if (!e2eSecret) return false;
   return secretsMatch(e2eSecret, request.headers.get("x-e2e-secret") ?? "");
 }
 
