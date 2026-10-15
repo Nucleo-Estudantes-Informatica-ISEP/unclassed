@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { encode } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -6,17 +6,12 @@ import * as userRepo from "@/application/repositories/userRepository";
 import { env } from "@/lib/env";
 
 function secretsMatch(expected: string, actual: string): boolean {
-  // Fixed-size buffers prevent timingSafeEqual from throwing on inputs longer than the
-  // pad length or on multibyte characters (where char count ≠ byte count).
-  const FIXED = 256;
-  const a = Buffer.alloc(FIXED);
-  const b = Buffer.alloc(FIXED);
-  a.write(expected, 0, FIXED, "utf8");
-  b.write(actual, 0, FIXED, "utf8");
-  return (
-    timingSafeEqual(a, b) &&
-    Buffer.byteLength(expected, "utf8") === Buffer.byteLength(actual, "utf8")
-  );
+  // Hash both sides to fixed-length (32-byte) digests so timingSafeEqual never
+  // truncates long inputs — a truncation bug would let an attacker authenticate
+  // with a value that shares only the first N bytes with the real secret.
+  const a = createHash("sha256").update(expected, "utf8").digest();
+  const b = createHash("sha256").update(actual, "utf8").digest();
+  return timingSafeEqual(a, b);
 }
 
 function checkSecret(request: NextRequest): boolean {

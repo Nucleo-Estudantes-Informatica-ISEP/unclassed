@@ -70,6 +70,14 @@ describe("POST /api/auth/test-session", () => {
     expect(userRepo.create).not.toHaveBeenCalled();
   });
 
+  test("returns 404 when header shares first 256 bytes of a long secret but differs after", async () => {
+    mockEnv.E2E_TEST_SECRET = "s".repeat(300);
+    const truncatedMatch = "s".repeat(256) + "x".repeat(44); // same first 256 bytes, wrong suffix
+    const res = await POST(makeRequest("http://localhost/api/auth/test-session", truncatedMatch));
+    expect(res.status).toBe(404);
+    expect(userRepo.create).not.toHaveBeenCalled();
+  });
+
   test("returns 500 when AUTH_SECRET is not configured", async () => {
     mockEnv.AUTH_SECRET = undefined;
     const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
