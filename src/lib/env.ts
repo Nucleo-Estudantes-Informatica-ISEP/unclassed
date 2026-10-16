@@ -58,6 +58,7 @@ const environmentSchema = z
     SENTRY_ENVIRONMENT: optionalString,
     NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
     CRON_SECRET: optionalSecret,
+    E2E_TEST_SECRET: optionalSecret,
     ENABLE_CRON_SCHEDULER: optionalBoolean(false),
     CRON_BATCH_MATCHING: z.preprocess(
       emptyToUndefined,
