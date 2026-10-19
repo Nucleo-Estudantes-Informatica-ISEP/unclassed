@@ -1,8 +1,12 @@
+import { Prisma } from "@prisma/client";
+
 import prisma from "@/lib/prisma";
 
 export type SubjectFilter = { year?: number; semester?: number };
 
-type SubjectWhereInput = NonNullable<Parameters<typeof prisma.subject.findMany>[0]>["where"];
+type SubjectWhereInput = NonNullable<
+  Parameters<typeof prisma.subject.findMany>[0]
+>["where"];
 
 export async function findSubjects(filter: SubjectFilter = {}) {
   const where: SubjectWhereInput = {};
@@ -35,14 +39,49 @@ export async function findByCode(code: string) {
 
 export async function findManyByIds(ids: string[]) {
   if (!ids || ids.length === 0) return [];
-  return prisma.subject.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+
+  return prisma.subject.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
 }
-export async function create(args: Parameters<typeof prisma.subject.create>[0], tx?: import("@prisma/client").Prisma.TransactionClient) {
+
+export async function create(
+  args: Parameters<typeof prisma.subject.create>[0],
+  tx?: Prisma.TransactionClient,
+) {
   return (tx || prisma).subject.create(args);
 }
 
-export async function deleteMany(args: Parameters<typeof prisma.subject.deleteMany>[0] = {}, tx?: import("@prisma/client").Prisma.TransactionClient) {
+export async function update(
+  args: Parameters<typeof prisma.subject.update>[0],
+  tx?: Prisma.TransactionClient,
+) {
+  return (tx || prisma).subject.update(args);
+}
+
+export async function remove(
+  args: Parameters<typeof prisma.subject.delete>[0],
+  tx?: Prisma.TransactionClient,
+) {
+  return (tx || prisma).subject.delete(args);
+}
+
+export async function deleteMany(
+  args: Parameters<typeof prisma.subject.deleteMany>[0] = {},
+  tx?: Prisma.TransactionClient,
+) {
   return (tx || prisma).subject.deleteMany(args);
+}
+
+
+
+export async function isInUse(id: string): Promise<boolean> {
+  const count = await prisma.singleSwapRequest.count({
+    where: { subjectId: id },
+  });
+
+  return count > 0;
 }
 
 export type { Subject } from "@prisma/client";
