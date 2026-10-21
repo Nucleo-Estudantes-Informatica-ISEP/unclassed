@@ -7,6 +7,8 @@ export const E2E_SECRET = __ENV.E2E_TEST_SECRET || "";
 // Latency thresholds are intentionally absent — establish a staging
 // baseline before inventing arbitrary values.
 export const THRESHOLDS = {
+  // Every check() assertion must pass.
+  checks: ["rate==1.0"],
   // Less than 1% of requests may fail (network errors or non-2xx).
   http_req_failed: ["rate<0.01"],
   // Zero server-side errors (5xx). Tracked via custom metric in each scenario.

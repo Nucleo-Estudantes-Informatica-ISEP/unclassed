@@ -22,13 +22,13 @@ export const options = {
 export function setup() {
   return {
     users: createSessions(1, "USER"),
-    admins: createSessions(1, "ADMIN"),
+    admin: createSessions(1, "ADMIN")[0],
   };
 }
 
 export default function run(data) {
   const user = data.users[(__VU - 1) % data.users.length];
-  const admin = data.admins[0];
+  const admin = data.admin;
 
   // Unauthenticated health check
   {
@@ -67,5 +67,5 @@ export default function run(data) {
 }
 
 export function teardown(data) {
-  destroySessions([...data.users, ...data.admins]);
+  destroySessions([...data.users, data.admin]);
 }
