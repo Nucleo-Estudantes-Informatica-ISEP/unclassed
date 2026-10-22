@@ -23,16 +23,21 @@ export function createSessions(count, role = "USER") {
       [`session created (${role} ${i + 1}/${count})`]: (r) => r.status === 200,
     });
 
-    const jar = res.cookies["authjs.session-token"];
+    // Auth.js sets __Secure-authjs.session-token over HTTPS and
+    // authjs.session-token over HTTP (localhost). Check secure name first.
+    const secureName = "__Secure-authjs.session-token";
+    const plainName = "authjs.session-token";
+    const cookieName = res.cookies[secureName] ? secureName : plainName;
+    const jar = res.cookies[cookieName];
     if (!jar || !jar[0]) {
       throw new Error(
-        `No authjs.session-token cookie in test-session response (${role} ${i + 1})`
+        `No session cookie in test-session response (${role} ${i + 1})`
       );
     }
 
     sessions.push({
       userId: res.json("userId"),
-      cookie: `authjs.session-token=${jar[0].value}`,
+      cookie: `${cookieName}=${jar[0].value}`,
     });
   }
   return sessions;
