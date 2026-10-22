@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: "Target URL to run the smoke test against"
+        description: "Target URL to run the smoke test against (must be staging — test-session is disabled on production)"
         required: true
-        default: "https://unclassed.nei-isep.org"
   # Callable from a post-deploy workflow (e.g. staging deploy — see #173).
   workflow_call:
     inputs:
