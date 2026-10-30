@@ -58,7 +58,7 @@
     "sweetalert": "^2.1.2",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^4.5.4"
+    "zod": "^4.6.6"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,tsx}": "eslint --max-warnings=0"
