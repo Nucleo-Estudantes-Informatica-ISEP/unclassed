@@ -27,13 +27,13 @@ export const options = {
 export function setup() {
   return {
     users: createSessions(MAX_VUS, "USER"),
-    admin: createSessions(1, "ADMIN")[0],
+    admins: createSessions(MAX_VUS, "ADMIN"),
   };
 }
 
 export default function run(data) {
   const user = data.users[(__VU - 1) % data.users.length];
-  const admin = data.admin;
+  const admin = data.admins[(__VU - 1) % data.admins.length];
 
   {
     const res = http.get(`${BASE_URL}/api/health`);
@@ -70,5 +70,5 @@ export default function run(data) {
 }
 
 export function teardown(data) {
-  destroySessions([...data.users, data.admin]);
+  destroySessions([...data.users, ...data.admins]);
 }
