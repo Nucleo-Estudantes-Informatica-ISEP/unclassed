@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 import { env } from "@/lib/env";
 import {
@@ -10,7 +10,7 @@ import {
 export type { MatchNotificationData } from "./emailTemplates";
 
 class EmailService {
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter: Transporter | null = null;
   private fromEmail: string;
 
   constructor() {
