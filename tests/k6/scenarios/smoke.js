@@ -5,11 +5,17 @@
  * return 200 on a live server. Intended to run automatically after every
  * staging deploy (see .github/workflows/k6-smoke.yml).
  */
-import http from "k6/http";
 import { check, sleep } from "k6";
-import { Rate } from "k6/metrics";
+import http from "k6/http";
+
+import {
+  createScenarioSessions,
+  destroySessions,
+  sessionParams,
+} from "../lib/auth.js";
 import { BASE_URL, THRESHOLDS } from "../lib/config.js";
-import { createSessions, destroySessions, sessionParams } from "../lib/auth.js";
+
+import { Rate } from "k6/metrics";
 
 const serverErrors = new Rate("server_errors");
 
@@ -20,15 +26,12 @@ export const options = {
 };
 
 export function setup() {
-  return {
-    users: createSessions(1, "USER"),
-    admin: createSessions(1, "ADMIN")[0],
-  };
+  return createScenarioSessions(1);
 }
 
 export default function run(data) {
   const user = data.users[(__VU - 1) % data.users.length];
-  const admin = data.admin;
+  const admin = data.admins[0];
 
   // Unauthenticated health check
   {
@@ -39,13 +42,19 @@ export default function run(data) {
 
   // Authenticated user endpoints
   {
-    const res = http.get(`${BASE_URL}/api/dashboard/stats`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/dashboard/stats`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "dashboard/stats → 200": (r) => r.status === 200 });
   }
 
   {
-    const res = http.get(`${BASE_URL}/api/swap-requests/single`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/swap-requests/single`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "swap-requests/single → 200": (r) => r.status === 200 });
   }
@@ -63,9 +72,9 @@ export default function run(data) {
     check(res, { "admin/cron → 200": (r) => r.status === 200 });
   }
 
-  sleep(1);
+  sleep(3 + Math.random()); // < 30 requests/minute per session on stats routes
 }
 
 export function teardown(data) {
-  destroySessions([...data.users, data.admin]);
+  destroySessions([...data.users, ...data.admins]);
 }

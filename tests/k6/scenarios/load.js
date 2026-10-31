@@ -5,11 +5,17 @@
  * Adjust MAX_VUS via --env K6_MAX_VUS if the staging baseline differs.
  * Run manually or as part of release validation — not wired to CI.
  */
-import http from "k6/http";
 import { check, sleep } from "k6";
-import { Rate } from "k6/metrics";
+import http from "k6/http";
+
+import {
+  createScenarioSessions,
+  destroySessions,
+  sessionParams,
+} from "../lib/auth.js";
 import { BASE_URL, THRESHOLDS } from "../lib/config.js";
-import { createSessions, destroySessions, sessionParams } from "../lib/auth.js";
+
+import { Rate } from "k6/metrics";
 
 const serverErrors = new Rate("server_errors");
 
@@ -19,16 +25,13 @@ export const options = {
   stages: [
     { duration: "1m", target: MAX_VUS }, // ramp up
     { duration: "3m", target: MAX_VUS }, // sustain
-    { duration: "1m", target: 0 },       // ramp down
+    { duration: "1m", target: 0 }, // ramp down
   ],
   thresholds: THRESHOLDS,
 };
 
 export function setup() {
-  return {
-    users: createSessions(MAX_VUS, "USER"),
-    admins: createSessions(MAX_VUS, "ADMIN"),
-  };
+  return createScenarioSessions(MAX_VUS);
 }
 
 export default function run(data) {
@@ -42,13 +45,19 @@ export default function run(data) {
   }
 
   {
-    const res = http.get(`${BASE_URL}/api/dashboard/stats`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/dashboard/stats`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "dashboard/stats → 200": (r) => r.status === 200 });
   }
 
   {
-    const res = http.get(`${BASE_URL}/api/swap-requests/single`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/swap-requests/single`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "swap-requests/single → 200": (r) => r.status === 200 });
   }
@@ -65,8 +74,8 @@ export default function run(data) {
     check(res, { "admin/cron → 200": (r) => r.status === 200 });
   }
 
-  // Simulate realistic think time between page interactions
-  sleep(Math.random() * 2 + 1); // 1–3 s
+  // Keep every scenario below the per-session stats endpoint limit.
+  sleep(3 + Math.random()); // < 30 requests/minute per session on stats routes
 }
 
 export function teardown(data) {

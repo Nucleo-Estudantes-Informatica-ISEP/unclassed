@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: "Target URL to run the smoke test against (must be staging — test-session is disabled on production)"
+        description: "Target URL to run the smoke test against (staging with pre-provisioned sessions)"
         required: true
   # Callable from a post-deploy workflow (e.g. staging deploy — see #173).
   workflow_call:
@@ -14,7 +14,7 @@ on:
         type: string
         required: true
     secrets:
-      K6_E2E_TEST_SECRET:
+      K6_SESSIONS_JSON:
         required: true
 
 permissions:
@@ -35,8 +35,13 @@ jobs:
       - name: Setup k6
         uses: grafana/setup-k6-action@v1
 
+      - name: Require pre-provisioned staging sessions
+        env:
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}
+        run: test -n "$K6_SESSIONS_JSON"
+
       - name: Run smoke test
         run: k6 run tests/k6/scenarios/smoke.js
         env:
           K6_BASE_URL: ${{ inputs.target_url }}
-          E2E_TEST_SECRET: ${{ secrets.K6_E2E_TEST_SECRET }}
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}

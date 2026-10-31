@@ -8,11 +8,17 @@
  * POST /api/admin/cron (trigger actions) is intentionally excluded —
  * it runs the matching engine and is not safe to hammer under load.
  */
-import http from "k6/http";
 import { check, sleep } from "k6";
-import { Rate } from "k6/metrics";
+import http from "k6/http";
+
+import {
+  createScenarioSessions,
+  destroySessions,
+  sessionParams,
+} from "../lib/auth.js";
 import { BASE_URL, THRESHOLDS } from "../lib/config.js";
-import { createSessions, destroySessions, sessionParams } from "../lib/auth.js";
+
+import { Rate } from "k6/metrics";
 
 const serverErrors = new Rate("server_errors");
 
@@ -24,16 +30,13 @@ export const options = {
     { duration: "3m", target: 10 }, // hold at low load
     { duration: "3m", target: 25 }, // ramp to medium
     { duration: "3m", target: MAX_VUS }, // ramp to peak
-    { duration: "2m", target: 0 },  // ramp down
+    { duration: "2m", target: 0 }, // ramp down
   ],
   thresholds: THRESHOLDS,
 };
 
 export function setup() {
-  return {
-    users: createSessions(MAX_VUS, "USER"),
-    admins: createSessions(MAX_VUS, "ADMIN"),
-  };
+  return createScenarioSessions(MAX_VUS);
 }
 
 export default function run(data) {
@@ -47,13 +50,19 @@ export default function run(data) {
   }
 
   {
-    const res = http.get(`${BASE_URL}/api/dashboard/stats`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/dashboard/stats`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "dashboard/stats → 200": (r) => r.status === 200 });
   }
 
   {
-    const res = http.get(`${BASE_URL}/api/swap-requests/single`, sessionParams(user));
+    const res = http.get(
+      `${BASE_URL}/api/swap-requests/single`,
+      sessionParams(user)
+    );
     serverErrors.add(res.status >= 500);
     check(res, { "swap-requests/single → 200": (r) => r.status === 200 });
   }
@@ -70,7 +79,7 @@ export default function run(data) {
     check(res, { "admin/cron → 200": (r) => r.status === 200 });
   }
 
-  sleep(Math.random() * 2 + 1);
+  sleep(3 + Math.random()); // < 30 requests/minute per session on stats routes
 }
 
 export function teardown(data) {
