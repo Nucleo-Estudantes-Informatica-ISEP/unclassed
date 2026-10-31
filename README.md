@@ -645,3 +645,14 @@ Check:
 - `ENABLE_CRON_SCHEDULER` matches the deployment model
 - Health checks are wired to `/api/health`
 - Admin access is available for cron and matching supervision
+
+
+### k6 load tests
+
+Use `pnpm test:k6:smoke`, `test:k6:load`, `test:k6:stress` or `test:k6:spike`. Set `K6_BASE_URL` to the intended isolated development/staging target. Each VU has distinct USER and ADMIN sessions; all scenarios wait 3–4 seconds per iteration to stay below the stats endpoints' 30 requests/minute limit. Thresholds still require every check to pass, <1% failed requests and no server errors.
+
+For local `next dev`, set `E2E_TEST_SECRET` to match the server. Setup creates test users and cleans up partial setup failures as well as normal teardown. Failed cleanup is reported and requires inspection of that isolated test DB.
+
+Hosted Next deployments use NODE_ENV=production, where `/api/auth/test-session` remains disabled. Instead, sign in normally to dedicated staging accounts, then provide `K6_SESSIONS_JSON` with separate cookie strings, for example `{"users":["__Secure-authjs.session-token=<user-session>"],"admins":["__Secure-authjs.session-token=<admin-session>"]}`. Store this as the Actions secret of the same name for the manual/reusable smoke workflow; it needs no test-session secret. Refresh expired sessions before running. Treat cookies as credentials; never commit or print them. Supplied accounts are never deleted by teardown. Load/stress/spike need a distinct session per role per maximum VU (15 configurable through K6_MAX_VUS, 50 and 100 respectively); duplicate cookies or insufficient pools fail before traffic starts.
+
+The smoke workflow takes an explicit staging URL. Do not target the production service. Load tests make read-only endpoint requests; POST /api/admin/cron remains excluded.
