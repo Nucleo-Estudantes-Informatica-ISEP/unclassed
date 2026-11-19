@@ -511,6 +511,8 @@ pnpm seed
 
 Authentication is handled by NextAuth with an AuthNEI provider. In the current implementation, that provider is backed by ZITADEL.
 
+See the [security audit](docs/security-audit-98.md) for the reviewed route permissions, credential handling, and follow-up issues.
+
 Key behavior:
 
 - only AuthNEI-authenticated users are expected
