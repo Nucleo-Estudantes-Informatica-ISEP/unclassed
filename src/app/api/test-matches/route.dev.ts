@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+
 import { defineHandler } from "@/lib/defineHandler";
+import { isFixtureDatabase } from "@/lib/fixtureDatabase";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import type { Class } from "@/application/repositories/classRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
@@ -18,13 +19,22 @@ export const POST = defineHandler({
     enforceSameOriginForSessionWrites: true,
   },
 
+  authorize: () => {
+    if (!isFixtureDatabase()) {
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
+  },
+
   handler: async () => {
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-    await matchRepo.deleteMany({});
-    await singleSwapRequestRepo.deleteMany();
-    await bundleSwapRequestRepo.deleteMany();
+    if (!(await clearSampleRequests(users))) {
+      return NextResponse.json(
+        { error: "Existem matches com pedidos de outros utilizadores" },
+        { status: 409 }
+      );
+    }
     const swapRequests = await createSampleSwapRequests(
       users,
       classes,
@@ -45,16 +55,48 @@ export const POST = defineHandler({
   },
 });
 
+async function clearSampleRequests(users: User[]) {
+  const userIds = users.map(({ id }) => id);
+  const requests = await singleSwapRequestRepo.findMany({
+    where: { userId: { in: userIds } },
+    select: { id: true },
+  });
+  const requestIds = requests.map(({ id }) => id);
+  if (!requestIds.length) return true;
+  const fixtureIds = new Set(requestIds);
+  const matches = await matchRepo.findMany({
+    where: { singleSwapRequestIds: { hasSome: requestIds } },
+    select: {
+      id: true,
+      singleSwapRequestIds: true,
+      bundleSwapRequestIds: true,
+    },
+  });
+  if (
+    matches.some(
+      (match) =>
+        match.bundleSwapRequestIds.length ||
+        match.singleSwapRequestIds.some((id) => !fixtureIds.has(id))
+    )
+  )
+    return false;
+  await matchRepo.deleteMany({
+    where: { id: { in: matches.map(({ id }) => id) } },
+  });
+  await singleSwapRequestRepo.deleteMany({ where: { id: { in: requestIds } } });
+  return true;
+}
+
 async function createSampleUsers(): Promise<User[]> {
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
         userRepo.upsert({
-          where: { email: `test-match-${index + 1}@isep.ipp.pt` },
+          where: { email: `test-match-${index + 1}@example.test` },
           update: {},
           create: {
             name,
-            email: `test-match-${index + 1}@isep.ipp.pt`,
+            email: `test-match-${index + 1}@example.test`,
             phone: `91${index + 2}345678`,
           },
         })

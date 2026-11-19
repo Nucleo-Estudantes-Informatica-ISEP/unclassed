@@ -5,6 +5,7 @@ const mockEnv = vi.hoisted(() => ({
   E2E_TEST_SECRET: "a-secret-that-is-long-enough-32c" as string | undefined, // gitleaks:allow
   AUTH_SECRET: "auth-secret-32-chars-long-minimum" as string | undefined, // gitleaks:allow
   NODE_ENV: "development" as string,
+  DATABASE_URL: "mongodb://localhost:27017/unclassed_e2e",
 }));
 
 vi.mock("@/lib/env", () => ({ env: mockEnv }));
@@ -21,7 +22,7 @@ vi.mock("@/application/repositories/userRepository", () => ({
 
 import { encode } from "next-auth/jwt";
 import * as userRepo from "@/application/repositories/userRepository";
-import { DELETE, POST } from "./route";
+import { DELETE, POST } from "./route.dev";
 
 function makeRequest(url: string, secret?: string, method: "POST" | "DELETE" = "POST", body?: unknown) {
   return new NextRequest(url, {
@@ -39,6 +40,7 @@ const VALID_SECRET = "a-secret-that-is-long-enough-32c"; // gitleaks:allow
 beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.NODE_ENV = "development";
+  mockEnv.DATABASE_URL = "mongodb://localhost:27017/unclassed_e2e";
   mockEnv.E2E_TEST_SECRET = VALID_SECRET;
   mockEnv.AUTH_SECRET = "auth-secret-32-chars-long-minimum"; // gitleaks:allow
 });
@@ -58,6 +60,13 @@ describe("POST /api/auth/test-session", () => {
 
   test("returns 404 in production regardless of secret", async () => {
     mockEnv.NODE_ENV = "production";
+    const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
+    expect(res.status).toBe(404);
+    expect(userRepo.create).not.toHaveBeenCalled();
+  });
+
+  test("requires the dedicated fixture database", async () => {
+    mockEnv.DATABASE_URL = "mongodb://localhost:27017/unclassed";
     const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
     expect(res.status).toBe(404);
     expect(userRepo.create).not.toHaveBeenCalled();
@@ -137,9 +146,10 @@ describe("DELETE /api/auth/test-session", () => {
     expect(userRepo.deleteMany).not.toHaveBeenCalled();
   });
 
-  test("deletes the user with the given userId", async () => {
-    const res = await DELETE(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET, "DELETE", { userId: "user-123" }));
+  test("deletes only a fixture user matching the given ObjectId", async () => {
+    const userId = "507f1f77bcf86cd799439011";
+    const res = await DELETE(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET, "DELETE", { userId }));
     expect(res.status).toBe(200);
-    expect(vi.mocked(userRepo.deleteMany)).toHaveBeenCalledWith({ where: { id: "user-123" } });
+    expect(vi.mocked(userRepo.deleteMany)).toHaveBeenCalledWith({ where: { id: userId, email: { startsWith: "e2e_", endsWith: "@example.test" } } });
   });
 });
