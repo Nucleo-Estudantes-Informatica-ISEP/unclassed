@@ -1,0 +1,47 @@
+name: k6 Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Target URL to run the smoke test against (staging with pre-provisioned sessions)"
+        required: true
+  # Callable from a post-deploy workflow (e.g. staging deploy — see #173).
+  workflow_call:
+    inputs:
+      target_url:
+        description: "Target URL to run the smoke test against"
+        type: string
+        required: true
+    secrets:
+      K6_SESSIONS_JSON:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k6-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: k6 smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Require pre-provisioned staging sessions
+        env:
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}
+        run: test -n "$K6_SESSIONS_JSON"
+
+      - name: Run smoke test
+        run: k6 run tests/k6/scenarios/smoke.js
+        env:
+          K6_BASE_URL: ${{ inputs.target_url }}
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}
