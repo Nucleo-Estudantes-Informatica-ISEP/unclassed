@@ -19,6 +19,8 @@ vi.mock("@/application/services/authSessionService", () => ({
   revokeAuthSession: vi.fn(),
 }));
 
+const sessionId = "96ba642e-a0e7-4e55-a1e8-7912acd3f011";
+
 test("sign-in issues a session reference and uses fresh server roles on every request", async () => {
   const config = vi.mocked(NextAuth).mock.calls[0][0] as NextAuthConfig;
   const jwt = config.callbacks?.jwt;
@@ -29,7 +31,7 @@ test("sign-in issues a session reference and uses fresh server roles on every re
     name: "Fixture User",
     email: "fixture@example.test",
   } as never);
-  vi.mocked(createAuthSession).mockResolvedValue("session-reference");
+  vi.mocked(createAuthSession).mockResolvedValue(sessionId);
   const token = await jwt!({
     token: {},
     user: { id: "oidc-subject" },
@@ -53,7 +55,7 @@ test("sign-in issues a session reference and uses fresh server roles on every re
     expect.objectContaining({ refreshToken: "synthetic-refresh" })
   );
   expect(token).toMatchObject({
-    authSessionId: "session-reference",
+    authSessionId: sessionId,
     localUserId: "local-user",
   });
   expect(JSON.stringify(token)).not.toContain("synthetic-");
@@ -69,5 +71,5 @@ test("sign-in issues a session reference and uses fresh server roles on every re
   expect(await jwt!(currentJwt)).toBeNull();
 
   await config.events?.signOut?.({ token });
-  expect(revokeAuthSession).toHaveBeenCalledWith("session-reference");
+  expect(revokeAuthSession).toHaveBeenCalledWith(sessionId);
 });

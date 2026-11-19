@@ -18,6 +18,8 @@ Set `APP_BASE_URL` and Auth.js `AUTH_URL` to the public HTTPS origin. The last p
 
 Local tests use a synthetic provider and an isolated MongoDB replica set to cover single-use rotation, concurrent requests, refreshed roles, provider rejection and logout. They cannot establish the hosted client's configuration or the behavior of the deployed proxy.
 
+Local verification passed lint, typecheck, 330 unit tests, schema validation, a production build, 45 MongoDB integration tests, and two Playwright smoke tests. Two pre-existing integration tests are marked TODO. Both Nginx configurations passed live loopback tests for forwarded headers and access-log redaction. Hosted verification remains pending.
+
 ## Development fixtures
 
 Run Playwright and the sample match endpoint against a disposable MongoDB replica set with database name `unclassed_e2e`. The test-session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are excluded from production builds. Cleanup is limited to harness-owned records.
