@@ -507,6 +507,10 @@ Run:
 pnpm seed
 ```
 
+## Match contact sharing
+
+Participants see each other’s email after everyone accepts the match. Phone numbers also require the profile sharing preference. These rules apply to the matches page and its API responses.
+
 ## Authentication Architecture
 
 Authentication is handled by NextAuth with an AuthNEI provider. In the current implementation, that provider is backed by ZITADEL.
