@@ -179,6 +179,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   trustHost: env.AUTH_TRUST_HOST,
   secret: env.AUTH_SECRET,
+  logger: {
+    error(error) {
+      logger.error(safeError(error), "Auth.js request failed");
+    },
+  },
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   callbacks: {
