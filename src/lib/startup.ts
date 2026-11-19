@@ -9,13 +9,16 @@ import { logger, safeError } from "@/lib/logger";
 
 import { initializeCronScheduler } from "@/services/cronScheduler";
 
-let isInitialized = false;
+// Next.js can load startup instrumentation and the health route in separate bundles.
+const startupState = globalThis as typeof globalThis & {
+  unclassedStartupComplete?: boolean;
+};
 
 /**
  * Initialize all application startup tasks
  */
 export function initializeApplication(): void {
-  if (isInitialized) {
+  if (isAppInitialized()) {
     return; // Prevent multiple initializations
   }
 
@@ -25,7 +28,7 @@ export function initializeApplication(): void {
     // Initialize cron scheduler for self-hosted deployments
     initializeCronScheduler();
 
-    isInitialized = true;
+    startupState.unclassedStartupComplete = true;
     logger.info("Application initialization completed");
   } catch (error) {
     logger.error(safeError(error), "Application initialization failed:");
@@ -40,5 +43,5 @@ export function initializeApplication(): void {
  * Check if the application has been initialized
  */
 export function isAppInitialized(): boolean {
-  return isInitialized;
+  return startupState.unclassedStartupComplete === true;
 }
