@@ -1,18 +1,10 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { encode } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
 import * as userRepo from "@/application/repositories/userRepository";
 import { env } from "@/lib/env";
-
-function secretsMatch(expected: string, actual: string): boolean {
-  // Hash both sides to fixed-length (32-byte) digests so timingSafeEqual never
-  // truncates long inputs — a truncation bug would let an attacker authenticate
-  // with a value that shares only the first N bytes with the real secret.
-  const a = createHash("sha256").update(expected, "utf8").digest();
-  const b = createHash("sha256").update(actual, "utf8").digest();
-  return timingSafeEqual(a, b);
-}
+import { secretsMatch } from "@/lib/secretsMatch";
 
 function checkSecret(request: NextRequest): boolean {
   // NODE_ENV is "development" when the app runs via `next dev` (CI) and
