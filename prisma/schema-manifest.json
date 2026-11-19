@@ -1,6 +1,6 @@
 {
-  "currentVersion": 5,
-  "currentSchemaSha256": "db7e04c5af43b760e85412879f66e0fd5b54bb9650f39a840445c29072eeb29e",
+  "currentVersion": 6,
+  "currentSchemaSha256": "55a6c2ce2738b7c21750c9ad8a028c24ec3613664afba9ea14c01896940803e9",
   "changes": [
     {
       "version": 1,
@@ -26,6 +26,11 @@
       "version": 5,
       "file": "schema-changes/0005-remove-legacy-local-auth.md",
       "schemaSha256": "db7e04c5af43b760e85412879f66e0fd5b54bb9650f39a840445c29072eeb29e"
+    },
+    {
+      "version": 6,
+      "file": "schema-changes/0006-auth-sessions.md",
+      "schemaSha256": "55a6c2ce2738b7c21750c9ad8a028c24ec3613664afba9ea14c01896940803e9"
     }
   ]
 }

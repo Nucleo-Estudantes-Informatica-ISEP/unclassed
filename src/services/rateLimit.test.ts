@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
+import { env } from "@/lib/env";
+
 import {
   MemoryRateLimitStore,
   buildRateLimitBucketKey,
@@ -67,4 +69,24 @@ test("keys authenticated limits by user instead of shared client IP", () => {
     }),
     "machine:cron"
   );
+});
+
+test("only accepts one validated address from an explicitly trusted proxy", () => {
+  const originalTrust = env.TRUST_PROXY_CLIENT_IP;
+  const headers = new Headers({
+    "cf-connecting-ip": "192.0.2.2",
+    "x-forwarded-for": "192.0.2.3",
+    "x-real-ip": "192.0.2.4",
+  });
+
+  try {
+    env.TRUST_PROXY_CLIENT_IP = false;
+    assert.equal(resolveRateLimitIdentifier({ headers }), "ip:unknown");
+    env.TRUST_PROXY_CLIENT_IP = true;
+    assert.equal(resolveRateLimitIdentifier({ headers }), "ip:192.0.2.4");
+    headers.set("x-real-ip", "192.0.2.4, 192.0.2.5");
+    assert.equal(resolveRateLimitIdentifier({ headers }), "ip:unknown");
+  } finally {
+    env.TRUST_PROXY_CLIENT_IP = originalTrust;
+  }
 });

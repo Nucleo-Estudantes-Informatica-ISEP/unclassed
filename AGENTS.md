@@ -197,14 +197,15 @@ Before finishing a change:
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
-- `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
-- `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
+- `/api/matching` and detailed `GET /api/health` accept the cron bearer secret. `/api/admin/cron` requires an `ADMIN` session.
+- The `test-matches` and `auth/test-session` endpoints use `route.dev.ts` and require an isolated `unclassed_e2e` database. Preserve the production route exclusion, database guard, and per-route credentials. The destructive database reset remains a separate CLI operation.
+- Keep the Auth.js JWT session reference stable across provider refresh. `AuthSession` owns encrypted refresh state, and its atomic claim prevents multiple replicas from consuming the same grant. See the [session ADR](docs/decisions/0003-persist-provider-session-state.md).
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 

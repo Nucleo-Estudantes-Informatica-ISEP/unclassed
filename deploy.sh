@@ -79,13 +79,17 @@ EOF
       - NODE_ENV=production
       - DATABASE_URL=\${DATABASE_URL}
       - APP_BASE_URL=\${APP_BASE_URL}
+      - AUTH_URL=\${APP_BASE_URL}
       - AUTH_SECRET=\${AUTH_SECRET}
       - AUTH_ISSUER_URL=\${AUTH_ISSUER_URL}
       - AUTH_CLIENT_ID=\${AUTH_CLIENT_ID}
       - AUTH_CLIENT_SECRET=\${AUTH_CLIENT_SECRET}
       - AUTH_SCOPES=\${AUTH_SCOPES}
+      - AUTH_ROLE_CLAIM=\${AUTH_ROLE_CLAIM}
       - AUTH_POST_LOGOUT_REDIRECT_URI=\${AUTH_POST_LOGOUT_REDIRECT_URI}
       - AUTH_TRUST_HOST=\${AUTH_TRUST_HOST}
+      - TRUST_PROXY_CLIENT_IP=true
+      - CRON_SECRET=\${CRON_SECRET}
       - ENABLE_CRON_SCHEDULER=$([ "$i" -eq 1 ] && echo true || echo false)
       - INSTANCE_ID=app$i
       - CRON_BATCH_MATCHING=\${CRON_BATCH_MATCHING:-*/5 * * * *}
@@ -126,8 +130,9 @@ EOF
     limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
     limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
 
-    # Logging
-    access_log /var/log/nginx/access.log;
+    # Keep callback parameters and referring URLs out of request logs.
+    log_format unclassed '$remote_addr [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent';
+    access_log /var/log/nginx/access.log unclassed;
     error_log /var/log/nginx/error.log;
 
     # Gzip compression
@@ -162,7 +167,8 @@ EOF
             proxy_set_header Connection 'upgrade';
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_cache_bypass $http_upgrade;
             
@@ -194,7 +200,8 @@ EOF
             proxy_set_header Connection 'upgrade';
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_cache_bypass $http_upgrade;
             

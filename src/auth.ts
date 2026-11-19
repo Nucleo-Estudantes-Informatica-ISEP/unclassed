@@ -1,23 +1,22 @@
 import NextAuth from "next-auth";
-import type { JWT } from "next-auth/jwt";
 import Zitadel from "next-auth/providers/zitadel";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
-import { getAuthNeiRoles, isAdmin } from "@/lib/auth-nei-roles";
+import {
+  getAuthNeiRoles,
+  hasVerifiedEmailClaim,
+  isAdmin,
+} from "@/lib/auth-nei-roles";
 import { env } from "@/lib/env";
+import { isFixtureDatabase } from "@/lib/fixtureDatabase";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 import { logger, safeError } from "@/lib/logger";
-
-const REFRESH_SKEW_MS = 30_000;
-
-type ZitadelRefreshResponse = {
-  access_token?: string;
-  expires_in?: number;
-  refresh_token?: string;
-  id_token?: string;
-  error?: string;
-  error_description?: string;
-};
+import {
+  AUTH_SESSION_MAX_AGE,
+  createAuthSession,
+  getAuthSessionRoles,
+  revokeAuthSession,
+} from "@/application/services/authSessionService";
 
 function getClaim(
   claims: Record<string, unknown> | undefined,
@@ -25,127 +24,6 @@ function getClaim(
 ): string | null {
   const value = claims?.[key];
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function parseEmailVerifiedClaim(claims: Record<string, unknown>) {
-  const raw = claims.email_verified;
-
-  if (typeof raw === "boolean") {
-    return raw;
-  }
-
-  if (typeof raw === "string") {
-    const normalized = raw.trim().toLowerCase();
-    if (normalized === "true") return true;
-    if (normalized === "false") return false;
-  }
-
-  return undefined;
-}
-
-function formUrlEncode(value: string) {
-  return new URLSearchParams({ value }).toString().slice("value=".length);
-}
-
-function invalidateProviderSession(token: JWT): JWT {
-  return {
-    ...token,
-    accessToken: undefined,
-    accessTokenExpiresAt: undefined,
-    authNeiRoles: [],
-    role: "USER",
-    error: "RefreshAccessTokenError",
-  };
-}
-
-async function fetchUserInfo(accessToken: string) {
-  const issuer = env.AUTH_ISSUER_URL?.replace(/\/$/, "");
-  if (!issuer) {
-    throw new Error("AUTH_ISSUER_URL is not configured");
-  }
-
-  const response = await fetch(`${issuer}/oidc/v1/userinfo`, {
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`ZITADEL userinfo failed with status ${response.status}`);
-  }
-
-  return (await response.json()) as Record<string, unknown>;
-}
-
-async function refreshProviderToken(token: JWT): Promise<JWT> {
-  const issuer = env.AUTH_ISSUER_URL?.replace(/\/$/, "");
-  const clientId = env.AUTH_CLIENT_ID;
-  const clientSecret = env.AUTH_CLIENT_SECRET;
-
-  if (!issuer || !clientId || !clientSecret || !token.refreshToken) {
-    return invalidateProviderSession(token);
-  }
-
-  try {
-    const basicCredentials = Buffer.from(
-      `${formUrlEncode(clientId)}:${formUrlEncode(clientSecret)}`
-    ).toString("base64");
-
-    const response = await fetch(`${issuer}/oauth/v2/token`, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Basic ${basicCredentials}`,
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: token.refreshToken,
-      }),
-    });
-
-    const refreshed = (await response.json()) as ZitadelRefreshResponse;
-    if (
-      !response.ok ||
-      typeof refreshed.access_token !== "string" ||
-      typeof refreshed.expires_in !== "number" ||
-      refreshed.expires_in <= 0
-    ) {
-      throw new Error(
-        refreshed.error_description ||
-          refreshed.error ||
-          `ZITADEL token refresh failed with status ${response.status}`
-      );
-    }
-
-    // Re-read userinfo with the newly issued provider token instead of carrying
-    // the Auth.js JWT's cached authorization forward. This makes role changes
-    // effective no later than the provider access-token lifetime.
-    const userInfo = await fetchUserInfo(refreshed.access_token);
-    const authNeiRoles = getAuthNeiRoles(userInfo, env.AUTH_ROLE_CLAIM);
-    const refreshedIdToken = refreshed.id_token ?? token.idToken;
-
-    return {
-      ...token,
-      accessToken: refreshed.access_token,
-      accessTokenExpiresAt: Date.now() + refreshed.expires_in * 1000,
-      refreshToken: refreshed.refresh_token ?? token.refreshToken,
-      idToken: refreshedIdToken,
-      idTokenHint: refreshed.id_token ?? token.idTokenHint,
-      authNeiRoles,
-      role: isAdmin({ authNeiRoles }) ? "ADMIN" : "USER",
-      error: undefined,
-    };
-  } catch (error) {
-    if (authDebugEnabled) {
-      logger.error(
-        safeError(error),
-        "[auth][refresh] Failed to refresh ZITADEL session"
-      );
-    }
-    return invalidateProviderSession(token);
-  }
 }
 
 const missingAuthEnvVars = getMissingAuthEnvVars();
@@ -178,15 +56,28 @@ const providers = authConfigured
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   trustHost: env.AUTH_TRUST_HOST,
+  useSecureCookies: env.NODE_ENV === "production" ? true : undefined,
   secret: env.AUTH_SECRET,
   pages: { signIn: "/login" },
-  session: { strategy: "jwt" },
+  logger: {
+    error(error) {
+      logger.error(safeError(error), "Auth.js request failed");
+    },
+  },
+  session: { strategy: "jwt", maxAge: AUTH_SESSION_MAX_AGE },
+  events: {
+    async signOut(message) {
+      if ("token" in message && message.token?.authSessionId) {
+        await revokeAuthSession(message.token.authSessionId);
+      }
+    },
+  },
   callbacks: {
     async signIn({ account, profile }) {
       if (account?.provider !== "zitadel") return true;
 
       const claims = (profile ?? {}) as Record<string, unknown>;
-      if (parseEmailVerifiedClaim(claims) !== true) {
+      if (!hasVerifiedEmailClaim(claims)) {
         logger.warn(
           "Blocking ZITADEL sign-in because email_verified claim is missing or false."
         );
@@ -197,76 +88,62 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return Boolean(sub);
     },
     async jwt({ token, account, profile, trigger }) {
-      if (
-        typeof account?.id_token === "string" &&
-        account.id_token.length > 0
-      ) {
-        token.idTokenHint = account.id_token;
-        token.idToken = account.id_token;
-      }
-
       if (account) {
-        token.accessToken = account.access_token;
-        token.accessTokenExpiresAt = account.expires_at
-          ? account.expires_at * 1000
-          : undefined;
-        token.refreshToken = account.refresh_token;
-        token.error = undefined;
-      }
-
-      if (authDebugEnabled && account) {
-        logger.info({ trigger }, "[auth][jwt]");
-      }
-
-      if (account && profile) {
-        const claims = profile as Record<string, unknown>;
+        const claims = (profile ?? {}) as Record<string, unknown>;
         const sub =
-          getClaim(claims, "sub") ||
-          account.providerAccountId ||
-          token.sub ||
-          null;
+          getClaim(claims, "sub") || account.providerAccountId || null;
+        if (!sub || !hasVerifiedEmailClaim(claims)) return null;
 
-        if (!sub) {
-          throw new Error("OIDC login did not include a subject claim.");
-        }
-
-        const authNeiRoles = getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM);
+        if (authDebugEnabled) logger.info({ trigger }, "[auth][jwt]");
+        const roles = getAuthNeiRoles(claims, env.AUTH_ROLE_CLAIM);
         const localUser = await syncLocalUserFromOidc({
           sub,
           email: getClaim(claims, "email") || token.email,
           name: getClaim(claims, "name") || token.name,
-          emailVerified: parseEmailVerifiedClaim(claims),
+          emailVerified: true,
+        });
+        const expiresAt = account.expires_at;
+        const authSessionId = await createAuthSession({
+          userId: localUser.id,
+          roles,
+          providerExpiresAt: new Date(
+            typeof expiresAt === "number" && Number.isFinite(expiresAt)
+              ? expiresAt * 1000
+              : Date.now()
+          ),
+          refreshToken: account.refresh_token,
         });
 
-        token.localUserId = localUser.id;
-        token.authNeiRoles = authNeiRoles;
-        token.role = isAdmin({ authNeiRoles }) ? "ADMIN" : "USER";
-        token.zitadelSub = sub;
-        token.name = localUser.name;
-        token.email = localUser.email;
+        return {
+          authSessionId,
+          localUserId: localUser.id,
+          zitadelSub: sub,
+          authNeiRoles: roles,
+          name: localUser.name,
+          email: localUser.email,
+          picture: token.picture,
+        };
+      }
 
+      if (token.fixtureSession && isFixtureDatabase() && env.E2E_TEST_SECRET) {
         return token;
       }
+      if (!token.authSessionId || !token.localUserId || !token.zitadelSub)
+        return null;
 
-      const accessTokenExpiresAt = token.accessTokenExpiresAt;
-      const providerTokenNeedsRefresh =
-        typeof accessTokenExpiresAt !== "number" ||
-        !Number.isFinite(accessTokenExpiresAt) ||
-        Date.now() >= accessTokenExpiresAt - REFRESH_SKEW_MS;
-
-      if (providerTokenNeedsRefresh) {
-        return refreshProviderToken(token);
-      }
-
-      return token;
+      const roles = await getAuthSessionRoles(
+        token.authSessionId,
+        token.localUserId,
+        token.zitadelSub
+      );
+      return roles ? { ...token, authNeiRoles: roles } : null;
     },
     async session({ session, token }) {
       if (authDebugEnabled) {
         logger.info("[auth][session]");
       }
 
-      const authNeiRoles = token.error ? [] : (token.authNeiRoles ?? []);
-      session.error = token.error;
+      const authNeiRoles = token.authNeiRoles ?? [];
       session.user = {
         ...session.user,
         id: token.localUserId as string,

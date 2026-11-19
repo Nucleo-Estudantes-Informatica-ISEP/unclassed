@@ -9,6 +9,7 @@ MongoDB schema source: [`prisma/schema.prisma`](../prisma/schema.prisma). See th
 - `SingleSwapRequest.preferredClassIds`, `BundleSwapRequest.preferredClassIds`, `Match.singleSwapRequestIds`, and `Match.bundleSwapRequestIds` are arrays of ObjectIds, not Prisma relations. `Match.participants` is an array of JSON objects. `MatchNotificationDelivery.matchId` and `userId` are stored IDs without `@relation`; do not infer database-enforced foreign keys from them.
 - `GraphPartition.partitionKey` and request/match `graphPartition` fields use `subject-<subjectId>` or `year-<year>` strings. `GraphPartition.subjectId` is optional and is not a declared Prisma relation. `GraphPartition.isLocked` tracks partition processing; `CronLock` leases scheduler jobs by unique `jobId`.
 - Active-request uniqueness uses [versioned partial MongoDB indexes](../prisma/mongodb-indexes.mjs): one active single request per `(userId, subjectId)` and one active bundle request per `(userId, currentClassId)`. Prisma 6 cannot express these partial indexes in `schema.prisma`.
+- `AuthSession` stores encrypted AuthNEI refresh state. MongoDB's TTL index on `expiresAt` removes expired records. Application authorization checks expiration before returning roles.
 - `RateLimitBucket.key` and `CronLock.jobId` are unique. Their `expiresAt` fields are indexed; expiry handling belongs to application logic.
 
 ## Changing the schema

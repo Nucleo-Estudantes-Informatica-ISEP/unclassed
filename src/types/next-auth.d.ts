@@ -5,7 +5,6 @@ import type { AuthNeiRole } from "@/lib/auth-nei-roles";
 
 declare module "next-auth" {
   interface Session {
-    error?: "RefreshAccessTokenError";
     user: {
       id: string;
       role: "USER" | "ADMIN";
@@ -20,15 +19,11 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
-    accessToken?: string;
-    accessTokenExpiresAt?: number;
-    refreshToken?: string;
-    idToken?: string;
-    idTokenHint?: string;
+    authSessionId?: string;
+    fixtureSession?: true;
     localUserId?: string;
     role?: "USER" | "ADMIN";
     authNeiRoles?: AuthNeiRole[];
     zitadelSub?: string;
-    error?: "RefreshAccessTokenError";
   }
 }

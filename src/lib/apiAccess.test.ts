@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { afterEach, test, vi } from "vitest";
 
 import { isDevOnlyRequestAllowed } from "./devOnly";
+import { env } from "./env";
 import { validateOrigin } from "./originValidation";
+
+vi.mock("./env", () => ({ env: { NODE_ENV: "test" } }));
+
+afterEach(() => {
+  env.NODE_ENV = "test";
+  env.APP_BASE_URL = undefined;
+  env.NEXT_PUBLIC_APP_URL = undefined;
+});
 
 function requestWith(headers: Record<string, string>) {
   return {
@@ -43,11 +52,31 @@ test("validateOrigin rejects a cross-origin Referer header", () => {
   );
 });
 
-test("validateOrigin allows requests with neither Origin nor Referer", () => {
-  // Same-origin same-site requests (e.g. same-tab navigations) don't always
-  // send Origin/Referer; enforceSameOriginForSessionWrites relies on this
-  // staying permissive rather than failing closed on missing headers.
-  assert.equal(validateOrigin(requestWith({})), true);
+test("validateOrigin requires Origin or Referer for session writes", () => {
+  assert.equal(validateOrigin(requestWith({})), false);
+});
+
+test("validateOrigin uses the configured app origin in production", () => {
+  env.NODE_ENV = "production";
+  env.APP_BASE_URL = "https://app.example.test/";
+  env.NEXT_PUBLIC_APP_URL = "https://other.example.test";
+  assert.equal(
+    validateOrigin(requestWith({ origin: "https://app.example.test" })),
+    true
+  );
+  for (const origin of [
+    "http://localhost:3000",
+    "https://other.example.test",
+    "https://app.example.test/path",
+    "null",
+  ]) {
+    assert.equal(
+      validateOrigin(
+        requestWith({ origin, referer: "https://app.example.test/page" })
+      ),
+      false
+    );
+  }
 });
 
 test("dev-only authorization is allowed only in development", () => {

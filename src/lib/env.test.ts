@@ -26,6 +26,23 @@ test("accepts complete production configuration without a role provisioner", () 
   assert.doesNotThrow(() => parseEnvironment(productionBase));
 });
 
+test("auth URLs allow HTTP loopback and require HTTP or HTTPS", () => {
+  assert.equal(
+    parseEnvironment({ APP_BASE_URL: "http://localhost:3000" }).APP_BASE_URL,
+    "http://localhost:3000"
+  );
+  assert.equal(
+    parseEnvironment({
+      AUTH_POST_LOGOUT_REDIRECT_URI: "http://127.0.0.1:3000/",
+    }).AUTH_POST_LOGOUT_REDIRECT_URI,
+    "http://127.0.0.1:3000/"
+  );
+  assert.throws(
+    () => parseEnvironment({ AUTH_ISSUER_URL: "file:///tmp/issuer" }),
+    /AUTH_ISSUER_URL/
+  );
+});
+
 test("allows secretless production builds but not malformed SMTP config", () => {
   assert.doesNotThrow(() =>
     parseEnvironment({

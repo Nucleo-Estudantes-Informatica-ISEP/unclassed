@@ -1,5 +1,14 @@
 export const mongoIndexSpecifications = [
   {
+    collection: "AuthSession",
+    fields: ["expiresAt"],
+    index: {
+      key: { expiresAt: 1 },
+      name: "expire_auth_sessions",
+      expireAfterSeconds: 0,
+    },
+  },
+  {
     collection: "SingleSwapRequest",
     fields: ["userId", "subjectId"],
     index: {

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 
 import * as rateLimitRepo from "@/application/repositories/rateLimitRepository";
+import { env } from "@/lib/env";
 
 // Configuration for different rate limit types
 export const RATE_LIMIT_POLICIES = {
@@ -60,12 +62,8 @@ export function resolveRateLimitIdentifier({
     return "machine:cron";
   }
 
-  const clientAddress =
-    headers.get("cf-connecting-ip") ||
-    headers.get("x-real-ip") ||
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown";
-  return `ip:${clientAddress}`;
+  const clientAddress = env.TRUST_PROXY_CLIENT_IP && headers.get("x-real-ip");
+  return clientAddress && isIP(clientAddress) ? `ip:${clientAddress}` : "ip:unknown";
 }
 
 export function buildRateLimitBucketKey(

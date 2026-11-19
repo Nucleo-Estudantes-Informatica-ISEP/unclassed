@@ -140,6 +140,7 @@ The main variables are:
 | `AUTH_SECRET` | Yes | NextAuth secret |
 | `AUTH_POST_LOGOUT_REDIRECT_URI` | Yes | Redirect target after sign-out |
 | `AUTH_TRUST_HOST` | Depends | Enable only behind a trusted proxy |
+| `TRUST_PROXY_CLIENT_IP` | Optional | Accept `X-Real-IP` for anonymous rate limits when the final trusted proxy overwrites it |
 | `CRON_SECRET` | Strongly recommended | Bearer secret for cron-triggered endpoints |
 | `ENABLE_CRON_SCHEDULER` | Yes | Enables internal in-process cron scheduler |
 | `CRON_BATCH_MATCHING` | Optional | Batch matching cron expression |
@@ -510,6 +511,10 @@ pnpm seed
 ## Authentication Architecture
 
 Authentication is handled by NextAuth with an AuthNEI provider. In the current implementation, that provider is backed by ZITADEL.
+
+Set `APP_BASE_URL` to the canonical public HTTPS origin. Session-authenticated API writes require that origin in `Origin` or `Referer`. Set `AUTH_URL` to the same URL when running outside the supplied Compose configuration.
+
+The browser holds an encrypted Auth.js session reference. Rotating refresh tokens stay in MongoDB encrypted with `AUTH_SECRET`. Deploy the schema before starting this revision. Existing sessions require a new sign-in. The [verification guide](docs/auth-security-verification.md) covers the proxy, logout and refresh checks.
 
 Key behavior:
 

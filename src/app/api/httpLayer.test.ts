@@ -58,7 +58,11 @@ beforeEach(() => {
   vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true } as never);
 });
 const req = (method = "GET", body?: string, headers?: Record<string, string>) =>
-  new NextRequest("http://localhost:3000/api/test", { method, body, headers });
+  new NextRequest("http://localhost:3000/api/test", {
+    method,
+    body,
+    headers: { origin: "http://localhost:3000", ...headers },
+  });
 const item = { params: Promise.resolve({ id: "item", matchId: "match" }) };
 
 const protectedRoutes = [

@@ -8,6 +8,10 @@ const optionalString = z.preprocess(
   z.string().trim().min(1).optional()
 );
 const optionalUrl = z.preprocess(emptyToUndefined, z.url().optional());
+const optionalHttpUrl = z.preprocess(
+  emptyToUndefined,
+  z.url({ protocol: /^https?$/ }).optional()
+);
 const optionalSecret = z.preprocess(
   emptyToUndefined,
   z.string().min(32, "Secret must contain at least 32 characters").optional()
@@ -39,9 +43,9 @@ const environmentSchema = z
         .regex(/^mongodb(?:\+srv)?:\/\//, "DATABASE_URL must be a MongoDB URL")
         .optional()
     ),
-    APP_BASE_URL: optionalUrl,
-    NEXT_PUBLIC_APP_URL: optionalUrl,
-    AUTH_ISSUER_URL: optionalUrl,
+    APP_BASE_URL: optionalHttpUrl,
+    NEXT_PUBLIC_APP_URL: optionalHttpUrl,
+    AUTH_ISSUER_URL: optionalHttpUrl,
     AUTH_CLIENT_ID: optionalString,
     AUTH_CLIENT_SECRET: optionalString,
     AUTH_SCOPES: z.preprocess(
@@ -50,8 +54,9 @@ const environmentSchema = z
     ),
     AUTH_ROLE_CLAIM: optionalString,
     AUTH_SECRET: optionalSecret,
-    AUTH_POST_LOGOUT_REDIRECT_URI: optionalUrl,
+    AUTH_POST_LOGOUT_REDIRECT_URI: optionalHttpUrl,
     AUTH_TRUST_HOST: optionalBoolean(false),
+    TRUST_PROXY_CLIENT_IP: optionalBoolean(false),
     AUTH_DEBUG: optionalBoolean(false),
     SENTRY_DSN: optionalUrl,
     NEXT_PUBLIC_SENTRY_DSN: optionalUrl,

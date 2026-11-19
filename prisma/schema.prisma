@@ -42,6 +42,16 @@ model UserIdentity {
   @@unique([provider, providerSubject])
 }
 
+model AuthSession {
+  id                    String    @id @map("_id")
+  userId                String    @db.ObjectId
+  encryptedRefreshToken String?
+  roles                 String[]
+  providerExpiresAt     DateTime
+  expiresAt             DateTime
+  refreshStartedAt      DateTime?
+}
+
 model Subject {
   id                 String              @id @default(auto()) @map("_id") @db.ObjectId
   code               String              @unique // ALGAN, APROG, etc.

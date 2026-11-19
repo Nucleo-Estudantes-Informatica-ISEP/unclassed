@@ -4,6 +4,14 @@ export type AuthNeiRole = (typeof AUTH_NEI_ROLES)[number];
 
 const ROLE_SET = new Set<string>(AUTH_NEI_ROLES);
 
+export function hasVerifiedEmailClaim(claims: Record<string, unknown>) {
+  const verified = claims.email_verified;
+  return (
+    verified === true ||
+    (typeof verified === "string" && verified.trim().toLowerCase() === "true")
+  );
+}
+
 function rolesFromValue(value: unknown): string[] {
   if (Array.isArray(value))
     return value.filter((role): role is string => typeof role === "string");

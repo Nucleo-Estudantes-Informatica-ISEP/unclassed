@@ -28,6 +28,16 @@ erDiagram
         DateTime updatedAt
     }
 
+    AuthSession {
+        String id PK
+        String userId
+        String encryptedRefreshToken "optional"
+        String[] roles
+        DateTime providerExpiresAt
+        DateTime expiresAt
+        DateTime refreshStartedAt "optional"
+    }
+
     Subject {
         String id PK
         String code UK
