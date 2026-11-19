@@ -149,8 +149,8 @@ async function createSampleMatches(
 ) {
   const participants = users.map((user, index) => ({
     userId: user.id,
-    fromClass: classes[index].name,
-    toClass: classes[(index + 1) % classes.length].name,
+    fromClass: classes[index].id,
+    toClass: classes[(index + 1) % classes.length].id,
     requestId: requests[index].id,
     requestType: "single",
     satisfactionScore: 0.9,
