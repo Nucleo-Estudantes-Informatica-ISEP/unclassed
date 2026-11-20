@@ -80,7 +80,7 @@ test("match DTO maps participants and class information to the public DTO shape"
       requestType: "single",
       satisfactionScore: 5,
       status: "pending",
-      user: users[0],
+      user: { id: users[0].id, name: users[0].name },
     },
   ]);
 
@@ -199,4 +199,47 @@ test("match DTO preserves revoked participant status", () => {
   const dto = toMatchDto(common, revokedParticipants);
 
   assert.equal(dto.participants[0].status, "revoked");
+});
+
+test("participant contact projection honors match state, sharing preference and membership", () => {
+  const partner = {
+    id: "user-2",
+    name: "Fixture Partner",
+    email: "partner@example.test",
+    phone: "912345678",
+    sharePhoneOnMatch: false,
+  };
+  const members = [...participants, { ...participants[0], userId: partner.id }];
+  const accepted = { ...common, status: "ACCEPTED" as const };
+
+  const visiblePartner = (
+    match: typeof accepted | typeof common,
+    viewer: string,
+    sharePhoneOnMatch = false
+  ) =>
+    toMatchDto(
+      match,
+      members,
+      undefined,
+      [{ ...partner, sharePhoneOnMatch }],
+      undefined,
+      viewer
+    ).participants[1].user;
+
+  const publicIdentity = { id: partner.id, name: partner.name };
+  assert.deepEqual(visiblePartner(common, "user-1", true), publicIdentity);
+  assert.deepEqual(
+    visiblePartner(accepted, "admin-outside-match", true),
+    publicIdentity
+  );
+  assert.deepEqual(visiblePartner(accepted, "user-1"), {
+    ...publicIdentity,
+    email: partner.email,
+    phone: null,
+    sharePhoneOnMatch: false,
+  });
+  assert.deepEqual(visiblePartner(accepted, "user-1", true), {
+    ...partner,
+    sharePhoneOnMatch: true,
+  });
 });

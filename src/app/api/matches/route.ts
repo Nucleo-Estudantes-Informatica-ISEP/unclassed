@@ -39,31 +39,6 @@ const matchStatuses = [
 
 const matchTypes = ["SINGLE", "BUNDLE"] as const;
 
-function sanitizeUserForMatch(
-  user:
-    | {
-        id: string;
-        name: string;
-        email: string;
-        phone: string | null;
-        sharePhoneOnMatch: boolean | null;
-      }
-    | undefined,
-  sessionUserId: string
-) {
-  if (!user) {
-    return undefined;
-  }
-
-  const canSeePhone =
-    user.id === sessionUserId || Boolean(user.sharePhoneOnMatch);
-
-  return {
-    ...user,
-    phone: canSeePhone ? user.phone : null,
-  };
-}
-
 function getMatchSignature(match: MatchLike): string {
   return buildMatchSignature({
     matchType: match.matchType,
@@ -168,12 +143,6 @@ export const GET = defineHandler({
           },
         });
 
-        const sanitizedUsers = users
-          .map((user) => sanitizeUserForMatch(user, session.id))
-          .filter(
-            (user): user is NonNullable<typeof user> => user !== undefined
-          );
-
         const classIds = [
           ...participants.map((participant) => participant.fromClass),
           ...participants.map((participant) => participant.toClass),
@@ -185,8 +154,9 @@ export const GET = defineHandler({
           match,
           participants,
           classes,
-          sanitizedUsers,
-          undefined
+          users,
+          undefined,
+          session.id
         );
       })
     );
