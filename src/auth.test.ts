@@ -1,27 +1,44 @@
-import NextAuth, { type AuthError, type NextAuthConfig } from "next-auth";
+import NextAuth, { AuthError, type NextAuthConfig } from "next-auth";
 import { expect, test, vi } from "vitest";
 
 import { logger } from "@/lib/logger";
 
 import "./auth";
 
-vi.mock("next-auth", () => ({ default: vi.fn().mockReturnValue({}) }));
+vi.mock("next-auth", () => ({
+  AuthError: class AuthError extends Error {},
+  default: vi.fn().mockReturnValue({}),
+}));
 vi.mock("@/lib/local-user", () => ({ syncLocalUserFromOidc: vi.fn() }));
-test("Auth.js error logging omits provider messages and causes", () => {
+
+class CallbackFailure extends AuthError {
+  static type = "CallbackRouteError";
+}
+
+test("Auth.js error logging keeps the classification and omits provider data", () => {
   const config = vi.mocked(NextAuth).mock.calls[0][0] as NextAuthConfig;
   const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
-  const error: AuthError = Object.assign(
-    new Error("synthetic provider response"),
-    {
-      type: "CallbackRouteError" as const,
-      cause: { err: new Error("synthetic sensitive details") },
-    }
-  );
+  const error = new CallbackFailure("synthetic provider response");
+  error.type = "CallbackRouteError";
+  error.cause = { err: new Error("synthetic sensitive details") };
 
-  config.logger?.error?.(error);
+  try {
+    config.logger?.error?.(error);
+    expect(logError).toHaveBeenLastCalledWith(
+      { errorType: "CallbackRouteError" },
+      "Auth.js request failed"
+    );
 
-  expect(logError).toHaveBeenCalledExactlyOnceWith(
-    { errorType: "Error" },
-    "Auth.js request failed"
-  );
+    const unexpected = Object.assign(new Error("provider response"), {
+      name: "ProviderControlledName",
+      type: "ProviderControlledType",
+    });
+    config.logger?.error?.(unexpected);
+    expect(logError).toHaveBeenLastCalledWith(
+      { errorType: "AuthError" },
+      "Auth.js request failed"
+    );
+  } finally {
+    logError.mockRestore();
+  }
 });
