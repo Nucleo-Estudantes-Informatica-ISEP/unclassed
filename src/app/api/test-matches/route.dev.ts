@@ -9,6 +9,10 @@ import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import {
+  executeInTransaction,
+  type Transaction,
+} from "@/application/repositories/transactionRepository";
 import type { User } from "@/application/repositories/userRepository";
 import * as userRepo from "@/application/repositories/userRepository";
 
@@ -29,7 +33,7 @@ export const POST = defineHandler({
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-    if (!(await clearSampleRequests(users))) {
+    if (!(await executeInTransaction((tx) => clearSampleRequests(users, tx)))) {
       return NextResponse.json(
         { error: "Existem matches com pedidos de outros utilizadores" },
         { status: 409 }
@@ -55,23 +59,29 @@ export const POST = defineHandler({
   },
 });
 
-async function clearSampleRequests(users: User[]) {
+async function clearSampleRequests(users: User[], tx: Transaction) {
   const userIds = users.map(({ id }) => id);
-  const requests = await singleSwapRequestRepo.findMany({
-    where: { userId: { in: userIds } },
-    select: { id: true },
-  });
+  const requests = await singleSwapRequestRepo.findMany(
+    {
+      where: { userId: { in: userIds } },
+      select: { id: true },
+    },
+    tx
+  );
   const requestIds = requests.map(({ id }) => id);
   if (!requestIds.length) return true;
   const fixtureIds = new Set(requestIds);
-  const matches = await matchRepo.findMany({
-    where: { singleSwapRequestIds: { hasSome: requestIds } },
-    select: {
-      id: true,
-      singleSwapRequestIds: true,
-      bundleSwapRequestIds: true,
+  const matches = await matchRepo.findMany(
+    {
+      where: { singleSwapRequestIds: { hasSome: requestIds } },
+      select: {
+        id: true,
+        singleSwapRequestIds: true,
+        bundleSwapRequestIds: true,
+      },
     },
-  });
+    tx
+  );
   if (
     matches.some(
       (match) =>
@@ -80,10 +90,16 @@ async function clearSampleRequests(users: User[]) {
     )
   )
     return false;
-  await matchRepo.deleteMany({
-    where: { id: { in: matches.map(({ id }) => id) } },
-  });
-  await singleSwapRequestRepo.deleteMany({ where: { id: { in: requestIds } } });
+  await matchRepo.deleteMany(
+    {
+      where: { id: { in: matches.map(({ id }) => id) } },
+    },
+    tx
+  );
+  await singleSwapRequestRepo.deleteMany(
+    { where: { id: { in: requestIds } } },
+    tx
+  );
   return true;
 }
 
