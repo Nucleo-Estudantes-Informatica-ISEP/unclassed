@@ -1,8 +1,46 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { NextRequest } from "next/server";
+import { test, vi } from "vitest";
 
+import { hasValidCronSecret } from "./apiAccess";
 import { isDevOnlyRequestAllowed } from "./devOnly";
+import { env } from "./env";
 import { validateOrigin } from "./originValidation";
+
+vi.mock("@/services/getServerSession", () => ({ default: vi.fn() }));
+vi.mock("@/services/rateLimit", () => ({
+  checkRateLimit: vi.fn(),
+  resolveRateLimitIdentifier: vi.fn(),
+}));
+vi.mock("./env", () => ({ env: {} }));
+
+test("cron bearer requires a configured secret and an exact header", () => {
+  const secret = "synthetic-cron-secret-for-testing";
+  const request = (authorization?: string) =>
+    new NextRequest("http://localhost/api/matching", {
+      headers: authorization ? { authorization } : {},
+    });
+
+  const valid = request(`Bearer ${secret}`);
+  assert.equal(hasValidCronSecret(valid), false);
+  env.CRON_SECRET = secret;
+  try {
+    assert.equal(hasValidCronSecret(valid), true);
+    assert.equal(hasValidCronSecret(request()), false);
+    assert.equal(hasValidCronSecret(request(`Basic ${secret}`)), false);
+    assert.equal(hasValidCronSecret(request(`Bearer ${secret}-extra`)), false);
+    assert.equal(
+      hasValidCronSecret(request(`Bearer ${secret.slice(1)}`)),
+      false
+    );
+    assert.equal(
+      hasValidCronSecret(request(`Bearer X${secret.slice(1)}`)),
+      false
+    );
+  } finally {
+    env.CRON_SECRET = undefined;
+  }
+});
 
 function requestWith(headers: Record<string, string>) {
   return {

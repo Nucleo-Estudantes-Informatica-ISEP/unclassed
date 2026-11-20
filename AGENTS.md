@@ -197,7 +197,7 @@ Before finishing a change:
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
-- `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
+- `/api/matching` and detailed `GET /api/health` accept the cron bearer secret. `/api/admin/cron` requires an `ADMIN` session. See the [security audit](docs/security-audit-98.md) for the route inventory.
 - `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
