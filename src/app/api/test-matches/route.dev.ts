@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
+
 import { defineHandler } from "@/lib/defineHandler";
+import { isFixtureDatabase } from "@/lib/fixtureDatabase";
 import { SingleSwapRequestDto } from "@/services/swapRequestDto";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
 import type { Class } from "@/application/repositories/classRepository";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import {
+  executeInTransaction,
+  type Transaction,
+} from "@/application/repositories/transactionRepository";
 import type { User } from "@/application/repositories/userRepository";
 import * as userRepo from "@/application/repositories/userRepository";
 
@@ -18,13 +23,22 @@ export const POST = defineHandler({
     enforceSameOriginForSessionWrites: true,
   },
 
+  authorize: () => {
+    if (!isFixtureDatabase()) {
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
+  },
+
   handler: async () => {
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-    await matchRepo.deleteMany({});
-    await singleSwapRequestRepo.deleteMany();
-    await bundleSwapRequestRepo.deleteMany();
+    if (!(await executeInTransaction((tx) => clearSampleRequests(users, tx)))) {
+      return NextResponse.json(
+        { error: "Existem matches com pedidos de outros utilizadores" },
+        { status: 409 }
+      );
+    }
     const swapRequests = await createSampleSwapRequests(
       users,
       classes,
@@ -45,16 +59,60 @@ export const POST = defineHandler({
   },
 });
 
+async function clearSampleRequests(users: User[], tx: Transaction) {
+  const userIds = users.map(({ id }) => id);
+  const requests = await singleSwapRequestRepo.findMany(
+    {
+      where: { userId: { in: userIds } },
+      select: { id: true },
+    },
+    tx
+  );
+  const requestIds = requests.map(({ id }) => id);
+  if (!requestIds.length) return true;
+  const fixtureIds = new Set(requestIds);
+  const matches = await matchRepo.findMany(
+    {
+      where: { singleSwapRequestIds: { hasSome: requestIds } },
+      select: {
+        id: true,
+        singleSwapRequestIds: true,
+        bundleSwapRequestIds: true,
+      },
+    },
+    tx
+  );
+  if (
+    matches.some(
+      (match) =>
+        match.bundleSwapRequestIds.length ||
+        match.singleSwapRequestIds.some((id) => !fixtureIds.has(id))
+    )
+  )
+    return false;
+  await matchRepo.deleteMany(
+    {
+      where: { id: { in: matches.map(({ id }) => id) } },
+    },
+    tx
+  );
+  await singleSwapRequestRepo.deleteMany(
+    { where: { id: { in: requestIds } } },
+    tx
+  );
+  return true;
+}
+
 async function createSampleUsers(): Promise<User[]> {
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
         userRepo.upsert({
-          where: { email: `test-match-${index + 1}@isep.ipp.pt` },
+          where: { email: `test-match-${index + 1}@example.test` },
           update: {},
           create: {
             name,
-            email: `test-match-${index + 1}@isep.ipp.pt`,
+            email: `test-match-${index + 1}@example.test`,
             phone: `91${index + 2}345678`,
           },
         })
@@ -107,8 +165,8 @@ async function createSampleMatches(
 ) {
   const participants = users.map((user, index) => ({
     userId: user.id,
-    fromClass: classes[index].name,
-    toClass: classes[(index + 1) % classes.length].name,
+    fromClass: classes[index].id,
+    toClass: classes[(index + 1) % classes.length].id,
     requestId: requests[index].id,
     requestType: "single",
     satisfactionScore: 0.9,

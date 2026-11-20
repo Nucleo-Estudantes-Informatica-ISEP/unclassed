@@ -199,6 +199,7 @@ Before finishing a change:
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
 - `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
+- `src/app/api/auth/test-session/route.dev.ts` is a development fixture bootstrap. It authenticates POST and DELETE with `E2E_TEST_SECRET` before a session exists and permits writes only to the dedicated `unclassed_e2e` database. This route owns its auth check because `authorizeRequest()` handles app sessions and cron credentials.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
 
