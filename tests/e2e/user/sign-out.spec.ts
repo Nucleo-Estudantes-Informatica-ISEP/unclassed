@@ -5,8 +5,10 @@ test("app-only sign-out clears the Unclassed session and returns home", async ({
 }) => {
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Menu da conta" }).click();
-  await page.route("**/api/logout-url", () => {
-    throw new Error("App-only sign-out must not fetch the AuthNEI logout URL");
+  let fetchedSharedUrl = false;
+  await page.route("**/api/logout-url", (route) => {
+    fetchedSharedUrl = true;
+    return route.abort();
   });
 
   await page
@@ -15,6 +17,7 @@ test("app-only sign-out clears the Unclassed session and returns home", async ({
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login/);
+  expect(fetchedSharedUrl).toBe(false);
 });
 
 test("shared sign-out clears the Unclassed session and follows the AuthNEI return", async ({
@@ -24,23 +27,17 @@ test("shared sign-out clears the Unclassed session and follows the AuthNEI retur
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Menu da conta" }).click();
 
-  const issuer = new URL(
-    process.env.AUTH_ISSUER_URL ?? "https://auth.example.test"
-  ).origin;
+  const configuredIssuer = process.env.AUTH_ISSUER_URL;
+  if (!configuredIssuer)
+    throw new Error("AUTH_ISSUER_URL is required for shared sign-out testing");
+  const issuer = new URL(configuredIssuer).origin;
   await page.route(
     (url) => url.origin === issuer,
-    (route) => {
-      const endSession = new URL(route.request().url());
-      expect(endSession.origin).toBe(issuer);
-      expect(endSession.pathname).toMatch(/\/end_session$/);
-      expect(endSession.searchParams.get("post_logout_redirect_uri")).toBe(
-        new URL("/", baseURL).href
-      );
-      return route.fulfill({
+    (route) =>
+      route.fulfill({
         status: 302,
         headers: { location: new URL("/", baseURL).href },
-      });
-    }
+      })
   );
 
   const logout = page.waitForRequest(
@@ -53,7 +50,12 @@ test("shared sign-out clears the Unclassed session and follows the AuthNEI retur
     "Outras aplicações abertas podem manter a sessão iniciada."
   );
   await shared.click();
-  await logout;
+  const endSession = new URL((await logout).url());
+  expect(endSession.origin).toBe(issuer);
+  expect(endSession.pathname).toMatch(/\/end_session$/);
+  expect(endSession.searchParams.get("post_logout_redirect_uri")).toBe(
+    process.env.AUTH_POST_LOGOUT_REDIRECT_URI ?? new URL("/", baseURL).href
+  );
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login/);
