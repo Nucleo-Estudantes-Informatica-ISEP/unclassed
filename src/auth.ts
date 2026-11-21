@@ -1,17 +1,17 @@
+import { cookies } from "next/headers";
 import NextAuth from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import Zitadel from "next-auth/providers/zitadel";
-import { cookies } from "next/headers";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { getAuthNeiRoles, isAdmin } from "@/lib/auth-nei-roles";
-import { env } from "@/lib/env";
 import {
   appReturnPath,
   EMAIL_VERIFICATION_COOKIE,
   emailVerificationCookieOptions,
   readEmailVerificationRecovery,
 } from "@/lib/email-verification-recovery";
+import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 import { logger, safeError } from "@/lib/logger";
 
@@ -199,22 +199,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const verified = parseEmailVerifiedClaim(claims);
       if (verified !== true) {
         const jar = await cookies();
-        const previous = readEmailVerificationRecovery(jar.get(EMAIL_VERIFICATION_COOKIE)?.value);
-        const hint = getClaim(claims, "preferred_username");
-        if (!previous?.attempted && hint) {
+        const previous = readEmailVerificationRecovery(
+          jar.get(EMAIL_VERIFICATION_COOKIE)?.value
+        );
+        const hint =
+          getClaim(claims, "preferred_username") ||
+          getClaim(claims, "email") ||
+          "";
+        if (!previous?.attempted) {
           const destination = appReturnPath(
-            jar.get("__Secure-authjs.callback-url")?.value ?? jar.get("authjs.callback-url")?.value,
+            jar.get("__Secure-authjs.callback-url")?.value ??
+              jar.get("authjs.callback-url")?.value
           );
           jar.set(
             EMAIL_VERIFICATION_COOKIE,
             JSON.stringify({ hint, destination, attempted: false }),
-            emailVerificationCookieOptions(process.env.NODE_ENV === "production"),
+            emailVerificationCookieOptions(
+              process.env.NODE_ENV === "production"
+            )
           );
         }
         return "/verify-email";
       }
       const jar = await cookies();
-      if (jar.has(EMAIL_VERIFICATION_COOKIE)) jar.delete(EMAIL_VERIFICATION_COOKIE);
+      if (jar.has(EMAIL_VERIFICATION_COOKIE))
+        jar.delete(EMAIL_VERIFICATION_COOKIE);
       return true;
     },
     async jwt({ token, account, profile, trigger }) {

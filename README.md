@@ -519,6 +519,7 @@ Key behavior:
 
 - only AuthNEI-authenticated users are expected
 - sign-in is blocked if `email_verified` is missing or false
+- unverified users are guided back to AuthNEI verification once, preserving the destination; an email can identify the existing session when the profile scope is absent
 - a local user is created or linked during JWT callback processing
 - local session data includes:
   - local user ID

@@ -32,19 +32,28 @@ export function readEmailVerificationRecovery(raw?: string): Recovery | null {
     if (
       !value ||
       typeof value.hint !== "string" ||
-      value.hint.length === 0 ||
       value.hint.length > 320 ||
       typeof value.destination !== "string" ||
       typeof value.attempted !== "boolean"
     ) {
       return null;
     }
-    return { hint: value.hint, destination: appReturnPath(value.destination), attempted: value.attempted };
+    return {
+      hint: value.hint,
+      destination: appReturnPath(value.destination),
+      attempted: value.attempted,
+    };
   } catch {
     return null;
   }
 }
 
 export function emailVerificationCookieOptions(secure: boolean) {
-  return { httpOnly: true, sameSite: "lax" as const, secure, path: "/", maxAge: EMAIL_VERIFICATION_MAX_AGE };
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure,
+    path: "/",
+    maxAge: EMAIL_VERIFICATION_MAX_AGE,
+  };
 }
