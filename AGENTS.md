@@ -214,15 +214,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Issue and pull request writing
 
-- Use plain, action-oriented issue titles. Follow the FallStack [task
-  template](https://github.com/Nucleo-Estudantes-Informatica-ISEP/fallstack-website/blob/dev/.github/ISSUE_TEMPLATE/task.md) for scoped work and the [bug
-  template](https://github.com/Nucleo-Estudantes-Informatica-ISEP/fallstack-website/blob/dev/.github/ISSUE_TEMPLATE/bug.md) for reproducible problem reports.
-  Keep task acceptance criteria and applicable dependencies as checklists.
-- Use Conventional Commit titles for PRs, such as `fix(auth): restore the return path`.
-  Follow the FallStack [PR template](https://github.com/Nucleo-Estudantes-Informatica-ISEP/fallstack-website/blob/dev/.github/PULL_REQUEST_TEMPLATE.md).
-  Include Issue when applicable, Summary, Tests, Manual testing steps,
-  Configuration / migration, and Observations. Use this repository's own check
-  commands and state which verification is still outstanding.
+- Use action-oriented titles prefixed with `[Type]` for tasks or `[Bug]` for bugs.
+  For tasks, include context, scope, acceptance criteria and applicable dependencies.
+  For bugs, include reproduction steps, expected and actual behavior, and environment.
+- Use Conventional Commit PR titles and include Issue (when applicable), Summary,
+  Tests, Manual testing steps, Configuration / migration, and Observations.
+  Report the checks from Verification that apply and any outstanding checks.
+  For schema changes, describe the `pnpm schema:deploy` steps, versioned record in
+  `prisma/schema-changes/`, and updated hash in `prisma/schema-manifest.json`.
+- For PRs addressing an issue, establish and verify the GitHub Development link.
+  A closing keyword alone does not establish it for PRs targeting `dev`.
 
 ## Pull request metadata
 
