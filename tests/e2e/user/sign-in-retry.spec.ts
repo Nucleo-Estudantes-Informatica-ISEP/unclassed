@@ -49,3 +49,26 @@ test("offers retry when a configured sign-in fails to start", async ({
     page.getByRole("link", { name: "Contactar o apoio do NEI" })
   ).toBeVisible();
 });
+
+test("can sign in again after returning from the issuer", async ({ page }) => {
+  const configuredIssuer = process.env.AUTH_ISSUER_URL;
+  if (!configuredIssuer) throw new Error("AUTH_ISSUER_URL is required");
+  const issuer = new URL(configuredIssuer).origin;
+  await page.route(
+    (url) => url.origin === issuer,
+    (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<h1>Fixture AuthNEI</h1>",
+      })
+  );
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Continuar para o login" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Fixture AuthNEI" })
+  ).toBeVisible();
+  await page.goBack();
+  await expect(
+    page.getByRole("button", { name: "Continuar para o login" })
+  ).toBeEnabled();
+});

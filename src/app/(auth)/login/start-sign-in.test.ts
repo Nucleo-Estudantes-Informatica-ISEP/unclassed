@@ -28,3 +28,17 @@ test("treats a local Auth.js error redirect or exception as a failed start", asy
   expect(await startSignIn("/dashboard")).toBeNull();
   expect(await startSignIn("/dashboard")).toBeNull();
 });
+
+test.each([
+  "https://elsewhere.test",
+  "//elsewhere.test",
+  "/\\elsewhere.test",
+  "/.//elsewhere.test",
+])(
+  "rejects an unsafe return path before starting OIDC (%s)",
+  async (callbackUrl) => {
+    signIn.mockClear();
+    expect(await startSignIn(callbackUrl)).toBeNull();
+    expect(signIn).not.toHaveBeenCalled();
+  }
+);

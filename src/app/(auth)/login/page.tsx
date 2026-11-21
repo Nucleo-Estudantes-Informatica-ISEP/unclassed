@@ -41,10 +41,16 @@ const Login: React.FC = () => {
       }
     };
 
+    const restoreSignIn = () => {
+      setStatus((current) => (current === "starting" ? "ready" : current));
+    };
+
+    window.addEventListener("pageshow", restoreSignIn);
     void checkAuthConfig();
 
     return () => {
       mounted = false;
+      window.removeEventListener("pageshow", restoreSignIn);
     };
   }, []);
 
