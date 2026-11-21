@@ -132,6 +132,7 @@ The main variables are:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Prisma connection string for MongoDB |
 | `APP_BASE_URL` | Yes | Server-side canonical app URL |
+| `SEASONAL_CLOSURE_UNTIL` | Optional | Expected seasonal reopening, as an ISO 8601 timestamp with timezone |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public app URL used in links and client code |
 | `AUTH_ISSUER_URL` | Yes | AuthNEI / OIDC issuer URL |
 | `AUTH_CLIENT_ID` | Yes | OIDC client ID |
@@ -159,6 +160,10 @@ The main variables are:
 | `LOG_LEVEL` | Optional | Pino level; defaults to `info` in production |
 
 HTTP API responses include `x-request-id`; server logs use the same request ID. Cron and matching runs add `jobExecutionId`. Production logs are JSON; local development uses `pino-pretty`. Log payloads omit exception messages, request bodies, emails, tokens, and passwords. When `SENTRY_DSN` is set, selected job and matching logs also appear in GlitchTip's Logs page. Only fixed operation messages and approved correlation/diagnostic fields are forwarded; other stdout logs stay in Coolify Runtime Logs.
+
+### Seasonal closure
+
+Set `SEASONAL_CLOSURE_UNTIL` on the running deployment to the expected reopening time, including a timezone offset or `Z`. Keep the service running during the closure. Verify that the homepage and `/login` display the reopening time in Lisbon time and respond with `503` and `Retry-After`. API and health-check traffic continue as usual. At the configured time, page requests resume without a restart. Leave the variable empty for normal operation.
 
 ### Authentication Notes
 
