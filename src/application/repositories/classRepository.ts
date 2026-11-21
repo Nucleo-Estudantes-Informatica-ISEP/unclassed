@@ -99,8 +99,13 @@ export async function deleteMany(
   return (tx || prisma).class.deleteMany(args);
 }
 
-export async function isInUse(id: string): Promise<boolean> {
-  const existingClass = await prisma.class.findUnique({
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+export async function isInUse(
+  id: string,
+  client: DbClient = prisma
+): Promise<boolean> {
+  const existingClass = await client.class.findUnique({
     where: { id },
     select: { name: true },
   });
@@ -111,17 +116,17 @@ export async function isInUse(id: string): Promise<boolean> {
   }
 
   const [singleCount, bundleCount, matches] = await Promise.all([
-    prisma.singleSwapRequest.count({
+    client.singleSwapRequest.count({
       where: {
         OR: [{ currentClassId: id }, { preferredClassIds: { has: id } }],
       },
     }),
-    prisma.bundleSwapRequest.count({
+    client.bundleSwapRequest.count({
       where: {
         OR: [{ currentClassId: id }, { preferredClassIds: { has: id } }],
       },
     }),
-    prisma.match.aggregateRaw({
+    client.match.aggregateRaw({
       pipeline: [
         {
           $match: {
@@ -146,6 +151,19 @@ export async function isInUse(id: string): Promise<boolean> {
     bundleCount > 0 ||
     (Array.isArray(matches) && matches.length > 0)
   );
+}
+
+// Check and delete share one transaction to narrow the window in which a
+// request created in between would be orphaned. MongoDB has no foreign keys and
+// a concurrent insert does not conflict with the delete, so the residual race
+// is accepted and tracked as a follow-up.
+export async function removeUnlessInUse(id: string): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    if (await isInUse(id, tx)) return false;
+
+    await tx.class.delete({ where: { id } });
+    return true;
+  });
 }
 
 export type { Class } from "@prisma/client";

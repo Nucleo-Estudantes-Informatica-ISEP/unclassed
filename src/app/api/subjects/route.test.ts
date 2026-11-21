@@ -12,6 +12,7 @@ vi.mock("@/application/repositories/subjectRepository", () => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  removeUnlessInUse: vi.fn(),
   isInUse: vi.fn(),
   findById: vi.fn(),
 }));
@@ -19,7 +20,7 @@ vi.mock("@/application/repositories/subjectRepository", () => ({
 const apiUrl = "http://localhost:3000/api/subjects";
 const validData = { code: "ALG", name: "Algebra", year: 1, semester: 1 };
 const existing = {
-  id: "item-1",
+  id: "64b7f0c2a1b2c3d4e5f60789",
   code: "ALG",
   name: "Algebra",
   year: 1,
@@ -27,7 +28,7 @@ const existing = {
 };
 const patchData = { name: "Linear Algebra" };
 const updated = {
-  id: "item-1",
+  id: "64b7f0c2a1b2c3d4e5f60789",
   code: "ALG",
   name: "Linear Algebra",
   year: 1,
@@ -105,8 +106,8 @@ describe("/api/subjects", () => {
 
   it.each([
     ["POST", POST, validData],
-    ["PATCH", PATCH, { id: "item-1", ...patchData }],
-    ["DELETE", DELETE, { id: "item-1" }],
+    ["PATCH", PATCH, { id: "64b7f0c2a1b2c3d4e5f60789", ...patchData }],
+    ["DELETE", DELETE, { id: "64b7f0c2a1b2c3d4e5f60789" }],
   ] as const)(
     "rejects unauthorized %s requests",
     async (method, handler, body) => {
@@ -141,11 +142,11 @@ describe("/api/subjects", () => {
     authorizeAdmin();
     vi.mocked(subjectRepo.update).mockResolvedValueOnce(updated as never);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", ...patchData })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", ...patchData })
     );
     expect(response.status).toBe(200);
     expect(subjectRepo.update).toHaveBeenCalledWith({
-      where: { id: "item-1" },
+      where: { id: "64b7f0c2a1b2c3d4e5f60789" },
       data: patchData,
     });
     expect(await response.json()).toEqual(updated);
@@ -153,7 +154,7 @@ describe("/api/subjects", () => {
 
   it("rejects an update without fields", async () => {
     authorizeAdmin();
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1" }));
+    const response = await PATCH(makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(400);
     expect(subjectRepo.update).not.toHaveBeenCalled();
   });
@@ -166,7 +167,7 @@ describe("/api/subjects", () => {
       vi.mocked(subjectRepo.isInUse).mockResolvedValueOnce(true);
 
       const response = await PATCH(
-        makeRequest("PATCH", { id: "item-1", ...changes })
+        makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", ...changes })
       );
 
       expect(response.status).toBe(409);
@@ -181,35 +182,32 @@ describe("/api/subjects", () => {
     vi.mocked(subjectRepo.update).mockResolvedValueOnce(updated as never);
 
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "Linear Algebra" })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "Linear Algebra" })
     );
 
     expect(response.status).toBe(200);
     expect(subjectRepo.isInUse).not.toHaveBeenCalled();
     expect(subjectRepo.update).toHaveBeenCalledWith({
-      where: { id: "item-1" },
+      where: { id: "64b7f0c2a1b2c3d4e5f60789" },
       data: { name: "Linear Algebra" },
     });
   });
 
   it("deletes a subject", async () => {
     authorizeAdmin();
-    vi.mocked(subjectRepo.remove).mockResolvedValueOnce(existing as never);
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(subjectRepo.removeUnlessInUse).mockResolvedValueOnce(true);
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(200);
-    expect(subjectRepo.remove).toHaveBeenCalledWith({
-      where: { id: "item-1" },
-    });
+    expect(subjectRepo.removeUnlessInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
     expect(await response.json()).toEqual({ success: true });
   });
 
   it("rejects deletion of a subject in use", async () => {
     authorizeAdmin();
-    vi.mocked(subjectRepo.isInUse).mockResolvedValueOnce(true);
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(subjectRepo.removeUnlessInUse).mockResolvedValueOnce(false);
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(409);
-    expect(subjectRepo.isInUse).toHaveBeenCalledWith("item-1");
-    expect(subjectRepo.remove).not.toHaveBeenCalled();
+    expect(subjectRepo.removeUnlessInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
   });
 
   it.each(["POST", "PATCH", "DELETE"] as const)(
@@ -231,8 +229,39 @@ describe("/api/subjects", () => {
 
   it("returns 404 when deleting a missing record", async () => {
     authorizeAdmin();
-    vi.mocked(subjectRepo.remove).mockRejectedValueOnce(prismaError("P2025"));
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(subjectRepo.removeUnlessInUse).mockRejectedValueOnce(prismaError("P2025"));
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(404);
+  });
+
+  it.each([
+    ["PATCH", PATCH, { id: "not-an-object-id", name: "X" }],
+    ["DELETE", DELETE, { id: "not-an-object-id" }],
+  ] as const)("rejects a malformed id for %s with 400", async (method, handler, body) => {
+    authorizeAdmin();
+    const response = await handler(makeRequest(method, body));
+    expect(response.status).toBe(400);
+    expect(subjectRepo.removeUnlessInUse).not.toHaveBeenCalled();
+    expect(subjectRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("stores the subject code upper-cased so case variants collide", async () => {
+    authorizeAdmin();
+    vi.mocked(subjectRepo.create).mockResolvedValueOnce(existing as never);
+    const response = await POST(makeRequest("POST", { ...validData, code: " alg " }));
+    expect(response.status).toBe(201);
+    expect(subjectRepo.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ code: "ALG" }),
+    });
+  });
+
+  it("returns 409 when a case-variant code already exists", async () => {
+    authorizeAdmin();
+    vi.mocked(subjectRepo.create).mockRejectedValueOnce(prismaError("P2002"));
+    const response = await POST(makeRequest("POST", { ...validData, code: "alg" }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Já existe uma disciplina com este código.",
+    });
   });
 });

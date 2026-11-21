@@ -21,11 +21,7 @@ export async function findSubjects(filter: SubjectFilter = {}) {
 
   return prisma.subject.findMany({
     where,
-    orderBy: [
-      { year: "asc" },
-      { semester: "asc" },
-      { code: "asc" },
-    ],
+    orderBy: [{ year: "asc" }, { semester: "asc" }, { code: "asc" }],
   });
 }
 
@@ -48,40 +44,61 @@ export async function findManyByIds(ids: string[]) {
 
 export async function create(
   args: Parameters<typeof prisma.subject.create>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).subject.create(args);
 }
 
 export async function update(
   args: Parameters<typeof prisma.subject.update>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).subject.update(args);
 }
 
 export async function remove(
   args: Parameters<typeof prisma.subject.delete>[0],
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).subject.delete(args);
 }
 
 export async function deleteMany(
   args: Parameters<typeof prisma.subject.deleteMany>[0] = {},
-  tx?: Prisma.TransactionClient,
+  tx?: Prisma.TransactionClient
 ) {
   return (tx || prisma).subject.deleteMany(args);
 }
 
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
+// A subject is referenced by swap requests, by its persistent graph partition
+// (which outlives the requests and keeps the stored year) and by matches via
+// their `subject-<id>` partition key.
+export async function isInUse(
+  id: string,
+  client: DbClient = prisma
+): Promise<boolean> {
+  const [requests, partitions, matches] = await Promise.all([
+    client.singleSwapRequest.count({ where: { subjectId: id } }),
+    client.graphPartition.count({ where: { subjectId: id } }),
+    client.match.count({ where: { graphPartition: `subject-${id}` } }),
+  ]);
 
-export async function isInUse(id: string): Promise<boolean> {
-  const count = await prisma.singleSwapRequest.count({
-    where: { subjectId: id },
+  return requests > 0 || partitions > 0 || matches > 0;
+}
+
+// Check and delete share one transaction to narrow the window in which a
+// request created in between would be orphaned. MongoDB has no foreign keys and
+// a concurrent insert does not conflict with the delete, so the residual race
+// is accepted and tracked as a follow-up.
+export async function removeUnlessInUse(id: string): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    if (await isInUse(id, tx)) return false;
+
+    await tx.subject.delete({ where: { id } });
+    return true;
   });
-
-  return count > 0;
 }
 
 export type { Subject } from "@prisma/client";

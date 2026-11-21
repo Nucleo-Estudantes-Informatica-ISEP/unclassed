@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createClassSchema,
+  deleteReferenceDataSchema,
   createSubjectSchema,
   updateClassSchema,
   updateSubjectSchema,
@@ -31,11 +32,11 @@ describe("referenceDataSchema", () => {
     });
 
     it("rejects an update without fields", () => {
-      expect(updateSubjectSchema.safeParse({ id: "subject-1" }).success).toBe(false);
+      expect(updateSubjectSchema.safeParse({ id: "64b7f0c2a1b2c3d4e5f60789" }).success).toBe(false);
     });
 
     it("rejects an invalid subject year update", () => {
-      expect(updateSubjectSchema.safeParse({ id: "subject-1", year: 4 }).success).toBe(false);
+      expect(updateSubjectSchema.safeParse({ id: "64b7f0c2a1b2c3d4e5f60789", year: 4 }).success).toBe(false);
     });
   });
 
@@ -67,31 +68,49 @@ describe("referenceDataSchema", () => {
     });
 
     it("rejects an update without fields", () => {
-      expect(updateClassSchema.safeParse({ id: "class-1" }).success).toBe(false);
+      expect(updateClassSchema.safeParse({ id: "64b7f0c2a1b2c3d4e5f60789" }).success).toBe(false);
     });
 
     it("accepts updating the name and year together", () => {
       expect(updateClassSchema.safeParse({
-        id: "class-1", name: "2DA", year: 2,
+        id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA", year: 2,
       }).success).toBe(true);
     });
 
     it("allows a partial update to be validated against the stored year", () => {
       expect(updateClassSchema.safeParse({
-        id: "class-1", name: "2DA",
+        id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA",
       }).success).toBe(true);
     });
 
     it("accepts a partial update with a free-form name", () => {
       expect(updateClassSchema.safeParse({
-        id: "class-1", name: "2 Evening Group",
+        id: "64b7f0c2a1b2c3d4e5f60789", name: "2 Evening Group",
       }).success).toBe(true);
     });
 
     it("rejects a partial update with an empty name", () => {
       expect(updateClassSchema.safeParse({
-        id: "class-1", name: "  ",
+        id: "64b7f0c2a1b2c3d4e5f60789", name: "  ",
       }).success).toBe(false);
     });
+  });
+
+  describe("subject code and ids", () => {
+    it("normalizes the subject code to upper case", () => {
+      const parsed = createSubjectSchema.parse({
+        code: " aprog ", name: "Programming", year: 1, semester: 1,
+      });
+      expect(parsed.code).toBe("APROG");
+    });
+
+    it.each(["", "abc", "64b7f0c2a1b2c3d4e5f6078", "zzb7f0c2a1b2c3d4e5f60789"])(
+      "rejects a malformed ObjectId: %j",
+      (id) => {
+        expect(deleteReferenceDataSchema.safeParse({ id }).success).toBe(false);
+        expect(updateSubjectSchema.safeParse({ id, name: "X" }).success).toBe(false);
+        expect(updateClassSchema.safeParse({ id, name: "1DA" }).success).toBe(false);
+      }
+    );
   });
 });

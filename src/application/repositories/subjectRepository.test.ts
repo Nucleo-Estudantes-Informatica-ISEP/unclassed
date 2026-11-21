@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import prisma from "@/lib/prisma";
-import { findSubjects } from "@/application/repositories/subjectRepository";
+import { findSubjects, isInUse } from "@/application/repositories/subjectRepository";
 
 describe("subjectRepository", () => {
   it("findSubjects builds where clause and calls prisma.subject.findMany (AAA)", async () => {
@@ -166,5 +166,35 @@ it("remove calls prisma.subject.delete", async () => {
     expect(res).toBe(mock);
 
     spy.mockRestore();
+  });
+
+  describe("isInUse", () => {
+    function mockCounts(requests: number, partitions: number, matches: number) {
+      vi.spyOn(prisma.singleSwapRequest, "count").mockResolvedValueOnce(requests);
+      vi.spyOn(prisma.graphPartition, "count").mockResolvedValueOnce(partitions);
+      vi.spyOn(prisma.match, "count").mockResolvedValueOnce(matches);
+    }
+
+    it("is false when nothing references the subject", async () => {
+      mockCounts(0, 0, 0);
+      expect(await isInUse("64b7f0c2a1b2c3d4e5f60789")).toBe(false);
+    });
+
+    it.each([
+      ["a swap request", [1, 0, 0]],
+      ["a graph partition that outlives its requests", [0, 1, 0]],
+      ["a match on the subject partition", [0, 0, 1]],
+    ] as const)("is true when %s references the subject", async (_label, counts) => {
+      mockCounts(counts[0], counts[1], counts[2]);
+      expect(await isInUse("64b7f0c2a1b2c3d4e5f60789")).toBe(true);
+    });
+
+    it("queries the subject partition key for matches", async () => {
+      mockCounts(0, 0, 0);
+      await isInUse("64b7f0c2a1b2c3d4e5f60789");
+      expect(prisma.match.count).toHaveBeenCalledWith({
+        where: { graphPartition: "subject-64b7f0c2a1b2c3d4e5f60789" },
+      });
+    });
   });
 });

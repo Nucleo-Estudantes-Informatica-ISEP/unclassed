@@ -14,14 +14,15 @@ vi.mock("@/application/repositories/classRepository", () => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  removeUnlessInUse: vi.fn(),
   isInUse: vi.fn(),
 }));
 
 const apiUrl = "http://localhost:3000/api/classes";
 const validData = { name: "1DA", year: 1 };
-const existing = { id: "item-1", name: "1DA", year: 1 };
+const existing = { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DA", year: 1 };
 const patchData = { name: "1DB" };
-const updated = { id: "item-1", name: "1DB", year: 1 };
+const updated = { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DB", year: 1 };
 
 function authorizeAdmin() {
   vi.mocked(authorizeRequest).mockResolvedValueOnce({
@@ -86,8 +87,8 @@ describe("/api/classes", () => {
 
   it.each([
     ["POST", POST, validData],
-    ["PATCH", PATCH, { id: "item-1", ...patchData }],
-    ["DELETE", DELETE, { id: "item-1" }],
+    ["PATCH", PATCH, { id: "64b7f0c2a1b2c3d4e5f60789", ...patchData }],
+    ["DELETE", DELETE, { id: "64b7f0c2a1b2c3d4e5f60789" }],
   ] as const)(
     "rejects unauthorized %s requests",
     async (method, handler, body) => {
@@ -123,11 +124,11 @@ describe("/api/classes", () => {
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     vi.mocked(classRepo.update).mockResolvedValueOnce(updated as never);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", ...patchData })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", ...patchData })
     );
     expect(response.status).toBe(200);
     expect(classRepo.update).toHaveBeenCalledWith({
-      where: { id: "item-1" },
+      where: { id: "64b7f0c2a1b2c3d4e5f60789" },
       data: patchData,
     });
     expect(await response.json()).toEqual(updated);
@@ -135,7 +136,7 @@ describe("/api/classes", () => {
 
   it("rejects an update without fields", async () => {
     authorizeAdmin();
-    const response = await PATCH(makeRequest("PATCH", { id: "item-1" }));
+    const response = await PATCH(makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(400);
     expect(classRepo.update).not.toHaveBeenCalled();
   });
@@ -148,7 +149,7 @@ describe("/api/classes", () => {
       year: 2,
     } as never);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", year: 2 })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", year: 2 })
     );
     expect(response.status).toBe(400);
     expect(classRepo.update).not.toHaveBeenCalled();
@@ -193,7 +194,7 @@ describe("/api/classes", () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "2DA" })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA" })
     );
     expect(response.status).toBe(400);
     expect(classRepo.update).not.toHaveBeenCalled();
@@ -204,24 +205,24 @@ describe("/api/classes", () => {
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
     vi.mocked(classRepo.hasNameConflict).mockResolvedValueOnce(true);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DB" })
     );
     expect(response.status).toBe(409);
-    expect(classRepo.hasNameConflict).toHaveBeenCalledWith("1DB", "item-1");
+    expect(classRepo.hasNameConflict).toHaveBeenCalledWith("1DB", "64b7f0c2a1b2c3d4e5f60789");
     expect(classRepo.update).not.toHaveBeenCalled();
   });
 
   it("allows changing the name and year together", async () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
-    const changed = { id: "item-1", name: "2DA", year: 2 };
+    const changed = { id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA", year: 2 };
     vi.mocked(classRepo.update).mockResolvedValueOnce(changed as never);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "2DA", year: 2 })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA", year: 2 })
     );
     expect(response.status).toBe(200);
     expect(classRepo.update).toHaveBeenCalledWith({
-      where: { id: "item-1" },
+      where: { id: "64b7f0c2a1b2c3d4e5f60789" },
       data: { name: "2DA", year: 2 },
     });
   });
@@ -232,11 +233,11 @@ describe("/api/classes", () => {
     vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
 
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "2DA", year: 2 })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA", year: 2 })
     );
 
     expect(response.status).toBe(409);
-    expect(classRepo.isInUse).toHaveBeenCalledWith("item-1");
+    expect(classRepo.isInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
     expect(classRepo.update).not.toHaveBeenCalled();
   });
 
@@ -247,14 +248,14 @@ describe("/api/classes", () => {
     vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
 
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DB" })
     );
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
       error: "Não é possível alterar uma turma que está em utilização.",
     });
-    expect(classRepo.isInUse).toHaveBeenCalledWith("item-1");
+    expect(classRepo.isInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
     expect(classRepo.update).not.toHaveBeenCalled();
   });
 
@@ -265,7 +266,7 @@ describe("/api/classes", () => {
   vi.mocked(classRepo.update).mockResolvedValueOnce(existing as never);
 
   const response = await PATCH(
-    makeRequest("PATCH", { id: "item-1", name: "1DA", year: 1 })
+    makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DA", year: 1 })
   );
 
   expect(response.status).toBe(200);
@@ -276,7 +277,7 @@ describe("/api/classes", () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(null);
     const response = await PATCH(
-      makeRequest("PATCH", { id: "item-1", name: "1DB" })
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "1DB" })
     );
     expect(response.status).toBe(404);
     expect(classRepo.update).not.toHaveBeenCalled();
@@ -284,20 +285,19 @@ describe("/api/classes", () => {
 
   it("deletes a class", async () => {
     authorizeAdmin();
-    vi.mocked(classRepo.remove).mockResolvedValueOnce(existing as never);
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(classRepo.removeUnlessInUse).mockResolvedValueOnce(true);
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(200);
-    expect(classRepo.remove).toHaveBeenCalledWith({ where: { id: "item-1" } });
+    expect(classRepo.removeUnlessInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
     expect(await response.json()).toEqual({ success: true });
   });
 
   it("rejects deletion of a class in use", async () => {
     authorizeAdmin();
-    vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(classRepo.removeUnlessInUse).mockResolvedValueOnce(false);
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(409);
-    expect(classRepo.isInUse).toHaveBeenCalledWith("item-1");
-    expect(classRepo.remove).not.toHaveBeenCalled();
+    expect(classRepo.removeUnlessInUse).toHaveBeenCalledWith("64b7f0c2a1b2c3d4e5f60789");
   });
 
   it.each(["POST", "PATCH", "DELETE"] as const)(
@@ -319,8 +319,19 @@ describe("/api/classes", () => {
 
   it("returns 404 when deleting a missing record", async () => {
     authorizeAdmin();
-    vi.mocked(classRepo.remove).mockRejectedValueOnce(prismaError("P2025"));
-    const response = await DELETE(makeRequest("DELETE", { id: "item-1" }));
+    vi.mocked(classRepo.removeUnlessInUse).mockRejectedValueOnce(prismaError("P2025"));
+    const response = await DELETE(makeRequest("DELETE", { id: "64b7f0c2a1b2c3d4e5f60789" }));
     expect(response.status).toBe(404);
+  });
+
+  it.each([
+    ["PATCH", PATCH, { id: "not-an-object-id", name: "X" }],
+    ["DELETE", DELETE, { id: "not-an-object-id" }],
+  ] as const)("rejects a malformed id for %s with 400", async (method, handler, body) => {
+    authorizeAdmin();
+    const response = await handler(makeRequest(method, body));
+    expect(response.status).toBe(400);
+    expect(classRepo.removeUnlessInUse).not.toHaveBeenCalled();
+    expect(classRepo.update).not.toHaveBeenCalled();
   });
 });

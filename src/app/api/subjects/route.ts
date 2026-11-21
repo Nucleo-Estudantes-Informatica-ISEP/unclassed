@@ -161,16 +161,12 @@ export const DELETE = defineHandler({
     const { id } = parsed.data;
 
     try {
-      if (await subjectRepo.isInUse(id)) {
+      if (!(await subjectRepo.removeUnlessInUse(id))) {
         return errorResponse(
           "Não é possível eliminar uma disciplina que está em utilização.",
           409
         );
       }
-
-      await subjectRepo.remove({
-        where: { id },
-      });
 
       return NextResponse.json({ success: true });
     } catch (error) {

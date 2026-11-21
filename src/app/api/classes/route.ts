@@ -162,16 +162,12 @@ export const DELETE = defineHandler({
     const { id } = parsed.data;
 
     try {
-      if (await classRepo.isInUse(id)) {
+      if (!(await classRepo.removeUnlessInUse(id))) {
         return errorResponse(
           "Não é possível eliminar uma turma que está em utilização.",
           409
         );
       }
-
-      await classRepo.remove({
-        where: { id },
-      });
 
       return NextResponse.json({ success: true });
     } catch (error) {

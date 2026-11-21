@@ -292,8 +292,8 @@ Key API routes:
 
 - `/api/auth/[...nextauth]` - NextAuth handlers
 - `/api/auth/configured` - auth readiness check
-- `/api/subjects` - subject data
-- `/api/classes` - class data
+- `/api/subjects` - subject data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session (subject codes are stored upper case)
+- `/api/classes` - class data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session
 - `/api/swap-requests/single`
 - `/api/swap-requests/bundle`
 - `/api/matches`

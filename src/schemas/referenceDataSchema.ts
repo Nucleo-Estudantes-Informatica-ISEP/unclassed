@@ -3,6 +3,21 @@ import { z } from "zod";
 const academicYearSchema = z.number().int().min(1).max(3);
 const semesterSchema = z.number().int().min(1).max(2);
 
+// MongoDB ObjectId: a malformed value would make Prisma throw (P2023) and
+// surface as a 500 instead of a 400.
+const objectIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9a-fA-F]{24}$/, { message: "Identificador inválido." });
+
+// Stored upper case so the case-sensitive `code @unique` index also blocks
+// case variants (aprog vs APROG).
+const subjectCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((code) => code.toUpperCase());
+
 const classNameSchema = z.string().trim().min(1).regex(/^[1-3]/, {
   message: "O nome da turma deve começar por 1, 2 ou 3.",
 });
@@ -14,7 +29,7 @@ export function classNameMatchesYear(name: string, year: number): boolean {
 // Subjects
 
 export const createSubjectSchema = z.object({
-  code: z.string().trim().min(1),
+  code: subjectCodeSchema,
   name: z.string().trim().min(1),
   year: academicYearSchema,
   semester: semesterSchema,
@@ -22,8 +37,8 @@ export const createSubjectSchema = z.object({
 
 export const updateSubjectSchema = z
   .object({
-    id: z.string().trim().min(1),
-    code: z.string().trim().min(1).optional(),
+    id: objectIdSchema,
+    code: subjectCodeSchema.optional(),
     name: z.string().trim().min(1).optional(),
     year: academicYearSchema.optional(),
     semester: semesterSchema.optional(),
@@ -49,7 +64,7 @@ export const createClassSchema = z.object({
 
 export const updateClassSchema = z
   .object({
-    id: z.string().trim().min(1),
+    id: objectIdSchema,
     name: classNameSchema.optional(),
     year: academicYearSchema.optional(),
   })
@@ -61,5 +76,5 @@ export const updateClassSchema = z
 // Delete
 
 export const deleteReferenceDataSchema = z.object({
-  id: z.string().trim().min(1),
+  id: objectIdSchema,
 });
