@@ -57,7 +57,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await signIn("zitadel", { callbackUrl });
+      await signIn("zitadel", { callbackUrl }, { prompt: "create" });
     } catch {
       logger.error("Register error:");
       setIsLoading(false);
