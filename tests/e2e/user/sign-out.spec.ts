@@ -4,7 +4,7 @@ test("app-only sign-out clears the Unclassed session and returns home", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: /E2E User/ }).click();
+  await page.getByRole("button", { name: "Menu da conta" }).click();
   await page.route("**/api/logout-url", () => {
     throw new Error("App-only sign-out must not fetch the AuthNEI logout URL");
   });
@@ -22,7 +22,7 @@ test("shared sign-out clears the Unclassed session and follows the AuthNEI retur
   baseURL,
 }) => {
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: /E2E User/ }).click();
+  await page.getByRole("button", { name: "Menu da conta" }).click();
 
   const issuer = new URL(
     process.env.AUTH_ISSUER_URL ?? "https://auth.example.test"

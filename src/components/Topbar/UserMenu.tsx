@@ -63,6 +63,8 @@ export default function UserMenu({ user }: UserMenuProps) {
       <Button
         variant="ghost"
         className="relative h-10 w-auto px-2"
+        aria-label="Menu da conta"
+        aria-expanded={showMenu}
         onClick={() => setShowMenu(!showMenu)}
       >
         <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white">
