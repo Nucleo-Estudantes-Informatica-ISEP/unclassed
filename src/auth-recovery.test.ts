@@ -82,3 +82,31 @@ test("keeps recovery and the destination when neither identifier is present", as
     attempted: false,
   });
 });
+
+test("an attempted recovery does not schedule another recovery cookie", async () => {
+  mocks.jar.get.mockReturnValue({
+    value: JSON.stringify({
+      hint: "student@example.test",
+      destination: "/profile",
+      attempted: true,
+    }),
+  });
+
+  const result = await mocks.config.value!.callbacks.signIn({
+    account: { provider: "zitadel", providerAccountId: "fixture" },
+    profile: { sub: "fixture", email_verified: false },
+  });
+  expect(result).toBe("/verify-email");
+  expect(mocks.jar.set).not.toHaveBeenCalled();
+});
+
+test("verified email permits sign-in and clears recovery state", async () => {
+  mocks.jar.has.mockReturnValueOnce(true);
+  const result = await mocks.config.value!.callbacks.signIn({
+    account: { provider: "zitadel", providerAccountId: "fixture" },
+    profile: { sub: "fixture", email_verified: true },
+  });
+  expect(result).toBe(true);
+  expect(mocks.jar.delete).toHaveBeenCalledWith("authnei-email-verification");
+  expect(mocks.jar.set).not.toHaveBeenCalled();
+});

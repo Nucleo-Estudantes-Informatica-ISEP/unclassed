@@ -1,4 +1,4 @@
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 
 import { resumeEmailVerification } from "./actions";
 
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/auth", () => ({ signIn: mocks.signIn }));
 vi.mock("next/headers", () => ({ cookies: async () => mocks.jar }));
 vi.mock("next-auth", () => ({ AuthError: class AuthError extends Error {} }));
+
+afterEach(() => vi.clearAllMocks());
 
 test("starts the guarded verification journey without an identifier", async () => {
   mocks.jar.get.mockReturnValue({
@@ -29,4 +31,19 @@ test("starts the guarded verification journey without an identifier", async () =
     { redirectTo: "/profile" },
     {}
   );
+});
+
+test.each([
+  ["missing", undefined],
+  [
+    "already attempted",
+    JSON.stringify({ hint: "", destination: "/profile", attempted: true }),
+  ],
+])("ignores %s verification recovery state", async (_description, value) => {
+  mocks.jar.get.mockReturnValue(value === undefined ? undefined : { value });
+
+  await resumeEmailVerification();
+
+  expect(mocks.signIn).not.toHaveBeenCalled();
+  expect(mocks.jar.set).not.toHaveBeenCalled();
 });
