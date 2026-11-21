@@ -63,23 +63,6 @@ test("treats empty AUTH_ROLE_CLAIM values as undefined", () => {
   }
 });
 
-test("requires a timezone on the seasonal reopening timestamp", () => {
-  const reopening = "2030-03-31T10:30:00+01:00";
-  assert.equal(
-    parseEnvironment({ SEASONAL_CLOSURE_UNTIL: reopening })
-      .SEASONAL_CLOSURE_UNTIL,
-    reopening
-  );
-  assert.equal(
-    parseEnvironment({ SEASONAL_CLOSURE_UNTIL: "" }).SEASONAL_CLOSURE_UNTIL,
-    undefined
-  );
-  assert.throws(
-    () => parseEnvironment({ SEASONAL_CLOSURE_UNTIL: "2030-03-31T10:30:00" }),
-    /SEASONAL_CLOSURE_UNTIL/
-  );
-});
-
 test("rejects weak secrets and non-Mongo database URLs", () => {
   assert.throws(
     () => parseEnvironment({ AUTH_SECRET: "too-short" }),

@@ -1,18 +1,18 @@
 import { NextRequest } from "next/server";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { proxy } from "./proxy";
 
-const { env } = vi.hoisted(() => ({
-  env: {
-    SEASONAL_CLOSURE_UNTIL: "2030-03-31T10:30:00+01:00" as string | undefined,
-  },
-}));
-vi.mock("@/lib/env", () => ({ env }));
+beforeEach(() =>
+  vi.stubEnv("SEASONAL_CLOSURE_UNTIL", "2030-03-31T10:30:00+01:00")
+);
 
 const deadline = Date.parse("2030-03-31T09:30:00Z");
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 test("serves the local reopening time throughout the closure", async () => {
   const clock = vi.spyOn(Date, "now");
@@ -50,4 +50,26 @@ test("preserves API request IDs and health checks during the closure", () => {
   );
   expect(response.headers.get("x-middleware-next")).toBe("1");
   expect(response.headers.get("x-request-id")).toBeTruthy();
+});
+
+test.each([undefined, "   "])(
+  "serves ordinary requests when the closure value is %s",
+  (value) => {
+    vi.stubEnv("SEASONAL_CLOSURE_UNTIL", value);
+    const response = proxy(
+      new NextRequest("https://unclassed.example.test/login")
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+  }
+);
+
+test("fails open and warns once when the reopening time lacks a timezone", () => {
+  vi.stubEnv("SEASONAL_CLOSURE_UNTIL", "2030-03-31T10:30:00");
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const request = new NextRequest("https://unclassed.example.test/login");
+  expect(proxy(request).headers.get("x-middleware-next")).toBe("1");
+  expect(proxy(request).headers.get("x-middleware-next")).toBe("1");
+  expect(warn).toHaveBeenCalledTimes(1);
 });

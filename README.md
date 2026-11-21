@@ -163,7 +163,7 @@ HTTP API responses include `x-request-id`; server logs use the same request ID. 
 
 ### Seasonal closure
 
-Set `SEASONAL_CLOSURE_UNTIL` on the running deployment to the expected reopening time, including a timezone offset or `Z`. Keep the service running during the closure. Verify that the homepage and `/login` display the reopening time in Lisbon time and respond with `503` and `Retry-After`. API and health-check traffic continue as usual. At the configured time, page requests resume without a restart. Leave the variable empty for normal operation.
+Set `SEASONAL_CLOSURE_UNTIL` on the running deployment to the expected reopening time, including a timezone offset or `Z`. Keep the service running during the closure. Verify that the homepage and `/login` display the reopening time in Lisbon time and respond with `503` and `Retry-After`. API and health-check traffic continue as usual. At the configured time, page requests resume without a restart. Leave the variable empty for normal operation. If the value is invalid, public pages stay open and the service logs a warning.
 
 ### Authentication Notes
 

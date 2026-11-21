@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-import { env } from "@/lib/env";
+const reopeningSchema = z.iso.datetime({ offset: true });
+let warnedAboutInvalidReopening = false;
 
 const reopeningDate = new Intl.DateTimeFormat("pt-PT", {
   dateStyle: "full",
@@ -11,13 +13,18 @@ const reopeningDate = new Intl.DateTimeFormat("pt-PT", {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname !== "/api" && !pathname.startsWith("/api/")) {
-    const reopensAt = env.SEASONAL_CLOSURE_UNTIL;
-    if (!reopensAt || Date.parse(reopensAt) <= Date.now()) {
-      return NextResponse.next();
-    }
-
-    const reopening = new Date(reopensAt);
+  const isPage = pathname !== "/api" && !pathname.startsWith("/api/");
+  const configuredReopening =
+    isPage && process.env.SEASONAL_CLOSURE_UNTIL?.trim();
+  const parsed = configuredReopening
+    ? reopeningSchema.safeParse(configuredReopening)
+    : undefined;
+  if (parsed && !parsed.success && !warnedAboutInvalidReopening) {
+    warnedAboutInvalidReopening = true;
+    console.warn("Invalid SEASONAL_CLOSURE_UNTIL; public pages remain open");
+  }
+  if (parsed?.success && Date.parse(parsed.data) > Date.now()) {
+    const reopening = new Date(parsed.data);
     return new NextResponse(
       request.method === "HEAD"
         ? null

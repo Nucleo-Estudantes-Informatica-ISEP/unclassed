@@ -41,10 +41,6 @@ const environmentSchema = z
     ),
     APP_BASE_URL: optionalUrl,
     NEXT_PUBLIC_APP_URL: optionalUrl,
-    SEASONAL_CLOSURE_UNTIL: z.preprocess(
-      emptyToUndefined,
-      z.iso.datetime({ offset: true }).optional()
-    ),
     AUTH_ISSUER_URL: optionalUrl,
     AUTH_CLIENT_ID: optionalString,
     AUTH_CLIENT_SECRET: optionalString,
