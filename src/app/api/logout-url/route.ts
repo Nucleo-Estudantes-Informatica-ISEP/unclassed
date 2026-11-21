@@ -5,7 +5,7 @@ import type { JWT } from "next-auth/jwt";
 import { defineHandler } from "@/lib/defineHandler";
 import { env } from "@/lib/env";
 import { logger, safeError } from "@/lib/logger";
-import { buildZitadelLogoutUrl, getPostLogoutRedirectUri } from "@/lib/zitadel";
+import { buildZitadelLogoutUrl } from "@/lib/zitadel";
 
 const authDebugEnabled = env.AUTH_DEBUG;
 
@@ -72,7 +72,7 @@ export const GET = defineHandler({
   auth: false,
   onError: (error) => {
     logger.error(safeError(error), "Failed to build logout URL:");
-    return NextResponse.json({ redirectTo: getPostLogoutRedirectUri() });
+    return NextResponse.json({ error: "AuthNEI logout unavailable" }, { status: 503 });
   },
   handler: async (context) => {
     const { request } = context;
