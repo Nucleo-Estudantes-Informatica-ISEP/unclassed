@@ -114,3 +114,25 @@ for (const scenario of ["smoke", "load", "stress", "spike"]) {
     expect(Math.ceil(60 / wait)).toBeLessThan(30);
   });
 }
+
+test.each([
+  [undefined, undefined],
+  ["http://localhost:3000", undefined],
+  ["http://127.0.0.1:3000/", undefined],
+  ["http://[::1]:3000", undefined],
+  ["https://staging.example.com", "1"],
+])("accepts target %s (allowRemote=%s)", async (url, allowRemote) => {
+  const { resolveBaseUrl } = await import("./lib/config.js");
+  expect(() => resolveBaseUrl(url, allowRemote)).not.toThrow();
+});
+
+test.each([
+  "https://unclassed.example.com",
+  "http://localhost.evil.com",
+  "http://localhost@evil.com",
+  "http://127.0.0.1.evil.com",
+])("refuses remote target %s without K6_ALLOW_REMOTE", async (url) => {
+  const { resolveBaseUrl } = await import("./lib/config.js");
+  expect(() => resolveBaseUrl(url, undefined)).toThrow("K6_ALLOW_REMOTE");
+  expect(() => resolveBaseUrl(url, "true")).toThrow("K6_ALLOW_REMOTE");
+});

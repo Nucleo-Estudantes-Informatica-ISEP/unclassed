@@ -1,6 +1,24 @@
 // k6 environment variables are passed via --env flags or the K6_ prefix.
 // Example: k6 run --env K6_BASE_URL=https://staging.example.com smoke.js
-export const BASE_URL = __ENV.K6_BASE_URL || "http://localhost:3000";
+// Load, stress and spike runs send up to 100 VUs of traffic and session
+// cookies to the target, so only loopback hosts are accepted by default.
+// Remote targets (staging) need an explicit K6_ALLOW_REMOTE=1 opt-in.
+export function resolveBaseUrl(url, allowRemote) {
+  const baseUrl = url || "http://localhost:3000";
+  const host = /^https?:\/\/(?:[^/@]*@)?(\[[^\]]+\]|[^/:?#]+)/i.exec(baseUrl)?.[1];
+  const loopback = host && /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i.test(host);
+  if (!loopback && allowRemote !== "1") {
+    throw new Error(
+      `Refusing non-loopback K6_BASE_URL "${baseUrl}"; set K6_ALLOW_REMOTE=1 to confirm an isolated staging target`
+    );
+  }
+  return baseUrl;
+}
+
+export const BASE_URL = resolveBaseUrl(
+  __ENV.K6_BASE_URL,
+  __ENV.K6_ALLOW_REMOTE
+);
 export const E2E_SECRET = __ENV.E2E_TEST_SECRET || "";
 
 // Thresholds applied to every scenario.
