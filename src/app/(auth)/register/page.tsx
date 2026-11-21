@@ -9,16 +9,17 @@ import { signIn } from "next-auth/react";
 import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 import { httpClient } from "@/lib/httpClient";
+import { relativeCallbackPath } from "@/lib/relativeCallbackPath";
 
 const Register: React.FC = () => {
   const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
   const [authConfigured, setAuthConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
-  const callbackUrl =
-    searchParams.get("callbackUrl") ||
-    searchParams.get("redirectTo") ||
-    "/profile";
+  const destination = relativeCallbackPath.safeParse(
+    searchParams.get("callbackUrl") || searchParams.get("redirectTo")
+  );
+  const callbackUrl = destination.success ? destination.data : "/profile";
 
   useEffect(() => {
     let mounted = true;
