@@ -24,6 +24,7 @@ describe("email verification recovery", () => {
 
   it("keeps the retry guard after returning from AuthNEI", () => {
     const recovery = {
+      subject: "fixture",
       hint: "fixture@example.test",
       destination: "/profile",
       attempted: true,
@@ -39,7 +40,7 @@ describe("email verification recovery", () => {
   });
 
   it("retains the return path without a login hint", () => {
-    const recovery = { hint: "", destination: "/profile", attempted: false };
+    const recovery = { subject: "fixture", hint: "", destination: "/profile", attempted: false };
     expect(readEmailVerificationRecovery(JSON.stringify(recovery))).toEqual(
       recovery
     );

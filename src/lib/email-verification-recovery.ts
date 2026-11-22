@@ -2,6 +2,7 @@ export const EMAIL_VERIFICATION_COOKIE = "authnei-email-verification";
 export const EMAIL_VERIFICATION_MAX_AGE = 300;
 
 type Recovery = {
+  subject: string;
   hint: string;
   destination: string;
   attempted: boolean;
@@ -31,6 +32,9 @@ export function readEmailVerificationRecovery(raw?: string): Recovery | null {
     const value = JSON.parse(raw) as Partial<Recovery> | null;
     if (
       !value ||
+      typeof value.subject !== "string" ||
+      !value.subject ||
+      value.subject.length > 255 ||
       typeof value.hint !== "string" ||
       value.hint.length > 320 ||
       typeof value.destination !== "string" ||
@@ -39,6 +43,7 @@ export function readEmailVerificationRecovery(raw?: string): Recovery | null {
       return null;
     }
     return {
+      subject: value.subject,
       hint: value.hint,
       destination: appReturnPath(value.destination),
       attempted: value.attempted,

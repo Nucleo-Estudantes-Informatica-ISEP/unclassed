@@ -206,14 +206,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           getClaim(claims, "preferred_username") ||
           getClaim(claims, "email") ||
           "";
-        if (!previous?.attempted) {
+        if (!previous?.attempted || previous.subject !== sub) {
           const destination = appReturnPath(
             jar.get("__Secure-authjs.callback-url")?.value ??
               jar.get("authjs.callback-url")?.value
           );
           jar.set(
             EMAIL_VERIFICATION_COOKIE,
-            JSON.stringify({ hint, destination, attempted: false }),
+            JSON.stringify({ subject: sub, hint, destination, attempted: false }),
             emailVerificationCookieOptions(
               process.env.NODE_ENV === "production"
             )

@@ -62,6 +62,7 @@ test("preserves the return path and starts recovery without preferred_username",
   expect(result).toBe("/verify-email");
   const recovery = JSON.parse(mocks.jar.set.mock.calls[0][1]);
   expect(recovery).toEqual({
+    subject: "fixture",
     hint: "student@example.test",
     destination: "/profile?tab=contact",
     attempted: false,
@@ -77,6 +78,7 @@ test("keeps recovery and the destination when neither identifier is present", as
     profile: { sub: "fixture", email_verified: false },
   });
   expect(JSON.parse(mocks.jar.set.mock.calls[0][1])).toEqual({
+    subject: "fixture",
     hint: "",
     destination: "/profile",
     attempted: false,
@@ -86,7 +88,8 @@ test("keeps recovery and the destination when neither identifier is present", as
 test("an attempted recovery does not schedule another recovery cookie", async () => {
   mocks.jar.get.mockReturnValue({
     value: JSON.stringify({
-      hint: "student@example.test",
+      subject: "fixture",
+    hint: "student@example.test",
       destination: "/profile",
       attempted: true,
     }),
@@ -109,4 +112,27 @@ test("verified email permits sign-in and clears recovery state", async () => {
   expect(result).toBe(true);
   expect(mocks.jar.delete).toHaveBeenCalledWith("authnei-email-verification");
   expect(mocks.jar.set).not.toHaveBeenCalled();
+});
+
+test("starts a new verification attempt for a different subject", async () => {
+  mocks.jar.get.mockImplementation((key) =>
+    key === "authnei-email-verification"
+      ? { value: JSON.stringify({ subject: "previous", hint: "", destination: "/old", attempted: true }) }
+      : key === "authjs.callback-url"
+        ? { value: "/profile" }
+        : undefined
+  );
+
+  const result = await mocks.config.value!.callbacks.signIn({
+    account: { provider: "zitadel", providerAccountId: "fixture" },
+    profile: { sub: "fixture", email_verified: false },
+  });
+
+  expect(result).toBe("/verify-email");
+  expect(JSON.parse(mocks.jar.set.mock.calls[0][1])).toEqual({
+    subject: "fixture",
+    hint: "",
+    destination: "/profile",
+    attempted: false,
+  });
 });
