@@ -1,8 +1,8 @@
 "use client";
 
-import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import { httpClient } from "@/lib/httpClient";
 import { useEffect, useState } from "react";
+import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
