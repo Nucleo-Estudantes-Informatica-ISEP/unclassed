@@ -35,10 +35,15 @@ test.each([
   "/\\elsewhere.test",
   "/.//elsewhere.test",
 ])(
-  "rejects an unsafe return path before starting OIDC (%s)",
+  "falls back to the dashboard for an invalid return path (%s)",
   async (callbackUrl) => {
-    signIn.mockClear();
-    expect(await startSignIn(callbackUrl)).toBeNull();
-    expect(signIn).not.toHaveBeenCalled();
+    const url = "https://auth.example.test/oauth/v2/authorize?state=test";
+    signIn.mockResolvedValueOnce(url);
+
+    expect(await startSignIn(callbackUrl)).toBe(url);
+    expect(signIn).toHaveBeenLastCalledWith("zitadel", {
+      redirect: false,
+      redirectTo: "/dashboard",
+    });
   }
 );
