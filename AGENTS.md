@@ -212,6 +212,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Issue and pull request writing
+
+- Use action-oriented titles prefixed with `[Type]` for tasks or `[Bug]` for bugs.
+  For tasks, include context, scope, acceptance criteria and applicable dependencies.
+  For bugs, include reproduction steps, expected and actual behavior, and environment.
+- Use Conventional Commit PR titles and include Issue (when applicable), Summary,
+  Tests, Manual testing steps, Configuration / migration, and Observations.
+  Report the checks from Verification that apply and any outstanding checks.
+  For schema changes, describe the `pnpm schema:deploy` steps, versioned record in
+  `prisma/schema-changes/`, and updated hash in `prisma/schema-manifest.json`.
+- For PRs addressing an issue, establish and verify the GitHub Development link.
+  A closing keyword alone does not establish it for PRs targeting `dev`.
+
 ## Pull request metadata
 
 - Whenever opening a pull request, add the applicable existing repository
