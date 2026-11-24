@@ -21,6 +21,7 @@ export function proxy(request: NextRequest) {
     : undefined;
   if (parsed && !parsed.success && !warnedAboutInvalidReopening) {
     warnedAboutInvalidReopening = true;
+    // The application logger loads the full env schema, which can prevent the proxy from failing open.
     console.warn("Invalid SEASONAL_CLOSURE_UNTIL; public pages remain open");
   }
   if (parsed?.success && Date.parse(parsed.data) > Date.now()) {

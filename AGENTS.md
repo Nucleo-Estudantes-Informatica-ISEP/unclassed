@@ -194,6 +194,8 @@ Before finishing a change:
 
 ## Gotchas
 
+- The proxy serves the seasonal closure notice for app pages. API routes still receive request IDs and continue normally.
+
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
