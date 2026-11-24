@@ -57,6 +57,9 @@ test("hosted sessions require no dev endpoint and are never deleted", async () =
       admins: ["__Secure-authjs.session-token=admin"],
     }),
   };
+  http.get
+    .mockReturnValueOnce({ status: 200, json: () => ({ user: { id: "user", role: "USER" } }) })
+    .mockReturnValueOnce({ status: 200, json: () => ({ user: { id: "admin", role: "ADMIN" } }) });
   const { createScenarioSessions, destroySessions } =
     await import("./lib/auth.js");
   const data = createScenarioSessions(1);
@@ -75,6 +78,36 @@ test("rejects duplicate or insufficient hosted session pools before requests", a
   expect(() => createScenarioSessions(1)).toThrow("distinct");
   expect(() => createScenarioSessions(2)).toThrow("requires 2");
   expect(http.post).not.toHaveBeenCalled();
+});
+
+test("rejects different cookies for the same hosted account", async () => {
+  globalThis.__ENV.K6_SESSIONS_JSON = JSON.stringify({
+    users: ["authjs.session-token=user-one", "authjs.session-token=user-two"],
+    admins: ["authjs.session-token=admin-one", "authjs.session-token=admin-two"],
+  });
+  http.get.mockReturnValue({
+    status: 200,
+    json: () => ({ user: { id: "same-account", role: "USER" } }),
+  });
+
+  const { createScenarioSessions } = await import("./lib/auth.js");
+  expect(() => createScenarioSessions(2)).toThrow("different account");
+  expect(http.get).toHaveBeenCalledTimes(2);
+  expect(http.del).not.toHaveBeenCalled();
+});
+
+test("rejects a hosted session from the wrong role", async () => {
+  globalThis.__ENV.K6_SESSIONS_JSON = JSON.stringify({
+    users: ["authjs.session-token=user"],
+    admins: ["authjs.session-token=admin"],
+  });
+  http.get.mockReturnValue({
+    status: 200,
+    json: () => ({ user: { id: "wrong-role", role: "ADMIN" } }),
+  });
+
+  const { createScenarioSessions } = await import("./lib/auth.js");
+  expect(() => createScenarioSessions(1)).toThrow("active USER sessions");
 });
 
 test("local HTTPS sessions preserve secure cookie names and are owned", async () => {

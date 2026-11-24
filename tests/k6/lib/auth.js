@@ -27,6 +27,29 @@ export function createScenarioSessions(count) {
         return { cookie, owned: false };
       });
     }
+    const usedAccounts = new Set();
+    for (const [key, role] of [["users", "USER"], ["admins", "ADMIN"]]) {
+      for (const session of result[key]) {
+        const response = http.get(`${BASE_URL}/api/auth/session`, {
+          ...sessionParams(session),
+          redirects: 0,
+        });
+        let identity;
+        try {
+          if (response.status === 200) identity = response.json();
+        } catch {
+          // Reject an unavailable or invalid session without printing its body.
+        }
+        const user = identity?.user;
+        if (identity?.error || typeof user?.id !== "string" || !user.id || user.role !== role) {
+          throw new Error(`K6_SESSIONS_JSON requires active ${role} sessions`);
+        }
+        if (usedAccounts.has(user.id)) {
+          throw new Error("K6_SESSIONS_JSON requires a different account for every session");
+        }
+        usedAccounts.add(user.id);
+      }
+    }
     return result;
   }
 
