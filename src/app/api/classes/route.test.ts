@@ -190,13 +190,15 @@ describe("/api/classes", () => {
     expect(classRepo.create).not.toHaveBeenCalled();
   });
 
-  it("rejects changing the name without changing the stored year", async () => {
+  it("rejects changing the name of an in-use class to a name inconsistent with its year", async () => {
     authorizeAdmin();
     vi.mocked(classRepo.findById).mockResolvedValueOnce(existing as never);
+    vi.mocked(classRepo.isInUse).mockResolvedValueOnce(true);
     const response = await PATCH(
       makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", name: "2DA" })
     );
     expect(response.status).toBe(400);
+    expect(classRepo.isInUse).not.toHaveBeenCalled();
     expect(classRepo.update).not.toHaveBeenCalled();
   });
 

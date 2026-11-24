@@ -116,7 +116,8 @@ export const PATCH = defineHandler({
         }
 
         const changesStructuralField =
-          (data.code !== undefined && data.code !== existingSubject.code) ||
+          (data.code !== undefined &&
+            data.code !== existingSubject.code.trim().toUpperCase()) ||
           (data.year !== undefined && data.year !== existingSubject.year) ||
           (data.semester !== undefined &&
             data.semester !== existingSubject.semester);

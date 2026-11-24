@@ -101,6 +101,13 @@ export const PATCH = defineHandler({
       const finalName = data.name ?? existingClass.name;
       const finalYear = data.year ?? existingClass.year;
 
+      if (!classNameMatchesYear(finalName, finalYear)) {
+        return errorResponse(
+          "O nome da turma deve começar pelo ano selecionado.",
+          400
+        );
+      }
+
       const changesName =
         data.name !== undefined &&
         data.name.trim().toUpperCase() !==
@@ -113,13 +120,6 @@ export const PATCH = defineHandler({
         return errorResponse(
           "Não é possível alterar uma turma que está em utilização.",
           409
-        );
-      }
-
-      if (!classNameMatchesYear(finalName, finalYear)) {
-        return errorResponse(
-          "O nome da turma deve começar pelo ano selecionado.",
-          400
         );
       }
 

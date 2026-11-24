@@ -46,6 +46,8 @@ describe("Class usage protection with MongoDB matches", () => {
       });
 
       expect(await classRepo.isInUse(classA.id)).toBe(true);
+      expect(await classRepo.removeUnlessInUse(classA.id)).toBe(false);
+      expect(await classRepo.findById(classA.id)).not.toBeNull();
     }
   );
 
@@ -104,9 +106,11 @@ describe("Class usage protection with MongoDB matches", () => {
     expect(await classRepo.isInUse(classB.id)).toBe(true);
   });
 
-  it("does not mark an unreferenced class as in use", async () => {
+  it("deletes an unreferenced class", async () => {
     const classA = await createTestClass();
 
     expect(await classRepo.isInUse(classA.id)).toBe(false);
+    expect(await classRepo.removeUnlessInUse(classA.id)).toBe(true);
+    expect(await classRepo.findById(classA.id)).toBeNull();
   });
 });

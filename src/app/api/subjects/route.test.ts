@@ -175,6 +175,27 @@ describe("/api/subjects", () => {
     }
   );
 
+  it("accepts the normalized code of an in-use legacy subject", async () => {
+    authorizeAdmin();
+    vi.mocked(subjectRepo.findById).mockResolvedValueOnce({
+      ...existing,
+      code: "  alg  ",
+    } as never);
+    vi.mocked(subjectRepo.isInUse).mockResolvedValueOnce(true);
+    vi.mocked(subjectRepo.update).mockResolvedValueOnce(updated as never);
+
+    const response = await PATCH(
+      makeRequest("PATCH", { id: "64b7f0c2a1b2c3d4e5f60789", code: "ALG" })
+    );
+
+    expect(response.status).toBe(200);
+    expect(subjectRepo.isInUse).not.toHaveBeenCalled();
+    expect(subjectRepo.update).toHaveBeenCalledWith({
+      where: { id: "64b7f0c2a1b2c3d4e5f60789" },
+      data: { code: "ALG" },
+    });
+  });
+
   it("allows changing the name of a subject in use", async () => {
     authorizeAdmin();
 

@@ -156,7 +156,7 @@ export async function isInUse(
 // Check and delete share one transaction to narrow the window in which a
 // request created in between would be orphaned. MongoDB has no foreign keys and
 // a concurrent insert does not conflict with the delete, so the residual race
-// is accepted and tracked as a follow-up.
+// and the same PATCH race are tracked in #294.
 export async function removeUnlessInUse(id: string): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     if (await isInUse(id, tx)) return false;
