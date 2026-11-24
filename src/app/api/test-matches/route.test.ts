@@ -128,7 +128,7 @@ test("fixture reset deletes only the validated match and fixture request IDs in 
   vi.mocked(matchRepo.findMany).mockResolvedValue([
     {
       id: "fixture-match",
-        participants: fixtureParticipants,
+      participants: fixtureParticipants,
       singleSwapRequestIds: requestIds,
       bundleSwapRequestIds: [],
     },

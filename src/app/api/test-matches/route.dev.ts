@@ -83,29 +83,35 @@ async function clearSampleRequests(users: User[], tx: Transaction) {
   );
   const matchesToClear = [];
   for (const match of matches) {
-    const fixtureParticipants = match.participants.map((participant) =>
-      participant !== null &&
-      typeof participant === "object" &&
-      !Array.isArray(participant) &&
-      typeof participant.userId === "string" &&
-      userIds.has(participant.userId)
+    const fixtureParticipants = match.participants.map(
+      (participant) =>
+        participant !== null &&
+        typeof participant === "object" &&
+        !Array.isArray(participant) &&
+        typeof participant.userId === "string" &&
+        userIds.has(participant.userId)
     );
     const hasFixtureParticipant = fixtureParticipants.some(Boolean);
-    const hasFixtureRequest = match.singleSwapRequestIds.some((id) => fixtureIds.has(id));
+    const hasFixtureRequest = match.singleSwapRequestIds.some((id) =>
+      fixtureIds.has(id)
+    );
     if (!hasFixtureParticipant && !hasFixtureRequest) continue;
     if (
       match.bundleSwapRequestIds.length ||
       !fixtureParticipants.length ||
       !fixtureParticipants.every(Boolean)
-    ) return false;
+    )
+      return false;
     matchesToClear.push(match);
   }
 
-  const unknownIds = [...new Set(
-    matchesToClear.flatMap(({ singleSwapRequestIds }) =>
-      singleSwapRequestIds.filter((id) => !fixtureIds.has(id))
-    )
-  )];
+  const unknownIds = [
+    ...new Set(
+      matchesToClear.flatMap(({ singleSwapRequestIds }) =>
+        singleSwapRequestIds.filter((id) => !fixtureIds.has(id))
+      )
+    ),
+  ];
   if (unknownIds.length) {
     const linkedRequests = await singleSwapRequestRepo.findMany(
       { where: { id: { in: unknownIds } }, select: { id: true } },
