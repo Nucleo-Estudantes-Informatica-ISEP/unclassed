@@ -7,7 +7,7 @@ export type MatchClass = {
 export type MatchUser = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string | null;
   sharePhoneOnMatch?: boolean | null;
 };
