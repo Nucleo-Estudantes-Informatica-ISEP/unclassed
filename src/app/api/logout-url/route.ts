@@ -72,7 +72,10 @@ export const GET = defineHandler({
   auth: false,
   onError: (error) => {
     logger.error(safeError(error), "Failed to build logout URL:");
-    return NextResponse.json({ error: "AuthNEI logout unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Não foi possível terminar a sessão no AuthNEI" },
+      { status: 503 }
+    );
   },
   handler: async (context) => {
     const { request } = context;

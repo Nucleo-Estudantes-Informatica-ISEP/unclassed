@@ -39,7 +39,11 @@ export default function UserMenu({ user }: UserMenuProps) {
 
     try {
       const redirectTo = shared
-        ? (await httpClient.get<{ redirectTo: string }>("/api/logout-url", { cache: "no-store" })).redirectTo
+        ? (
+            await httpClient.get<{ redirectTo: string }>("/api/logout-url", {
+              cache: "no-store",
+            })
+          ).redirectTo
         : "/";
 
       await signOut({ redirect: false });
@@ -183,7 +187,16 @@ export default function UserMenu({ user }: UserMenuProps) {
               <LogOut className="mr-2 h-4 w-4 shrink-0" />
               <span>Terminar sessão nesta aplicação e no AuthNEI</span>
             </button>
-            <p id="shared-signout-note" className="text-muted-foreground px-2 pb-2 text-xs">
+            <p
+              role="status"
+              className={isLoggingOut ? "px-2 text-sm" : "sr-only"}
+            >
+              {isLoggingOut ? "A sair..." : ""}
+            </p>
+            <p
+              id="shared-signout-note"
+              className="text-muted-foreground px-2 pb-2 text-xs"
+            >
               Outras aplicações abertas podem manter a sessão iniciada.
             </p>
           </div>
