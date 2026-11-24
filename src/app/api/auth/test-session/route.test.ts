@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const mockEnv = vi.hoisted(() => ({
   E2E_TEST_SECRET: "a-secret-that-is-long-enough-32c" as string | undefined, // gitleaks:allow
@@ -39,11 +39,14 @@ const VALID_SECRET = "a-secret-that-is-long-enough-32c"; // gitleaks:allow
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("NODE_ENV", "development");
   mockEnv.NODE_ENV = "development";
   mockEnv.DATABASE_URL = "mongodb://localhost:27017/unclassed_e2e";
   mockEnv.E2E_TEST_SECRET = VALID_SECRET;
   mockEnv.AUTH_SECRET = "auth-secret-32-chars-long-minimum"; // gitleaks:allow
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe("POST /api/auth/test-session", () => {
   test("returns 404 when x-e2e-secret header is missing", async () => {
@@ -58,8 +61,8 @@ describe("POST /api/auth/test-session", () => {
     expect(userRepo.create).not.toHaveBeenCalled();
   });
 
-  test("returns 404 in production regardless of secret", async () => {
-    mockEnv.NODE_ENV = "production";
+  test.each(["production", "test", undefined])("returns 404 with NODE_ENV=%s", async (environment) => {
+    vi.stubEnv("NODE_ENV", environment);
     const res = await POST(makeRequest("http://localhost/api/auth/test-session", VALID_SECRET));
     expect(res.status).toBe(404);
     expect(userRepo.create).not.toHaveBeenCalled();

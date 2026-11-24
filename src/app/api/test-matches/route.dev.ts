@@ -60,39 +60,62 @@ export const POST = defineHandler({
 });
 
 async function clearSampleRequests(users: User[], tx: Transaction) {
-  const userIds = users.map(({ id }) => id);
+  const userIds = new Set(users.map(({ id }) => id));
   const requests = await singleSwapRequestRepo.findMany(
     {
-      where: { userId: { in: userIds } },
+      where: { userId: { in: [...userIds] } },
       select: { id: true },
     },
     tx
   );
   const requestIds = requests.map(({ id }) => id);
-  if (!requestIds.length) return true;
   const fixtureIds = new Set(requestIds);
   const matches = await matchRepo.findMany(
     {
-      where: { singleSwapRequestIds: { hasSome: requestIds } },
       select: {
         id: true,
+        participants: true,
         singleSwapRequestIds: true,
         bundleSwapRequestIds: true,
       },
     },
     tx
   );
-  if (
-    matches.some(
-      (match) =>
-        match.bundleSwapRequestIds.length ||
-        match.singleSwapRequestIds.some((id) => !fixtureIds.has(id))
+  const matchesToClear = [];
+  for (const match of matches) {
+    const fixtureParticipants = match.participants.map((participant) =>
+      participant !== null &&
+      typeof participant === "object" &&
+      !Array.isArray(participant) &&
+      typeof participant.userId === "string" &&
+      userIds.has(participant.userId)
+    );
+    const hasFixtureParticipant = fixtureParticipants.some(Boolean);
+    const hasFixtureRequest = match.singleSwapRequestIds.some((id) => fixtureIds.has(id));
+    if (!hasFixtureParticipant && !hasFixtureRequest) continue;
+    if (
+      match.bundleSwapRequestIds.length ||
+      !fixtureParticipants.length ||
+      !fixtureParticipants.every(Boolean)
+    ) return false;
+    matchesToClear.push(match);
+  }
+
+  const unknownIds = [...new Set(
+    matchesToClear.flatMap(({ singleSwapRequestIds }) =>
+      singleSwapRequestIds.filter((id) => !fixtureIds.has(id))
     )
-  )
-    return false;
+  )];
+  if (unknownIds.length) {
+    const linkedRequests = await singleSwapRequestRepo.findMany(
+      { where: { id: { in: unknownIds } }, select: { id: true } },
+      tx
+    );
+    if (linkedRequests.length) return false;
+  }
   await matchRepo.deleteMany(
     {
-      where: { id: { in: matches.map(({ id }) => id) } },
+      where: { id: { in: matchesToClear.map(({ id }) => id) } },
     },
     tx
   );

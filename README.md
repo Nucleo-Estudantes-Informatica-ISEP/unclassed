@@ -213,8 +213,6 @@ pnpm generate
 
 ### 4. Validate and Deploy the Schema to MongoDB
 
-Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
-
 Prisma Migrate does not support MongoDB. This project uses the supported
 `db push` path, guarded by a versioned manifest under `prisma/schema-changes/`.
 Every schema edit must add the next change record and update
@@ -626,6 +624,10 @@ Check:
 - `/api/health` detailed response
 - `/api/admin/cron` as an admin
 
+
+## Development fixtures
+
+Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
 
 ## Recommended First Steps for New Contributors
 

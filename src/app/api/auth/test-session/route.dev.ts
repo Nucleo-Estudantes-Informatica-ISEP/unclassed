@@ -1,26 +1,20 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { encode } from "next-auth/jwt";
 import { z } from "zod";
 
+import { isDevOnlyRequestAllowed } from "@/lib/devOnly";
 import { env } from "@/lib/env";
 import { isFixtureDatabase } from "@/lib/fixtureDatabase";
+import { secretsMatch } from "@/lib/secretsMatch";
 import * as userRepo from "@/application/repositories/userRepository";
 
 const fixtureEmailPrefix = "e2e_";
 const fixtureEmailSuffix = "@example.test";
 const cleanupSchema = z.object({ userId: z.string().regex(/^[a-f0-9]{24}$/i) });
 
-function secretsMatch(expected: string, actual: string): boolean {
-  // Hash both sides to fixed-length (32-byte) digests so timingSafeEqual never
-  // truncates long inputs — a truncation bug would let an attacker authenticate
-  // with a value that shares only the first N bytes with the real secret.
-  const a = createHash("sha256").update(expected, "utf8").digest();
-  const b = createHash("sha256").update(actual, "utf8").digest();
-  return timingSafeEqual(a, b);
-}
-
 function checkSecret(request: NextRequest): boolean {
+  if (!isDevOnlyRequestAllowed(true, process.env.NODE_ENV ?? "")) return false;
   if (!isFixtureDatabase()) return false;
   const e2eSecret = env.E2E_TEST_SECRET;
   if (!e2eSecret) return false;

@@ -47,6 +47,9 @@ vi.mock("@/application/repositories/userRepository", () => ({
 
 const tx = {} as Transaction;
 const requestIds = ["fixture-request-1", "fixture-request-2"];
+const fixtureParticipants = [1, 2].map((i) => ({
+  userId: `test-match-${i}@example.test`,
+}));
 
 function post() {
   return POST(
@@ -107,10 +110,11 @@ test.each([
     vi.mocked(matchRepo.findMany).mockResolvedValue([
       {
         id: "fixture-match",
+        participants: fixtureParticipants,
         singleSwapRequestIds: requestIds,
         bundleSwapRequestIds: [],
       },
-      { id: "linked-match", ...links },
+      { id: "linked-match", participants: fixtureParticipants, ...links },
     ] as never);
 
     expect((await post()).status).toBe(409);
@@ -124,6 +128,7 @@ test("fixture reset deletes only the validated match and fixture request IDs in 
   vi.mocked(matchRepo.findMany).mockResolvedValue([
     {
       id: "fixture-match",
+        participants: fixtureParticipants,
       singleSwapRequestIds: requestIds,
       bundleSwapRequestIds: [],
     },
@@ -144,7 +149,7 @@ test("fixture reset deletes only the validated match and fixture request IDs in 
   );
   expect(matchRepo.findMany).toHaveBeenCalledWith(
     expect.objectContaining({
-      where: { singleSwapRequestIds: { hasSome: requestIds } },
+      select: expect.objectContaining({ participants: true }),
     }),
     tx
   );
@@ -158,6 +163,34 @@ test("fixture reset deletes only the validated match and fixture request IDs in 
     {
       where: { id: { in: requestIds } },
     },
+    tx
+  );
+});
+
+test("fixture reset removes an orphaned fixture match with no current fixture requests", async () => {
+  vi.mocked(requestRepo.findMany).mockResolvedValue([]);
+  vi.mocked(matchRepo.findMany).mockResolvedValue([
+    {
+      id: "fixture-orphan",
+      participants: fixtureParticipants,
+      singleSwapRequestIds: ["missing-request"],
+      bundleSwapRequestIds: [],
+    },
+    {
+      id: "unrelated-match",
+      participants: [{ userId: "real-user" }],
+      singleSwapRequestIds: ["real-request"],
+      bundleSwapRequestIds: [],
+    },
+  ] as never);
+
+  expect((await post()).status).toBe(200);
+  expect(requestRepo.findMany).toHaveBeenLastCalledWith(
+    { where: { id: { in: ["missing-request"] } }, select: { id: true } },
+    tx
+  );
+  expect(matchRepo.deleteMany).toHaveBeenCalledExactlyOnceWith(
+    { where: { id: { in: ["fixture-orphan"] } } },
     tx
   );
 });
