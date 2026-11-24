@@ -629,6 +629,10 @@ Check:
 - `/api/admin/cron` as an admin
 
 
+## Browser tests
+
+Run `pnpm test:e2e` with the app port free. Playwright starts the fixture OIDC issuer on port 3418 and launches the dev server with that issuer configured. An existing server is reused, so stop it first unless it was started with `AUTH_ISSUER_URL=http://127.0.0.1:3418`.
+
 ## Recommended First Steps for New Contributors
 
 1. Install dependencies with `pnpm install`.
