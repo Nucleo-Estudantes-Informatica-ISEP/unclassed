@@ -11,6 +11,10 @@ export function getPageExtensions(phase: string) {
 
 const baseConfig: NextConfig = {
   output: "standalone",
+  // Prevent Webpack from bundling @prisma/client — it can't resolve the
+  // Prisma 6 WASM engine (query_engine_bg.js) at bundle time. Node.js
+  // resolves it natively at runtime instead.
+  serverExternalPackages: ["@prisma/client"],
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/@swc/helpers/**/*",

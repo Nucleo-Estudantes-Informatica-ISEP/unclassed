@@ -8,6 +8,10 @@
 
 # testing
 /coverage
+docker-compose.local.yml
+/tests/e2e/.auth/
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/

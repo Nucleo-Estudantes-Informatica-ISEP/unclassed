@@ -141,6 +141,7 @@ Rules:
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
 - GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary for exceptions and forwarded Pino logs; preserve exception stacks and correlation IDs while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
 - Use `src/lib/logger.ts` for server logs. `defineHandler` supplies request context through `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
+- AuthNEI is the source of truth for `name`, `email`, and email verification status. Unclassed may retain local copies for synchronization or compatibility, but these fields must not be editable through Unclassed profile preferences. `phone` remains Unclassed-owned and editable because the current OIDC integration does not request or synchronize the `phone` or `phone_verified` claims. `emailNotifications` and `sharePhoneOnMatch` are also Unclassed-owned preferences.
 
 ## API conventions
 
@@ -203,13 +204,26 @@ Before finishing a change:
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Issue and pull request writing
+
+- Use action-oriented titles prefixed with `[Type]` for tasks or `[Bug]` for bugs.
+  For tasks, include context, scope, acceptance criteria and applicable dependencies.
+  For bugs, include reproduction steps, expected and actual behavior, and environment.
+- Use Conventional Commit PR titles and include Issue (when applicable), Summary,
+  Tests, Manual testing steps, Configuration / migration, and Observations.
+  Report the checks from Verification that apply and any outstanding checks.
+  For schema changes, describe the `pnpm schema:deploy` steps, versioned record in
+  `prisma/schema-changes/`, and updated hash in `prisma/schema-manifest.json`.
+- For PRs addressing an issue, establish and verify the GitHub Development link.
+  A closing keyword alone does not establish it for PRs targeting `dev`.
 
 ## Pull request metadata
 

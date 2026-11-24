@@ -9,6 +9,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/.next/**",
+      "tests/e2e/**",
     ],
   },
 });

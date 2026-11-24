@@ -10,9 +10,24 @@ import type { MatchParticipant } from "@/application/services/matchActionService
 function toMatchParticipantsDto(
   participants: MatchParticipant[],
   users?: MatchUser[],
-  classes?: MatchClass[]
+  classes?: MatchClass[],
+  contactViewerId?: string
 ): MatchParticipantDto[] {
   return participants.map((participant) => {
+    const user = users?.find((entry) => entry.id === participant.userId);
+    const projectedUser = user && {
+      id: user.id,
+      name: user.name,
+      ...(contactViewerId && {
+        email: user.email,
+        phone:
+          user.id === contactViewerId || user.sharePhoneOnMatch
+            ? user.phone
+            : null,
+        sharePhoneOnMatch: Boolean(user.sharePhoneOnMatch),
+      }),
+    };
+
     return {
       userId: participant.userId,
       fromClass:
@@ -25,7 +40,7 @@ function toMatchParticipantsDto(
       requestType: participant.requestType,
       satisfactionScore: participant.satisfactionScore,
       status: participant.status,
-      user: users?.find((user) => user.id === participant.userId),
+      user: projectedUser,
     };
   });
 }
@@ -35,8 +50,15 @@ export function toMatchDto(
   participants: MatchParticipant[],
   classes?: MatchClass[],
   users?: MatchUser[],
-  subject?: MatchDto["subject"]
+  subject?: MatchDto["subject"],
+  viewerId?: string
 ): MatchDto {
+  const contactViewerId =
+    match.status === "ACCEPTED" &&
+    participants.some((participant) => participant.userId === viewerId)
+      ? viewerId
+      : undefined;
+
   return {
     id: match.id,
     matchType: match.matchType,
@@ -47,7 +69,12 @@ export function toMatchDto(
       ? match.provisionalUntil.toISOString()
       : null,
     satisfactionScore: match.satisfactionScore,
-    participants: toMatchParticipantsDto(participants, users, classes),
+    participants: toMatchParticipantsDto(
+      participants,
+      users,
+      classes,
+      contactViewerId
+    ),
     singleSwapRequestIds: match.singleSwapRequestIds,
     bundleSwapRequestIds: match.bundleSwapRequestIds,
     createdAt: match.createdAt.toISOString(),

@@ -5,6 +5,7 @@ import * as classRepo from "@/application/repositories/classRepository";
 import * as userRepo from "@/application/repositories/userRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
 import { CheckCircle2, History, Zap, Search } from "lucide-react";
+import { toMatchDto } from "@/services/matchDto";
 import { MatchListClient } from "@/components/MatchListClient";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -141,24 +142,7 @@ export default async function MatchesPage() {
         subject = swapRequest?.subject;
       }
 
-      const enrichedParticipants = participants.map((p) => {
-        const user = users.find((u) => u.id === p.userId);
-        const fromClassObj = classes.find((c) => c.id === p.fromClass);
-        const toClassObj = classes.find((c) => c.id === p.toClass);
-
-        return {
-          ...p,
-          user,
-          fromClass: fromClassObj ?? p.fromClass,
-          toClass: toClassObj ?? p.toClass,
-        };
-      });
-
-      return {
-        ...match,
-        participants: enrichedParticipants,
-        subject,
-      };
+      return toMatchDto(match, participants, classes, users, subject ?? undefined, session.id);
     })
   );
 
@@ -204,14 +188,7 @@ export default async function MatchesPage() {
           {/* Active Matches */}
           {activeMatches.length > 0 && (
             <MatchListClient
-              matches={activeMatches.map((match) => ({
-                ...match,
-                satisfactionScore: match.satisfactionScore ?? 0,
-                subject: match.subject || undefined,
-                createdAt: match.createdAt.toISOString(),
-                updatedAt: match.updatedAt.toISOString(),
-                provisionalUntil: match.provisionalUntil?.toISOString() || null,
-              }))}
+              matches={activeMatches}
               currentUserId={session.id}
               title="Matches Ativos"
               emptyMessage="Nenhum match ativo"
@@ -227,14 +204,7 @@ export default async function MatchesPage() {
                 <div className="my-8 border-t border-border"></div>
               )}
               <MatchListClient
-                matches={completedMatches.map((match) => ({
-                  ...match,
-                  satisfactionScore: match.satisfactionScore ?? 0,
-                  subject: match.subject || undefined,
-                  createdAt: match.createdAt.toISOString(),
-                  updatedAt: match.updatedAt.toISOString(),
-                  provisionalUntil: match.provisionalUntil?.toISOString() || null,
-                }))}
+                matches={completedMatches}
                 currentUserId={session.id}
                 title="Matches Completos"
                 emptyMessage="Nenhum match completo"
@@ -251,14 +221,7 @@ export default async function MatchesPage() {
                 <div className="my-8 border-t border-border"></div>
               )}
               <MatchListClient
-                matches={replacedMatches.map((match) => ({
-                  ...match,
-                  satisfactionScore: match.satisfactionScore ?? 0,
-                  subject: match.subject || undefined,
-                  createdAt: match.createdAt.toISOString(),
-                  updatedAt: match.updatedAt.toISOString(),
-                  provisionalUntil: match.provisionalUntil?.toISOString() || null,
-                }))}
+                matches={replacedMatches}
                 currentUserId={session.id}
                 title="Matches Substituídos"
                 emptyMessage="Nenhum match substituído/atualizado"

@@ -14,7 +14,7 @@ function rolesFromValue(value: unknown): string[] {
 
 export function getAuthNeiRoles(
   claims: Record<string, unknown> | undefined,
-  configuredClaim = process.env.AUTH_ROLE_CLAIM
+  configuredClaim: string | undefined
 ): AuthNeiRole[] {
   if (!claims || !configuredClaim) return [];
 
