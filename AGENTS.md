@@ -195,7 +195,7 @@ Before finishing a change:
 ## Gotchas
 
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
-- Keep the startup completion flag shared within the Node.js process because Next.js can load instrumentation and health handlers in separate bundles.
+- Keep the startup completion flag, cron scheduler singleton, and shutdown-hook registration shared within the Node.js process because Next.js can load instrumentation and health handlers in separate bundles.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
 - `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
@@ -205,7 +205,7 @@ Before finishing a change:
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-## This is NOT the Next.js you know
+# This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
