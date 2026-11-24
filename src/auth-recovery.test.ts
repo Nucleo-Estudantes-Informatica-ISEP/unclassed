@@ -1,5 +1,7 @@
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 
+import { logger } from "@/lib/logger";
+
 type Config = {
   callbacks: {
     signIn: (input: {
@@ -60,6 +62,9 @@ test("preserves the return path and starts recovery without preferred_username",
     },
   });
   expect(result).toBe("/verify-email");
+  expect(logger.warn).toHaveBeenCalledExactlyOnceWith(
+    "AuthNEI sign-in blocked by email verification requirement"
+  );
   const recovery = JSON.parse(mocks.jar.set.mock.calls[0][1]);
   expect(recovery).toEqual({
     subject: "fixture",
@@ -89,7 +94,7 @@ test("an attempted recovery does not schedule another recovery cookie", async ()
   mocks.jar.get.mockReturnValue({
     value: JSON.stringify({
       subject: "fixture",
-    hint: "student@example.test",
+      hint: "student@example.test",
       destination: "/profile",
       attempted: true,
     }),
@@ -117,7 +122,14 @@ test("verified email permits sign-in and clears recovery state", async () => {
 test("starts a new verification attempt for a different subject", async () => {
   mocks.jar.get.mockImplementation((key) =>
     key === "authnei-email-verification"
-      ? { value: JSON.stringify({ subject: "previous", hint: "", destination: "/old", attempted: true }) }
+      ? {
+          value: JSON.stringify({
+            subject: "previous",
+            hint: "",
+            destination: "/old",
+            attempted: true,
+          }),
+        }
       : key === "authjs.callback-url"
         ? { value: "/profile" }
         : undefined

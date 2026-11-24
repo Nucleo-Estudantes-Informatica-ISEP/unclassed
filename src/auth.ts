@@ -198,6 +198,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const verified = parseEmailVerifiedClaim(claims);
       if (verified !== true) {
+        logger.warn("AuthNEI sign-in blocked by email verification requirement");
         const jar = await cookies();
         const previous = readEmailVerificationRecovery(
           jar.get(EMAIL_VERIFICATION_COOKIE)?.value

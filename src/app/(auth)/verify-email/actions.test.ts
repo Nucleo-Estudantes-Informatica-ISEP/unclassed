@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/auth", () => ({ signIn: mocks.signIn }));
 vi.mock("next/headers", () => ({ cookies: async () => mocks.jar }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/lib/zitadel", () => ({ getIssuerUrl: () => "https://auth.example.test" }));
+vi.mock("@/lib/zitadel", () => ({
+  getIssuerUrl: () => "https://auth.example.test",
+}));
 
 afterEach(() => vi.clearAllMocks());
 
@@ -43,7 +45,12 @@ test.each([
   ["missing", undefined],
   [
     "already attempted",
-    JSON.stringify({ subject: "fixture", hint: "", destination: "/profile", attempted: true }),
+    JSON.stringify({
+      subject: "fixture",
+      hint: "",
+      destination: "/profile",
+      attempted: true,
+    }),
   ],
 ])("ignores %s verification recovery state", async (_description, value) => {
   mocks.jar.get.mockReturnValue(value === undefined ? undefined : { value });
@@ -54,7 +61,13 @@ test.each([
   expect(mocks.jar.set).not.toHaveBeenCalled();
 });
 
-test("keeps verification retryable when sign-in cannot start", async () => {
+test.each([
+  ["sign-in cannot start", new Error("issuer unavailable")],
+  [
+    "the redirect points outside the issuer",
+    "https://other.example.test/authorize",
+  ],
+])("keeps verification retryable when %s", async (_reason, outcome) => {
   mocks.jar.get.mockReturnValue({
     value: JSON.stringify({
       subject: "fixture",
@@ -63,7 +76,8 @@ test("keeps verification retryable when sign-in cannot start", async () => {
       attempted: false,
     }),
   });
-  mocks.signIn.mockRejectedValueOnce(new Error("issuer unavailable"));
+  if (outcome instanceof Error) mocks.signIn.mockRejectedValueOnce(outcome);
+  else mocks.signIn.mockResolvedValueOnce(outcome);
 
   await expect(resumeEmailVerification()).resolves.toBe(true);
 
