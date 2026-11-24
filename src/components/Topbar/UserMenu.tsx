@@ -146,7 +146,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               onClick={() => setShowMenu(false)}
             >
               <UserCog className="mr-2 h-4 w-4" />
-              <span>Conta AuthNEI</span>
+              <span>Gerir conta no AuthNEI</span>
             </a>
 
             <Link

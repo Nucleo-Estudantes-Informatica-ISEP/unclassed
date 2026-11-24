@@ -13,7 +13,7 @@ for (const [name, viewport] of Object.entries(viewports)) {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "Menu da conta" }).click();
 
-    const accountLink = page.getByRole("link", { name: "Conta AuthNEI" });
+    const accountLink = page.getByRole("link", { name: "Gerir conta no AuthNEI" });
     await expect(accountLink).toBeVisible();
     await expect(accountLink).toHaveAttribute("href", "/api/auth/profile-url");
     const accountRedirect = await page.request.get("/api/auth/profile-url", {
