@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
 import prisma from "@/lib/prisma";
 import * as classRepo from "@/application/repositories/classRepository";
 
@@ -8,7 +9,9 @@ describe("classRepository", () => {
     const mock = [{ id: "c1", name: "Turma A", year: 2024 }];
     const spy = vi
       .spyOn(prisma.class, "findMany")
-      .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.class.findMany>>);
+      .mockResolvedValueOnce(
+        mock as Awaited<ReturnType<typeof prisma.class.findMany>>
+      );
 
     // Act
     const res = await classRepo.findClasses({ year: 2024 });
@@ -28,7 +31,9 @@ describe("classRepository", () => {
     const mock = { id: "c1", name: "Turma A" };
     const spy = vi
       .spyOn(prisma.class, "findUnique")
-      .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.class.findUnique>>);
+      .mockResolvedValueOnce(
+        mock as Awaited<ReturnType<typeof prisma.class.findUnique>>
+      );
 
     // Act
     const res = await classRepo.findById("c1");
@@ -59,13 +64,18 @@ describe("classRepository", () => {
     const mock = [{ id: "c1", name: "Turma A" }];
     const spy = vi
       .spyOn(prisma.class, "findMany")
-      .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.class.findMany>>);
+      .mockResolvedValueOnce(
+        mock as Awaited<ReturnType<typeof prisma.class.findMany>>
+      );
 
     // Act
     const res = await classRepo.findManyByIds(["c1"]);
 
     // Assert
-    expect(spy).toHaveBeenCalledWith({ where: { id: { in: ["c1"] } }, select: { id: true, name: true, year: true } });
+    expect(spy).toHaveBeenCalledWith({
+      where: { id: { in: ["c1"] } },
+      select: { id: true, name: true, year: true },
+    });
     expect(res).toBe(mock);
 
     spy.mockRestore();
@@ -90,7 +100,9 @@ describe("classRepository", () => {
     const mock = [{ id: "c1", name: "Turma A" }];
     const spy = vi
       .spyOn(prisma.class, "findMany")
-      .mockResolvedValueOnce(mock as Awaited<ReturnType<typeof prisma.class.findMany>>);
+      .mockResolvedValueOnce(
+        mock as Awaited<ReturnType<typeof prisma.class.findMany>>
+      );
 
     // Act
     const res = await classRepo.findByNames(["Turma A"]);
@@ -115,6 +127,160 @@ describe("classRepository", () => {
     expect(res).toBe(mock);
 
     spy.mockRestore();
+  });
+
+  it("update calls prisma.class.update", async () => {
+    const mock = { id: "c1", name: "1DA", year: 1 };
+    const spy = vi
+      .spyOn(prisma.class, "update")
+      .mockResolvedValueOnce(mock as never);
+
+    const args = {
+      where: { id: "c1" },
+      data: { name: "1DB" },
+    };
+    const res = await classRepo.update(args);
+
+    expect(spy).toHaveBeenCalledWith(args);
+    expect(res).toBe(mock);
+
+    spy.mockRestore();
+  });
+
+  it("remove calls prisma.class.delete", async () => {
+    const mock = { id: "c1", name: "1DA", year: 1 };
+    const spy = vi
+      .spyOn(prisma.class, "delete")
+      .mockResolvedValueOnce(mock as never);
+
+    const args = { where: { id: "c1" } };
+    const res = await classRepo.remove(args);
+
+    expect(spy).toHaveBeenCalledWith(args);
+    expect(res).toBe(mock);
+
+    spy.mockRestore();
+  });
+
+    it("isInUse detects a Match referencing the class", async () => {
+    const classId = "class-1";
+
+    const classSpy = vi
+      .spyOn(prisma.class, "findUnique")
+      .mockResolvedValueOnce({
+        id: classId,
+        name: "1DA",
+        year: 1,
+      } as never);
+
+    const singleSpy = vi
+      .spyOn(prisma.singleSwapRequest, "count")
+      .mockResolvedValueOnce(0);
+
+    const bundleSpy = vi
+      .spyOn(prisma.bundleSwapRequest, "count")
+      .mockResolvedValueOnce(0);
+
+    const matchSpy = vi
+      .spyOn(prisma.match, "aggregateRaw")
+      .mockResolvedValueOnce([{ _id: "match-1" }] as never);
+
+    try {
+      expect(await classRepo.isInUse(classId)).toBe(true);
+
+      expect(matchSpy).toHaveBeenCalledWith({
+        pipeline: [
+          {
+            $match: {
+              participants: {
+                $elemMatch: {
+                  $or: [
+                    { fromClass: { $in: [classId, "1DA"] } },
+                    { toClass: { $in: [classId, "1DA"] } },
+                  ],
+                },
+              },
+            },
+          },
+          { $limit: 1 },
+          { $project: { _id: 1 } },
+        ],
+      });
+
+      expect(classSpy).toHaveBeenCalledOnce();
+      expect(singleSpy).toHaveBeenCalledOnce();
+      expect(bundleSpy).toHaveBeenCalledOnce();
+    } finally {
+      classSpy.mockRestore();
+      singleSpy.mockRestore();
+      bundleSpy.mockRestore();
+      matchSpy.mockRestore();
+    }
+  });
+
+  it("isInUse returns false when the class has no requests or matches", async () => {
+    const classSpy = vi
+      .spyOn(prisma.class, "findUnique")
+      .mockResolvedValueOnce({ id: "class-1", name: "1DA", year: 1 } as never);
+
+    const singleSpy = vi
+      .spyOn(prisma.singleSwapRequest, "count")
+      .mockResolvedValueOnce(0);
+
+    const bundleSpy = vi
+      .spyOn(prisma.bundleSwapRequest, "count")
+      .mockResolvedValueOnce(0);
+
+    const matchSpy = vi
+      .spyOn(prisma.match, "aggregateRaw")
+      .mockResolvedValueOnce([] as never);
+
+    try {
+      expect(await classRepo.isInUse("class-1")).toBe(false);
+    } finally {
+      classSpy.mockRestore();
+      singleSpy.mockRestore();
+      bundleSpy.mockRestore();
+      matchSpy.mockRestore();
+    }
+  });
+
+  it("normalizes class names before creating them", async () => {
+    const spy = vi
+      .spyOn(prisma.class, "create")
+      .mockResolvedValueOnce({ id: "c1", name: "1DA", year: 1 } as never);
+
+    try {
+      await classRepo.create({
+        data: { name: " 1da ", year: 1 },
+      });
+
+      expect(spy).toHaveBeenCalledWith({
+        data: { name: "1DA", year: 1 },
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("normalizes class names before updating them", async () => {
+    const spy = vi
+      .spyOn(prisma.class, "update")
+      .mockResolvedValueOnce({ id: "c1", name: "1DB", year: 1 } as never);
+
+    try {
+      await classRepo.update({
+        where: { id: "c1" },
+        data: { name: " 1db " },
+      });
+
+      expect(spy).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: { name: "1DB" },
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("deleteMany calls prisma.class.deleteMany", async () => {
