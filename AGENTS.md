@@ -194,6 +194,8 @@ Before finishing a change:
 
 ## Gotchas
 
+- The proxy serves the seasonal closure notice for app pages. API routes still receive request IDs and continue normally.
+
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
 - Keep the startup completion flag, cron scheduler singleton, and shutdown-hook registration shared within the Node.js process because Next.js can load instrumentation and health handlers in separate bundles.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.

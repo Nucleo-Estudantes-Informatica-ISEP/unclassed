@@ -11,6 +11,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:?APP_BASE_URL is required}
+      - SEASONAL_CLOSURE_UNTIL=${SEASONAL_CLOSURE_UNTIL:-}
       - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required}
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
@@ -39,6 +40,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:?APP_BASE_URL is required}
+      - SEASONAL_CLOSURE_UNTIL=${SEASONAL_CLOSURE_UNTIL:-}
       - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required}
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
@@ -67,6 +69,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:?APP_BASE_URL is required}
+      - SEASONAL_CLOSURE_UNTIL=${SEASONAL_CLOSURE_UNTIL:-}
       - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required}
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:?AUTH_ISSUER_URL is required}
       - AUTH_CLIENT_ID=${AUTH_CLIENT_ID:?AUTH_CLIENT_ID is required}
