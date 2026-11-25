@@ -1,0 +1,70 @@
+name: k6 Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Staging URL to run the smoke test against; must be under the environment's K6_STAGING_ORIGIN"
+        required: true
+  # Callable from a post-deploy workflow (e.g. staging deploy — see #173).
+  workflow_call:
+    inputs:
+      target_url:
+        description: "Target URL to run the smoke test against"
+        type: string
+        required: true
+    secrets:
+      # Optional: the `staging` environment secret is used when omitted.
+      K6_SESSIONS_JSON:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k6-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: k6 smoke test
+    runs-on: ubuntu-latest
+    # Session cookies are credentials: the secret lives in this protected
+    # environment (required reviewers), not repo-wide.
+    environment: staging
+    steps:
+      # Runs before any step receives the secret, so a dispatcher cannot
+      # redirect the session cookies to a host they control.
+      - name: Validate target URL
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          ALLOWED_ORIGIN: ${{ vars.K6_STAGING_ORIGIN }}
+        run: |
+          allowed="${ALLOWED_ORIGIN%/}"
+          case "$allowed" in
+            https://*) ;;
+            *) echo "::error::Set the https K6_STAGING_ORIGIN variable on the staging environment"; exit 1 ;;
+          esac
+          case "$TARGET_URL" in
+            "$allowed" | "$allowed"/*) ;;
+            *) echo "::error::target_url must be under the staging origin"; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@c47136d33d365efbeb9ae7266908b5dcf98cdece # v1
+
+      - name: Require pre-provisioned staging sessions
+        env:
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}
+        run: test -n "$K6_SESSIONS_JSON"
+
+      - name: Run smoke test
+        run: k6 run tests/k6/scenarios/smoke.js
+        env:
+          K6_BASE_URL: ${{ inputs.target_url }}
+          # Validated against the staging origin above.
+          K6_ALLOW_REMOTE: "1"
+          K6_SESSIONS_JSON: ${{ secrets.K6_SESSIONS_JSON }}

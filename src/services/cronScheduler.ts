@@ -257,12 +257,14 @@ export class CronScheduler {
   }
 }
 
-let globalScheduler: CronScheduler | null = null;
-let gracefulShutdownHooksRegistered = false;
+// Next.js instrumentation and routes can load separate copies of this module.
+declare global {
+  var unclassedCronScheduler: CronScheduler | undefined;
+  var unclassedCronShutdownHooksRegistered: boolean | undefined;
+}
 
 export function getCronScheduler(): CronScheduler {
-  globalScheduler ??= new CronScheduler();
-  return globalScheduler;
+  return (globalThis.unclassedCronScheduler ??= new CronScheduler());
 }
 
 export function getCronSchedulerStatus() {
@@ -296,7 +298,7 @@ export function getCronSchedulerStatus() {
 }
 
 function registerGracefulShutdownHandlers() {
-  if (gracefulShutdownHooksRegistered) return;
+  if (globalThis.unclassedCronShutdownHooksRegistered) return;
 
   const shutdown = () => {
     logger.info("Received shutdown signal, stopping cron scheduler...");
@@ -306,7 +308,7 @@ function registerGracefulShutdownHandlers() {
 
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
-  gracefulShutdownHooksRegistered = true;
+  globalThis.unclassedCronShutdownHooksRegistered = true;
 }
 
 export function initializeCronScheduler() {
@@ -320,6 +322,6 @@ export function initializeCronScheduler() {
 }
 
 export function shutdownCronScheduler() {
-  globalScheduler?.stop();
-  globalScheduler = null;
+  globalThis.unclassedCronScheduler?.stop();
+  globalThis.unclassedCronScheduler = undefined;
 }

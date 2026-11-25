@@ -194,11 +194,15 @@ Before finishing a change:
 
 ## Gotchas
 
+- The proxy serves the seasonal closure notice for app pages. API routes still receive request IDs and continue normally.
+
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
+- Keep the startup completion flag, cron scheduler singleton, and shutdown-hook registration shared within the Node.js process because Next.js can load instrumentation and health handlers in separate bundles.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
-- `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
+- `/api/matching` and detailed `GET /api/health` accept the cron bearer secret. `/api/admin/cron` requires an `ADMIN` session. Keep those boundaries separate. See the [security audit](docs/security-audit-98.md) for the route inventory.
 - `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
+- `src/app/api/auth/test-session/route.dev.ts` is a development fixture bootstrap. It authenticates POST and DELETE with `E2E_TEST_SECRET` before a session exists and permits writes only to the dedicated `unclassed_e2e` database. The secret gates fixture bootstrap only. Application-session and cron access decisions use `authorizeRequest()`.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
 
@@ -211,6 +215,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Issue and pull request writing
+
+- Use action-oriented titles prefixed with `[Type]` for tasks or `[Bug]` for bugs.
+  For tasks, include context, scope, acceptance criteria and applicable dependencies.
+  For bugs, include reproduction steps, expected and actual behavior, and environment.
+- Use Conventional Commit PR titles and include Issue (when applicable), Summary,
+  Tests, Manual testing steps, Configuration / migration, and Observations.
+  Report the checks from Verification that apply and any outstanding checks.
+  For schema changes, describe the `pnpm schema:deploy` steps, versioned record in
+  `prisma/schema-changes/`, and updated hash in `prisma/schema-manifest.json`.
+- For PRs addressing an issue, establish and verify the GitHub Development link.
+  A closing keyword alone does not establish it for PRs targeting `dev`.
 
 ## Pull request metadata
 

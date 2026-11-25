@@ -1,5 +1,6 @@
 "use client";
 
+import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import Image from "next/image";
 import Link from "next/link";
 import { LogIn, UserPlus } from "lucide-react";
@@ -90,10 +91,10 @@ const Topbar: React.FC<TopbarProps> = ({ user }) => {
                 </Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/register">
+                <AuthNeiRegistrationLink>
                   <UserPlus className="size-4" />
                   Criar conta
-                </Link>
+                </AuthNeiRegistrationLink>
               </Button>
             </div>
           )}

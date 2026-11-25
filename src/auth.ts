@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { AuthError } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import Zitadel from "next-auth/providers/zitadel";
 
@@ -179,6 +179,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   trustHost: env.AUTH_TRUST_HOST,
   secret: env.AUTH_SECRET,
+  logger: {
+    error(error) {
+      const errorType =
+        error instanceof AuthError &&
+        error.type === (error.constructor as { type?: string }).type
+          ? error.type
+          : "AuthError";
+      logger.error({ errorType }, "Auth.js request failed");
+    },
+  },
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   callbacks: {

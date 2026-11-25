@@ -5,6 +5,7 @@ import * as bundleSwapRequestRepository from "@/application/repositories/bundleS
 import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepository from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepository from "@/application/repositories/singleSwapRequestRepository";
+import { coerceParticipants } from "@/application/services/matchActionService";
 
 /**
  * GET /api/dashboard/stats
@@ -16,6 +17,7 @@ export const GET = defineHandler({
   handler: async () => {
     const classes = await classRepo.findClasses();
     const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const classNames = new Set(classMap.values());
     const [activeSingle, activeBundle, matches] = await Promise.all([
       singleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
       bundleSwapRequestRepository.findMany({ where: { status: "ACTIVE" } }),
@@ -105,18 +107,13 @@ export const GET = defineHandler({
       )
       .sort((a, b) => (b.successRate ?? 0) - (a.successRate ?? 0))
       .slice(0, 10);
-    const recentSwaps = matches.map((m: (typeof matches)[number]) => ({
-      id: m.id,
-      createdAt: m.createdAt,
-      classes: [
-        ...(m.singleSwapRequestIds || []),
-        ...(m.bundleSwapRequestIds || []),
-      ].map((reqId: string) => {
-        const req = allActive.find((r) => r.id === reqId);
-        return req
-          ? classMap.get(req.currentClassId) || req.currentClassId
-          : reqId;
-      }),
+    const recentSwaps = matches.map((match) => ({
+      createdAt: match.createdAt,
+      classes: coerceParticipants(match.participants)
+        .map((participant) => participant?.fromClass)
+        .filter((fromClass): fromClass is string => typeof fromClass === "string")
+        .map((fromClass) => classMap.get(fromClass) ?? fromClass)
+        .filter((label) => classNames.has(label)),
     }));
     return NextResponse.json({
       popularInto,

@@ -102,10 +102,10 @@ export function ProfileClient({
               </div>
               <div>
                 <h1 className="text-foreground text-2xl font-bold">
-                  Perfil de Utilizador
+                  Preferências da aplicação
                 </h1>
                 <p className="text-muted-foreground">
-                  Gere as tuas definições e preferências
+                  Gere o teu contacto e as notificações do Unclassed.
                 </p>
               </div>
             </div>
