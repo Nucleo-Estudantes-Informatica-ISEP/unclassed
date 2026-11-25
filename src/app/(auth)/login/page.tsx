@@ -1,19 +1,28 @@
 "use client";
 
-import { httpClient } from "@/lib/httpClient";
 import { useEffect, useState } from "react";
 import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import { signIn } from "next-auth/react";
 
-import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
+import { httpClient } from "@/lib/httpClient";
+
+import { startSignIn } from "./start-sign-in";
+
+async function checkAuthConfiguration() {
+  const { configured } = await httpClient.get<{ configured: boolean }>(
+    "/api/auth/configured",
+    { cache: "no-store" }
+  );
+  return configured;
+}
 
 const Login: React.FC = () => {
-  const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
-  const [authConfigured, setAuthConfigured] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<
+    "checking" | "ready" | "starting" | "unavailable"
+  >("checking");
+  const [showSupport, setShowSupport] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl =
     searchParams.get("callbackUrl") ||
@@ -25,42 +34,42 @@ const Login: React.FC = () => {
 
     const checkAuthConfig = async () => {
       try {
-        const data = await httpClient.get<{ configured?: boolean }>("/api/auth/configured", { cache: "no-store" });
-
-        if (mounted) {
-          setAuthConfigured(data.configured !== false);
-          setAuthConfigLoaded(true);
-        }
+        const configured = await checkAuthConfiguration();
+        if (mounted) setStatus(configured ? "ready" : "unavailable");
       } catch {
-        if (mounted) {
-          setAuthConfigured(false);
-          setAuthConfigLoaded(true);
-        }
+        if (mounted) setStatus("unavailable");
       }
     };
 
+    const restoreSignIn = () => {
+      setStatus((current) => (current === "starting" ? "ready" : current));
+    };
+
+    window.addEventListener("pageshow", restoreSignIn);
     void checkAuthConfig();
 
     return () => {
       mounted = false;
+      window.removeEventListener("pageshow", restoreSignIn);
     };
   }, []);
 
-  async function handleSignIn() {
-    if (isLoading) {
-      return;
-    }
-
-    setIsLoading(true);
+  async function handleSignIn(retry: boolean) {
+    setStatus("starting");
 
     try {
-      await signIn("zitadel", { callbackUrl });
+      if (!retry || (await checkAuthConfiguration())) {
+        const target = await startSignIn(callbackUrl);
+        if (target) {
+          window.location.assign(target);
+          return;
+        }
+      }
     } catch {
-      logger.error("Login error:");
-      setIsLoading(false);
-    } finally {
-      setIsLoading(false);
+      // The same retry action works for transient network failures.
     }
+    setStatus("unavailable");
+    setShowSupport(retry);
   }
 
   return (
@@ -79,25 +88,38 @@ const Login: React.FC = () => {
           </p>
         </div>
 
-        {authConfigLoaded && !authConfigured ? (
-          <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm">
-            <p className="font-semibold">Autenticação indisponível</p>
-            <p className="mt-1 opacity-90">
-              Por favor, contacta a equipa técnica para configurar as variáveis
-              de ambiente.
+        {status === "unavailable" ? (
+          <div
+            role="alert"
+            className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm"
+          >
+            <p className="font-semibold">
+              O início de sessão está temporariamente indisponível.
             </p>
+            {showSupport && (
+              <a
+                className="mt-1 inline-block underline"
+                href="mailto:info@nei-isep.org"
+              >
+                Contactar o apoio do NEI
+              </a>
+            )}
           </div>
         ) : null}
 
         <div className="space-y-3">
           <Button
-            onClick={handleSignIn}
+            onClick={() => handleSignIn(status === "unavailable")}
             size="lg"
             className="shadow-primary/20 w-full shadow-md"
-            disabled={isLoading || !authConfigLoaded || !authConfigured}
+            disabled={status === "checking" || status === "starting"}
           >
-            {isLoading ? "Aguarde..." : "Continuar para o login"}
-            {!isLoading && <ArrowRight className="size-4" />}
+            {status === "starting"
+              ? "A iniciar sessão…"
+              : status === "unavailable"
+                ? "Tentar novamente"
+                : "Continuar para o login"}
+            {status === "ready" && <ArrowRight className="size-4" />}
           </Button>
         </div>
 

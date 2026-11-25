@@ -640,6 +640,8 @@ Check:
 
 Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
 
+Run `pnpm test:e2e` with the app port free. Playwright starts the fixture OIDC issuer on port 3418 and launches the dev server with that issuer configured. An existing server is reused, so stop it first unless it was started with `AUTH_ISSUER_URL=http://127.0.0.1:3418`.
+
 ## Recommended First Steps for New Contributors
 
 1. Install dependencies with `pnpm install`.
