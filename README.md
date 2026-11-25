@@ -132,6 +132,7 @@ The main variables are:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Prisma connection string for MongoDB |
 | `APP_BASE_URL` | Yes | Server-side canonical app URL |
+| `SEASONAL_CLOSURE_UNTIL` | Optional | Expected seasonal reopening, as an ISO 8601 timestamp with timezone |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public app URL used in links and client code |
 | `AUTH_ISSUER_URL` | Yes | AuthNEI / OIDC issuer URL |
 | `AUTH_CLIENT_ID` | Yes | OIDC client ID |
@@ -159,6 +160,10 @@ The main variables are:
 | `LOG_LEVEL` | Optional | Pino level; defaults to `info` in production |
 
 HTTP API responses include `x-request-id`; server logs use the same request ID. Cron and matching runs add `jobExecutionId`. Production logs are JSON; local development uses `pino-pretty`. Log payloads omit exception messages, request bodies, emails, tokens, and passwords. When `SENTRY_DSN` is set, selected job and matching logs also appear in GlitchTip's Logs page. Only fixed operation messages and approved correlation/diagnostic fields are forwarded; other stdout logs stay in Coolify Runtime Logs.
+
+### Seasonal closure
+
+Set `SEASONAL_CLOSURE_UNTIL` on the running deployment to the expected reopening time, including a timezone offset or `Z`. Keep the service running during the closure. Verify that the homepage and `/login` display the reopening time in Lisbon time and respond with `503` and `Retry-After`. API and health-check traffic continue as usual. At the configured time, page requests resume without a restart. Leave the variable empty for normal operation. If the value is invalid, public pages stay open and the service logs a warning.
 
 ### Authentication Notes
 
@@ -292,8 +297,8 @@ Key API routes:
 
 - `/api/auth/[...nextauth]` - NextAuth handlers
 - `/api/auth/configured` - auth readiness check
-- `/api/subjects` - subject data
-- `/api/classes` - class data
+- `/api/subjects` - subject data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session (subject codes are stored upper case)
+- `/api/classes` - class data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session
 - `/api/swap-requests/single`
 - `/api/swap-requests/bundle`
 - `/api/matches`
@@ -515,6 +520,8 @@ Participants see each other’s email after everyone accepts the match. Phone nu
 
 Authentication is handled by NextAuth with an AuthNEI provider. In the current implementation, that provider is backed by ZITADEL.
 
+See the [security audit](docs/security-audit-98.md) for the reviewed route permissions, credential handling, and follow-up issues.
+
 Key behavior:
 
 - only AuthNEI-authenticated users are expected
@@ -630,6 +637,10 @@ Check:
 - `/api/admin/cron` as an admin
 
 
+## Development fixtures
+
+Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
+
 ## Recommended First Steps for New Contributors
 
 1. Install dependencies with `pnpm install`.
@@ -650,3 +661,14 @@ Check:
 - `ENABLE_CRON_SCHEDULER` matches the deployment model
 - Health checks are wired to `/api/health`
 - Admin access is available for cron and matching supervision
+
+
+### k6 load tests
+
+Install the Grafana k6 binary separately and ensure `k6` is on your PATH. Use `pnpm test:k6:smoke`, `test:k6:load`, `test:k6:stress` or `test:k6:spike`. Set `K6_BASE_URL` to the intended isolated development/staging target. Non-loopback hosts are refused unless `K6_ALLOW_REMOTE=1` is set, so a mistyped URL cannot send session cookies or load to production. Each VU has distinct USER and ADMIN sessions; all scenarios wait 3–4 seconds per iteration to stay below the stats endpoints' 30 requests/minute limit. Thresholds still require every check to pass, <1% failed requests and no server errors.
+
+For local `next dev`, set `E2E_TEST_SECRET` to match the server. Setup creates test users and cleans up partial setup failures as well as normal teardown. Failed cleanup is reported and requires inspection of that isolated test DB.
+
+Hosted Next deployments use NODE_ENV=production, where `/api/auth/test-session` remains disabled. Instead, sign in normally to dedicated staging accounts, then provide `K6_SESSIONS_JSON` with separate cookie strings, for example `{"users":["__Secure-authjs.session-token=<user-session>"],"admins":["__Secure-authjs.session-token=<admin-session>"]}`. Store this as a secret of the same name on the protected `staging` GitHub Environment (required reviewers) for the manual/reusable smoke workflow, and set the environment variable `K6_STAGING_ORIGIN` (https origin); the workflow refuses any `target_url` outside that origin before the secret is exposed; it needs no test-session secret. Refresh expired sessions before running. Treat cookies as credentials; never commit or print them. Supplied accounts are never deleted by teardown. Load/stress/spike need a session per role per maximum VU, each from a different account because the stats limiter keys on the user ID (15 for load, configurable with `K6_MAX_VUS`, 50 for stress, and 100 for spike). Setup checks that each cookie still belongs to a different account with the expected role before scenario iterations start.
+
+Before enabling the smoke workflow, a repository administrator must create the `staging` GitHub Environment, enable required reviewers, and configure its origin variable and session secret. The smoke workflow takes an explicit staging URL. Do not target the production service. Load tests make read-only endpoint requests; POST /api/admin/cron remains excluded.

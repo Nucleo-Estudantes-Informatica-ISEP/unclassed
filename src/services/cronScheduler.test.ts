@@ -192,3 +192,34 @@ test("does not start scheduler in production when ENABLE_CRON_SCHEDULER is false
     env.ENABLE_CRON_SCHEDULER = originalEnableCronScheduler;
   }
 });
+
+test("shares the running scheduler and shutdown hooks across module instances", async () => {
+  vi.stubEnv("ENABLE_CRON_SCHEDULER", "true");
+  vi.stubGlobal("unclassedCronScheduler", undefined);
+  vi.stubGlobal("unclassedCronShutdownHooksRegistered", undefined);
+  const on = vi.spyOn(process, "on").mockReturnValue(process);
+  const originalEnabled = env.ENABLE_CRON_SCHEDULER;
+  env.ENABLE_CRON_SCHEDULER = true;
+  const instrumentation = await import("./cronScheduler");
+
+  try {
+    instrumentation.initializeCronScheduler();
+
+    vi.resetModules();
+    const health = await import("./cronScheduler");
+    assert.notEqual(health.getCronSchedulerStatus, instrumentation.getCronSchedulerStatus);
+    assert.equal(health.getCronSchedulerStatus().running, true);
+
+    health.initializeCronScheduler();
+    assert.deepEqual(on.mock.calls.map(([signal]) => signal), ["SIGTERM", "SIGINT"]);
+
+    health.shutdownCronScheduler();
+    assert.equal(instrumentation.getCronSchedulerStatus().running, false);
+  } finally {
+    instrumentation.shutdownCronScheduler();
+    env.ENABLE_CRON_SCHEDULER = originalEnabled;
+    on.mockRestore();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
+});

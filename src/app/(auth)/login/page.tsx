@@ -2,7 +2,7 @@
 
 import { httpClient } from "@/lib/httpClient";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
@@ -104,12 +104,12 @@ const Login: React.FC = () => {
         <div className="border-border border-t" />
 
         <div className="space-y-3 text-center text-sm">
-          <Link
+          <AuthNeiRegistrationLink
             className="text-primary block font-medium hover:underline"
-            href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+            callbackUrl={callbackUrl}
           >
             Ainda não tens conta? Cria uma agora
-          </Link>
+          </AuthNeiRegistrationLink>
         </div>
       </div>
     </div>

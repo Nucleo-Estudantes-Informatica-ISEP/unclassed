@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, RefreshCw, User, UserCog } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
@@ -11,7 +10,6 @@ import { switchAuthNeiAccount } from "@/lib/client-auth-actions";
 import { logger } from "@/lib/clientLogger";
 import { Button } from "@/lib/components/ui/button";
 import { httpClient } from "@/lib/httpClient";
-import { navigateToAuthNeiProfile } from "@/lib/navigateToAuthNeiProfile";
 
 interface UserMenuProps {
   user: {
@@ -24,34 +22,29 @@ interface UserMenuProps {
 export default function UserMenu({ user }: UserMenuProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const router = useRouter();
-
-  const handleManageProfile = () => {
-    setShowMenu(false);
-    navigateToAuthNeiProfile();
-  };
 
   const handleSwitchAccount = async () => {
     setShowMenu(false);
     await switchAuthNeiAccount("/dashboard");
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (shared: boolean) => {
     setIsLoggingOut(true);
-    setShowMenu(false);
 
     try {
-      const data = await httpClient.get<{ redirectTo?: string }>("/api/logout-url", { cache: "no-store" });
-      const redirectTo = data.redirectTo || "/";
+      const redirectTo = shared
+        ? (
+            await httpClient.get<{ redirectTo: string }>("/api/logout-url", {
+              cache: "no-store",
+            })
+          ).redirectTo
+        : "/";
 
       await signOut({ redirect: false });
       window.location.href = redirectTo;
     } catch {
       logger.error("Logout error:");
-      toast.error("Erro ao terminar sessão");
-      router.push("/");
-      router.refresh();
-    } finally {
+      toast.error("Não foi possível terminar a sessão. Tenta novamente.");
       setIsLoggingOut(false);
     }
   };
@@ -68,6 +61,8 @@ export default function UserMenu({ user }: UserMenuProps) {
       <Button
         variant="ghost"
         className="relative h-10 w-auto px-2"
+        aria-label="Menu da conta"
+        aria-expanded={showMenu}
         onClick={() => setShowMenu(!showMenu)}
       >
         <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white">
@@ -142,24 +137,27 @@ export default function UserMenu({ user }: UserMenuProps) {
               <div className="border-border my-1 border-t" />
             </div>
 
+            {/* This route redirects the browser to the external AuthNEI console. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a
+              href="/api/auth/profile-url"
+              className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
+              onClick={() => setShowMenu(false)}
+            >
+              <UserCog className="mr-2 h-4 w-4" />
+              <span>Gerir conta no AuthNEI</span>
+            </a>
+
             <Link
               href="/profile"
               className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
               onClick={() => setShowMenu(false)}
             >
               <User className="mr-2 h-4 w-4" />
-              <span>Perfil</span>
+              <span>Preferências da aplicação</span>
             </Link>
 
             <div className="border-border my-1 border-t" />
-
-            <button
-              onClick={handleManageProfile}
-              className="text-foreground hover:bg-muted flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm"
-            >
-              <UserCog className="mr-2 h-4 w-4" />
-              <span>Gerir Conta no AuthNEI</span>
-            </button>
 
             <button
               onClick={handleSwitchAccount}
@@ -170,13 +168,34 @@ export default function UserMenu({ user }: UserMenuProps) {
             </button>
 
             <button
-              onClick={handleLogout}
+              onClick={() => handleLogout(false)}
               disabled={isLoggingOut}
               className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
             >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>{isLoggingOut ? "A sair..." : "Terminar sessão"}</span>
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              <span>Terminar sessão só nesta aplicação</span>
             </button>
+            <button
+              onClick={() => handleLogout(true)}
+              disabled={isLoggingOut}
+              className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+              aria-describedby="shared-signout-note"
+            >
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              <span>Terminar sessão nesta aplicação e no AuthNEI</span>
+            </button>
+            <p
+              role="status"
+              className={isLoggingOut ? "px-2 text-sm" : "sr-only"}
+            >
+              {isLoggingOut ? "A sair..." : ""}
+            </p>
+            <p
+              id="shared-signout-note"
+              className="text-muted-foreground px-2 pb-2 text-xs"
+            >
+              Outras aplicações abertas podem manter a sessão iniciada.
+            </p>
           </div>
         </div>
       )}

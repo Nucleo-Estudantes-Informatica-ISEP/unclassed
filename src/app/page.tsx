@@ -1,3 +1,4 @@
+import AuthNeiRegistrationLink from "@/components/AuthNeiRegistrationLink";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -82,10 +83,10 @@ const Home: React.FC = async () => {
               size="xl"
               className="w-full sm:w-auto shadow-lg shadow-primary/20"
             >
-              <Link href="/register">
+              <AuthNeiRegistrationLink>
                 Quero registar-me
                 <ArrowRight className="size-4" />
-              </Link>
+              </AuthNeiRegistrationLink>
             </Button>
             <Button
               asChild
@@ -180,10 +181,10 @@ const Home: React.FC = async () => {
                 variant="secondary"
                 className="bg-white text-primary hover:bg-white/90 shadow-md"
               >
-                <Link href="/register">
+                <AuthNeiRegistrationLink>
                   Começar agora
                   <ArrowRight className="size-4" />
-                </Link>
+                </AuthNeiRegistrationLink>
               </Button>
               <Button
                 asChild
