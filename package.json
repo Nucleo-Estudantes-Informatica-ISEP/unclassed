@@ -94,7 +94,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-helpers": "^2.0.2",
     "eslint-plugin-prettier": "^5.5.7",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "husky": "^9.1.7",
     "jsonwebtoken": "^9.0.3",
     "lint-staged": "^17.6.1",
