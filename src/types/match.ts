@@ -7,19 +7,19 @@ export type MatchClass = {
 export type MatchUser = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string | null;
   sharePhoneOnMatch?: boolean | null;
 };
 
 export type MatchParticipant = {
   userId: string;
-  fromClass: string | MatchClass;
-  toClass: string | MatchClass;
-  requestId: string;
-  requestType: "single" | "bundle";
-  satisfactionScore: number;
-  status?: "pending" | "accepted" | "rejected" | "completed";
+  fromClass?: string | MatchClass;
+  toClass?: string | MatchClass;
+  requestId?: string;
+  requestType?: "single" | "bundle";
+  satisfactionScore?: number;
+  status?: "pending" | "accepted" | "rejected" | "completed" | "revoked";
   user?: MatchUser;
 };
 

@@ -118,6 +118,10 @@ export async function create(data: {
   return toBundleSwapRequestDto(request, preferredClasses);
 }
 
+export async function createRaw(args: Parameters<typeof prisma.bundleSwapRequest.create>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).bundleSwapRequest.create(args);
+}
+
 export async function updatePreferredClasses(id: string, preferredClassIds: string[]) {
   const request = await prisma.bundleSwapRequest.update({
     where: { id },

@@ -1,6 +1,8 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { env } from "@/lib/env";
+import { logger, safeError } from "@/lib/logger";
+
 import {
   getMatchNotificationTemplate,
   getMatchStatusUpdateTemplate,
@@ -21,11 +23,7 @@ class EmailService {
   private initializeTransporter() {
     try {
       // Check if we have email credentials configured
-      if (
-        env.EMAIL_HOST &&
-        env.EMAIL_USER &&
-        env.EMAIL_PASS
-      ) {
+      if (env.EMAIL_HOST && env.EMAIL_USER && env.EMAIL_PASS) {
         // Use configured email service
         this.transporter = nodemailer.createTransport({
           host: env.EMAIL_HOST,
@@ -36,16 +34,12 @@ class EmailService {
             pass: env.EMAIL_PASS,
           },
         });
-        console.log(
-          `Email service initialized with ${env.EMAIL_HOST}`
-        );
+        logger.info("Email service initialized with");
       } else {
-        console.warn(
-          "No email configuration found - emails will not be sent"
-        );
+        logger.warn("No email configuration found - emails will not be sent");
       }
     } catch (error) {
-      console.error("Failed to initialize email transporter:", error);
+      logger.error(safeError(error), "Failed to initialize email transporter:");
     }
   }
 
@@ -54,7 +48,7 @@ class EmailService {
     data: MatchNotificationData
   ): Promise<boolean> {
     if (!this.transporter) {
-      console.error("Email transporter not initialized");
+      logger.error("Email transporter not initialized");
       return false;
     }
 
@@ -66,12 +60,12 @@ class EmailService {
         html: getMatchNotificationTemplate(data),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log("Match notification sent:", result.messageId);
+      await this.transporter.sendMail(mailOptions);
+      logger.info("Match notification sent");
 
       return true;
     } catch (error) {
-      console.error("Failed to send match notification:", error);
+      logger.error(safeError(error), "Failed to send match notification:");
       return false;
     }
   }
@@ -84,7 +78,7 @@ class EmailService {
     details: string
   ): Promise<boolean> {
     if (!this.transporter) {
-      console.error("Email transporter not initialized");
+      logger.error("Email transporter not initialized");
       return false;
     }
 
@@ -113,11 +107,11 @@ class EmailService {
         }),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log("Match status update sent:", result.messageId);
+      await this.transporter.sendMail(mailOptions);
+      logger.info("Match status update sent");
       return true;
     } catch (error) {
-      console.error("Failed to send match status update:", error);
+      logger.error(safeError(error), "Failed to send match status update:");
       return false;
     }
   }
@@ -129,10 +123,10 @@ class EmailService {
 
     try {
       await this.transporter.verify();
-      console.log("Email service connection verified");
+      logger.info("Email service connection verified");
       return true;
     } catch (error) {
-      console.error("Email service connection failed:", error);
+      logger.error(safeError(error), "Email service connection failed:");
       return false;
     }
   }

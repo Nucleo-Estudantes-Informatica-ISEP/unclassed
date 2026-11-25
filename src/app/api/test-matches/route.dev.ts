@@ -1,43 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-import type { Class } from "@/application/repositories/classRepository";
-import type { Subject } from "@/application/repositories/subjectRepository";
-import type { User } from "@/application/repositories/userRepository";
-import { SingleSwapRequestDto } from "@/services/swapRequestDto";
+import { NextResponse } from "next/server";
 
-import { authorizeRequest } from "@/lib/apiAccess";
-import * as userRepo from "@/application/repositories/userRepository";
+import { defineHandler } from "@/lib/defineHandler";
+import { isFixtureDatabase } from "@/lib/fixtureDatabase";
+import { SingleSwapRequestDto } from "@/services/swapRequestDto";
+import type { Class } from "@/application/repositories/classRepository";
+import * as classRepo from "@/application/repositories/classRepository";
 import * as matchRepo from "@/application/repositories/matchRepository";
 import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as classRepo from "@/application/repositories/classRepository";
+import type { Subject } from "@/application/repositories/subjectRepository";
 import * as subjectRepo from "@/application/repositories/subjectRepository";
+import {
+  executeInTransaction,
+  type Transaction,
+} from "@/application/repositories/transactionRepository";
+import type { User } from "@/application/repositories/userRepository";
+import * as userRepo from "@/application/repositories/userRepository";
 
-import bcrypt from "bcryptjs";
-
-export async function POST(request: NextRequest) {
-  const authResult = await authorizeRequest(request, {
+export const POST = defineHandler({
+  auth: {
     devOnly: true,
     requireAdmin: true,
     enforceSameOriginForSessionWrites: true,
-  });
-  if (!authResult.ok) return authResult.response;
+  },
 
-  try {
+  authorize: () => {
+    if (!isFixtureDatabase()) {
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
+  },
+
+  handler: async () => {
     const users = await createSampleUsers();
     const classes = await getSeededClasses();
     const subject = await getSeededSubject();
-
-    await matchRepo.deleteMany({});
-    await singleSwapRequestRepo.deleteMany();
-    await bundleSwapRequestRepo.deleteMany();
-
+    if (!(await executeInTransaction((tx) => clearSampleRequests(users, tx)))) {
+      return NextResponse.json(
+        { error: "Existem matches com pedidos de outros utilizadores" },
+        { status: 409 }
+      );
+    }
     const swapRequests = await createSampleSwapRequests(
       users,
       classes,
       subject
     );
     const matches = await createSampleMatches(users, classes, swapRequests);
-
     return NextResponse.json({
       success: true,
       created: {
@@ -49,27 +56,92 @@ export async function POST(request: NextRequest) {
       },
       message: "Matches de exemplo criados com sucesso!",
     });
-  } catch (error) {
-    console.error("Error creating test matches:", error);
-    return NextResponse.json(
-      { error: "Erro interno do servidor" },
-      { status: 500 }
+  },
+});
+
+async function clearSampleRequests(users: User[], tx: Transaction) {
+  const userIds = new Set(users.map(({ id }) => id));
+  const requests = await singleSwapRequestRepo.findMany(
+    {
+      where: { userId: { in: [...userIds] } },
+      select: { id: true },
+    },
+    tx
+  );
+  const requestIds = requests.map(({ id }) => id);
+  const fixtureIds = new Set(requestIds);
+  const matches = await matchRepo.findMany(
+    {
+      select: {
+        id: true,
+        participants: true,
+        singleSwapRequestIds: true,
+        bundleSwapRequestIds: true,
+      },
+    },
+    tx
+  );
+  const matchesToClear = [];
+  for (const match of matches) {
+    const fixtureParticipants = match.participants.map(
+      (participant) =>
+        participant !== null &&
+        typeof participant === "object" &&
+        !Array.isArray(participant) &&
+        typeof participant.userId === "string" &&
+        userIds.has(participant.userId)
     );
+    const hasFixtureParticipant = fixtureParticipants.some(Boolean);
+    const hasFixtureRequest = match.singleSwapRequestIds.some((id) =>
+      fixtureIds.has(id)
+    );
+    if (!hasFixtureParticipant && !hasFixtureRequest) continue;
+    if (
+      match.bundleSwapRequestIds.length ||
+      !fixtureParticipants.length ||
+      !fixtureParticipants.every(Boolean)
+    )
+      return false;
+    matchesToClear.push(match);
   }
+
+  const unknownIds = [
+    ...new Set(
+      matchesToClear.flatMap(({ singleSwapRequestIds }) =>
+        singleSwapRequestIds.filter((id) => !fixtureIds.has(id))
+      )
+    ),
+  ];
+  if (unknownIds.length) {
+    const linkedRequests = await singleSwapRequestRepo.findMany(
+      { where: { id: { in: unknownIds } }, select: { id: true } },
+      tx
+    );
+    if (linkedRequests.length) return false;
+  }
+  await matchRepo.deleteMany(
+    {
+      where: { id: { in: matchesToClear.map(({ id }) => id) } },
+    },
+    tx
+  );
+  await singleSwapRequestRepo.deleteMany(
+    { where: { id: { in: requestIds } } },
+    tx
+  );
+  return true;
 }
 
 async function createSampleUsers(): Promise<User[]> {
-  const password = await bcrypt.hash("password123", 10);
   return Promise.all(
     ["Alice Silva", "Bruno Santos", "Carlos Oliveira", "Diana Costa"].map(
       (name, index) =>
         userRepo.upsert({
-          where: { email: `test-match-${index + 1}@isep.ipp.pt` },
+          where: { email: `test-match-${index + 1}@example.test` },
           update: {},
           create: {
             name,
-            email: `test-match-${index + 1}@isep.ipp.pt`,
-            password,
+            email: `test-match-${index + 1}@example.test`,
             phone: `91${index + 2}345678`,
           },
         })
@@ -122,8 +194,8 @@ async function createSampleMatches(
 ) {
   const participants = users.map((user, index) => ({
     userId: user.id,
-    fromClass: classes[index].name,
-    toClass: classes[(index + 1) % classes.length].name,
+    fromClass: classes[index].id,
+    toClass: classes[(index + 1) % classes.length].id,
     requestId: requests[index].id,
     requestType: "single",
     satisfactionScore: 0.9,

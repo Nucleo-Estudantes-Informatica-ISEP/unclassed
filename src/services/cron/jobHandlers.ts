@@ -1,4 +1,5 @@
 import type { JobExecutionResult } from "./types";
+import { logger } from "@/lib/logger";
 import { MatchingOrchestrator } from "@/application/matchingOrchestrator";
 
 export class CronJobHandlers {
@@ -9,11 +10,18 @@ export class CronJobHandlers {
       await this.matchingOrchestrator.countActiveRequests();
     const results = await this.matchingOrchestrator.runBatchProcessing();
 
-    console.log(
-      `Batch matching completed: ${results.matchesFound} matches found, ${results.processedPartitions} partitions processed`
+    logger.info(
+      {
+        matchesFound: results.matchesFound,
+        processedPartitions: results.processedPartitions,
+      },
+      "Batch matching completed"
     );
     if (results.errors.length > 0) {
-      console.warn("Batch matching errors:", results.errors);
+      logger.warn(
+        { errorCount: results.errors.length },
+        "Batch matching errors"
+      );
     }
 
     return {
@@ -29,7 +37,7 @@ export class CronJobHandlers {
     const expiredMatches =
       await this.matchingOrchestrator.expireProvisionalMatches();
     if (expiredMatches > 0) {
-      console.log(`Expired ${expiredMatches} provisional matches`);
+      logger.info({ expiredMatches }, "Expired provisional matches");
     }
 
     return {
@@ -44,8 +52,12 @@ export class CronJobHandlers {
 
   async runHealthCheck(): Promise<JobExecutionResult> {
     const stats = await this.matchingOrchestrator.getAdvancedStats();
-    console.log(
-      `Health check: ${stats.totalActiveRequests} active requests, ${stats.activePartitions} active partitions`
+    logger.info(
+      {
+        activeRequests: stats.totalActiveRequests,
+        activePartitions: stats.activePartitions,
+      },
+      "Health check completed"
     );
 
     const errors: string[] = [];
@@ -55,7 +67,8 @@ export class CronJobHandlers {
     if (stats.averageSatisfactionScore < 0.5) {
       errors.push(`Low satisfaction score: ${stats.averageSatisfactionScore}`);
     }
-    for (const warning of errors) console.warn(`${warning}`);
+    for (const warning of errors)
+      logger.warn({ warning }, "Health check warning");
 
     return {
       processedPartitions: stats.activePartitions,

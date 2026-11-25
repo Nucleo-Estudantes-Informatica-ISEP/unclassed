@@ -12,6 +12,7 @@ For each task:
    - `feature/` or `feat/` — new functionality
    - `bugfix/` or `fix/` — bug fixes
    - `hotfix/` — urgent production fixes
+   - `refactor/` — behavior-preserving code restructuring
    - `release/` — release preparation
    - `docs/` — documentation-only changes
    - `chore/` — tooling, configuration, and other maintenance
@@ -55,7 +56,9 @@ Node.js `>=20.9.0` required. Prefer `pnpm`; `package-lock.json` is legacy and `p
 pnpm dev        # Next.js development server
 pnpm lint       # ESLint
 pnpm typecheck  # tsc --noEmit
-pnpm test       # Vitest over every **/*.{test,spec}.ts file
+pnpm test       # Vitest unit test suite (fast, database-independent)
+pnpm test:unit  # alias for unit test suite
+pnpm test:integration # Vitest integration tests against MongoDB replica set
 pnpm build      # production build; see Gotchas
 pnpm generate   # Prisma client generation
 pnpm sync       # compatibility alias for schema:deploy
@@ -89,12 +92,20 @@ src/
 
 prisma/           # MongoDB schema, seed, reset helper
 data/             # static subject data
-docs/domain-model/ # PlantUML domain diagram
+docs/architecture.md # Runtime layer diagram
+docs/database.md   # MongoDB schema notes
+docs/decisions/    # Numbered architecture decision records
+docs/domain-model/ # Mermaid domain diagram
 ```
 
 ### Request and data layers
 
-Routes currently own request orchestration: authenticate, validate input, enforce authorization, call Prisma/services, return `NextResponse`. Preserve auth and ownership checks on every new or edited mutating route.
+Routes use `defineHandler` (`src/lib/defineHandler.ts`) to authenticate through `authorizeRequest`, parse JSON with a Zod `schema`, optionally apply resource `authorize` checks, and map errors. Handlers call application services/repositories and return a `Response`; status codes, headers, cookies and redirects are preserved. Swap routes share this wrapper through `createSwapRequestHandlers`.
+
+- Session writes always enforce same-origin validation through `defineHandler`; route options cannot disable it. Preserve every route's admin/cron/rate-limit policy and service ownership checks.
+- Use `auth: false` only for public endpoints or NextAuth protocol handlers that own authentication. `auth: { requireAuth: false }` still resolves optional session/cron identity (for example, detailed health status).
+- Use `schema` for JSON bodies. Malformed JSON returns 400; default schema failures return `{ error: "Validação falhou" }` without Zod issues. `onError` maps domain errors or existing response contracts and may return undefined to use the shared mapping. Unexpected errors return a generic 500.
+- Browser components and hooks use `httpClient` (`src/lib/httpClient.ts`) with a response type, such as `httpClient.get<MyDto>(url)`. Its get/post/patch/put/delete methods serialize JSON, preserve request options and throw `HttpError` with status, parsed body and response headers for HTTP failures. A 204 response resolves to undefined; use `void` when expecting no body. Generic response types describe the contract; they do not validate server data at runtime.
 
 - Use `src/lib/prisma.ts` for normal application database access. It is the shared Prisma singleton; never create a new `PrismaClient` in a route or ordinary service.
 - `CronScheduler` owns polling/timers only. `src/services/cron/` owns registry state, database leases, execution records/stats, and job business handlers; all database-backed modules reuse the shared Prisma singleton.
@@ -124,10 +135,13 @@ Three distinct mechanisms coexist. Do not conflate them:
 Rules:
 
 - Preserve the ZITADEL `email_verified` gate.
-- Local `User.password` exists for compatibility but active sign-in is OIDC. Do not add a parallel password-login flow without an explicit product decision.
-- Use `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. It is the single authorization layer for the app; do not add a second wrapper or hand-roll `getServerSession()`/role checks inline in a route.
-- For session-authenticated writes, pass `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
+- Authentication is OIDC-only through AuthNEI/ZITADEL. Do not reintroduce local password authentication or a `User.password` field without an explicit product decision.
+- Use `defineHandler()` backed by `authorizeRequest()` (`src/lib/apiAccess.ts`) for every route's session/admin/cron decision and same-origin checks. `apiAccess` remains the single authorization layer; do not hand-roll `getServerSession()`/role checks inline in a route.
+- For session-authenticated writes, retain the wrapper default `enforceSameOriginForSessionWrites: true` so unsafe methods (non-GET/HEAD/OPTIONS) are rejected with `403` when the request's origin doesn't match the app's.
 - Never expose OIDC tokens, `AUTH_SECRET`, `CRON_SECRET`, SMTP credentials, or database URLs to clients or logs.
+- GlitchTip is an optional Coolify service. `src/lib/sanitizeMonitoringEvent.ts` is the SDK privacy boundary for exceptions and forwarded Pino logs; preserve exception stacks and correlation IDs while excluding request/user payloads. Server and browser DSNs are set separately, and browser values are build-time configuration.
+- Use `src/lib/logger.ts` for server logs. `defineHandler` supplies request context through `withRequestLogContext`; matching and scheduled jobs use `withJobExecution`. Log only approved metadata, and use `safeError` for exception types instead of logging raw exceptions.
+- AuthNEI is the source of truth for `name`, `email`, and email verification status. Unclassed may retain local copies for synchronization or compatibility, but these fields must not be editable through Unclassed profile preferences. `phone` remains Unclassed-owned and editable because the current OIDC integration does not request or synchronize the `phone` or `phone_verified` claims. `emailNotifications` and `sharePhoneOnMatch` are also Unclassed-owned preferences.
 
 ## API conventions
 
@@ -148,6 +162,7 @@ Documentation should answer a future contributor's first question without duplic
 - Update `README.md` when a user-visible capability, setup prerequisite, environment variable, script, route, deployment requirement, or operational workflow changes.
 - Update this `AGENTS.md` when the stack, layer map, contribution/verification workflow, architectural boundary, or persistent gotcha changes.
 - Keep documentation adjacent to its audience: public setup and operations in `README.md`; contributor rules and architecture here; domain diagrams in `docs/domain-model/`; code-specific rationale beside the code.
+- Record accepted architectural decisions as numbered ADRs in `docs/decisions/`.
 - Document why for non-obvious constraints, especially auth boundaries, lifecycle-managed clients, cron locks, data integrity rules, and security decisions. Do not restate code line-by-line.
 - Keep examples runnable and command names synchronized with `package.json`.
 - In the same change that alters behavior, update relevant docs. Do not defer known documentation drift to a follow-up.
@@ -163,6 +178,8 @@ Read environment variables server-side only. `.env.example` is source of truth f
 
 ## Verification
 
+For documentation-only changes (including `AGENTS.md`, `README.md`, and `docs/`), verify changed content, links, filenames, and `git diff --check`. Local application installs, lint, typecheck, tests, builds, audits, schema/migration checks, Docker builds, and runtime smoke checks are unnecessary. CI still runs its configured checks on the PR.
+
 Before finishing a change:
 
 1. Run `pnpm lint`.
@@ -173,14 +190,58 @@ Before finishing a change:
 6. Exercise changed behavior through `pnpm dev`: interact with UI changes and make a real request for API changes, checking both response body and status.
 7. State exactly what could not be exercised (for example, real OIDC, SMTP, cron, or production MongoDB) rather than implying it passed.
 
-`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. Colocate a test next to the file it covers; import `test` from `vitest`, and use either Vitest expectations or `node:assert`. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
+`pnpm test` (or `pnpm test:unit`) runs Vitest over unit test files (`*.test.ts`/`*.spec.ts`, excluding `*.integration.test.ts`) fast and without database dependencies. `pnpm test:integration` runs integration tests (`tests/integration/**/*.integration.test.ts`) against a MongoDB replica set (`DATABASE_URL` must point to an isolated database with "test" or "integration" in its name). Direct `prisma` access is confined to `src/application/repositories/`; tests and test helpers use repository abstractions. Colocate a unit test next to the file it covers; import `test` from `vitest`, and use either Vitest expectations or `node:assert`. Coverage is still thin — add a focused regression test for non-trivial pure logic or a regression fix, but don't assume prior behavior is covered just because the suite is green.
 
 ## Gotchas
 
+- The proxy serves the seasonal closure notice for app pages. API routes still receive request IDs and continue normally.
+
 - `CronScheduler` start/stop manages timers only; registry, lock, execution-store, and handler changes belong in their modules under `src/services/cron/`.
+- Keep the startup completion flag, cron scheduler singleton, and shutdown-hook registration shared within the Node.js process because Next.js can load instrumentation and health handlers in separate bundles.
 - `ENABLE_CRON_SCHEDULER=true` starts in-process jobs. Avoid multiple local instances against one database unless testing lock behavior.
 - A green `pnpm build` is not a substitute for the separate required `pnpm typecheck` gate.
-- `/api/cron/*` accepts the cron bearer secret; admin screens/routes require an `ADMIN` local session. Keep those boundaries separate.
+- `/api/matching` and detailed `GET /api/health` accept the cron bearer secret. `/api/admin/cron` requires an `ADMIN` session. Keep those boundaries separate. See the [security audit](docs/security-audit-98.md) for the route inventory.
 - `src/app/api/test-matches/route.dev.ts` and `prisma/reset.ts` are development/destructive surfaces. `next.config.ts` only recognizes the compound `dev.ts` route extension in the development server, and the route must also use `authorizeRequest({ devOnly: true })`. Preserve both controls.
+- `src/app/api/auth/test-session/route.dev.ts` is a development fixture bootstrap. It authenticates POST and DELETE with `E2E_TEST_SECRET` before a session exists and permits writes only to the dedicated `unclassed_e2e` database. The secret gates fixture bootstrap only. Application-session and cron access decisions use `authorizeRequest()`.
 - `scripts/` is ignored by Git. Do not put required product code or tests there unless its ignore rule changes in the same scoped task.
 - Docker relies on Next standalone output. Verify deployment-sensitive environment/startup changes with `pnpm build` and, when practical, the Docker path.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+
+## Issue and pull request writing
+
+- Use action-oriented titles prefixed with `[Type]` for tasks or `[Bug]` for bugs.
+  For tasks, include context, scope, acceptance criteria and applicable dependencies.
+  For bugs, include reproduction steps, expected and actual behavior, and environment.
+- Use Conventional Commit PR titles and include Issue (when applicable), Summary,
+  Tests, Manual testing steps, Configuration / migration, and Observations.
+  Report the checks from Verification that apply and any outstanding checks.
+  For schema changes, describe the `pnpm schema:deploy` steps, versioned record in
+  `prisma/schema-changes/`, and updated hash in `prisma/schema-manifest.json`.
+- For PRs addressing an issue, establish and verify the GitHub Development link.
+  A closing keyword alone does not establish it for PRs targeting `dev`.
+
+## Pull request metadata
+
+- Whenever opening a pull request, add the applicable existing repository
+  labels. Follow the repository's label conventions; do not leave the PR
+  unlabeled.
+- Assign every pull request to its creator (the GitHub PR author). Read the PR
+  author from GitHub and use that account; use `--add-assignee @me` only when
+  the authenticated account is the PR author.
+- Link the issue the PR addresses through GitHub's **Development** relationship
+  and verify that the link exists. A plain `Refs #N` mention is not sufficient.
+  Use a closing keyword when the PR completes the issue, or explicitly link it
+  through Development for partial work. For a non-default target branch,
+  explicitly establish the Development link rather than relying on a closing
+  keyword. Do not link a parent for closure unless its full scope is completed.
+- Verify the labels, creator assignment and Development issue link before
+  reporting the PR as opened.

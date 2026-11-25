@@ -1,5 +1,6 @@
 "use client";
 
+import { httpClient } from "@/lib/httpClient";
 import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -48,9 +49,7 @@ export default function DashboardStats() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/dashboard/stats");
-        if (!res.ok) throw new Error("Falha ao carregar estatísticas");
-        const data = (await res.json()) as DashboardStatsData;
+        const data = await httpClient.get<DashboardStatsData>("/api/dashboard/stats");
         setStats(data);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

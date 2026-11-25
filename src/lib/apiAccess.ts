@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth-nei-roles";
 import { isDevOnlyRequestAllowed } from "@/lib/devOnly";
 import { env } from "@/lib/env";
 import { validateOrigin } from "@/lib/originValidation";
+import { secretsMatch } from "@/lib/secretsMatch";
 import getServerSession, {
   type SessionUser,
 } from "@/services/getServerSession";
@@ -32,7 +33,7 @@ type AuthorizationFailure = {
   response: NextResponse;
 };
 
-type AuthorizationOptions = {
+export type AuthorizationOptions = {
   requireAuth?: boolean;
   requireAdmin?: boolean;
   allowCronSecret?: boolean;
@@ -88,7 +89,9 @@ export function hasValidCronSecret(request: NextRequest) {
   const cronSecret = env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
-  return Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
+  return Boolean(
+    cronSecret && authHeader && secretsMatch(`Bearer ${cronSecret}`, authHeader)
+  );
 }
 
 export function authorizeRequest(

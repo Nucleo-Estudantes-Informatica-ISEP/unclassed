@@ -50,14 +50,78 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      - name: Unit tests
+        run: pnpm test:unit
 
       - name: Validate Prisma schema
         run: pnpm schema:validate
 
       - name: Production build
         run: pnpm build
+
+  integration:
+    name: Integration tests (MongoDB replica set)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mongodb://127.0.0.1:27017/unclassed_integration?replicaSet=rs0&directConnection=true
+      APP_BASE_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+      AUTH_ISSUER_URL: https://auth.example.test
+      AUTH_CLIENT_ID: ci-client
+      AUTH_CLIENT_SECRET: ci-client-secret
+      AUTH_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/
+      ENABLE_CRON_SCHEDULER: "false"
+      CRON_SECRET: ci-only-cron-secret-at-least-32-characters
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.19.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start ephemeral MongoDB replica set
+        run: |
+          docker run -d --name mongo-integration \
+            -p 27017:27017 \
+            mongo:7 --replSet rs0 --bind_ip_all
+
+          echo "Waiting for MongoDB to accept connections..."
+          until docker exec mongo-integration mongosh --quiet --eval "db.runCommand({ ping: 1 }).ok" 2>/dev/null | grep -q "1"; do
+            sleep 1
+          done
+
+          echo "Initiating replica set rs0..."
+          docker exec mongo-integration mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] })"
+
+          echo "Waiting for replica set primary..."
+          until docker exec mongo-integration mongosh --quiet --eval "db.hello().isWritablePrimary" 2>/dev/null | grep -q "true"; do
+            sleep 1
+          done
+          echo "MongoDB replica set rs0 is ready."
+
+      - name: Deploy Prisma schema and indexes to test database
+        run: pnpm schema:deploy
+
+      - name: Run integration tests
+        run: pnpm test:integration
+
+      - name: Show MongoDB container logs on failure
+        if: failure()
+        run: docker logs mongo-integration || true
+
+      - name: Stop and cleanup MongoDB container
+        if: always()
+        run: docker rm -f mongo-integration || true
 
   docker:
     name: Production Docker image

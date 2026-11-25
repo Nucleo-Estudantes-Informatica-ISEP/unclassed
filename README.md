@@ -69,7 +69,10 @@ The core product flow is:
 ├── data/
 │   └── subjects.json
 ├── docs/
-│   └── domain-model/
+│   ├── architecture.md      # Runtime layer diagram
+│   ├── database.md          # MongoDB schema quirks and change process
+│   ├── decisions/           # Architecture decision records
+│   └── domain-model/        # Mermaid schema diagram
 ├── Dockerfile
 ├── docker-compose.yaml
 ├── docker-compose.override.yml
@@ -77,6 +80,8 @@ The core product flow is:
 ```
 
 ## Core Domain Model
+
+See the [Mermaid domain diagram](./docs/domain-model/domain-model.md), [database notes](./docs/database.md), [architecture diagram](./docs/architecture.md), and [decision records](./docs/decisions/) for contributor context.
 
 The Prisma schema defines the following main entities:
 
@@ -127,6 +132,7 @@ The main variables are:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Prisma connection string for MongoDB |
 | `APP_BASE_URL` | Yes | Server-side canonical app URL |
+| `SEASONAL_CLOSURE_UNTIL` | Optional | Expected seasonal reopening, as an ISO 8601 timestamp with timezone |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public app URL used in links and client code |
 | `AUTH_ISSUER_URL` | Yes | AuthNEI / OIDC issuer URL |
 | `AUTH_CLIENT_ID` | Yes | OIDC client ID |
@@ -147,6 +153,17 @@ The main variables are:
 | `EMAIL_USER` | Optional | SMTP username |
 | `EMAIL_PASS` | Optional | SMTP password |
 | `EMAIL_FROM` | Optional | Sender address |
+| `SENTRY_DSN` | Optional | Server-side GlitchTip project DSN |
+| `NEXT_PUBLIC_SENTRY_DSN` | Optional | Browser GlitchTip DSN, set before building the image |
+| `SENTRY_ENVIRONMENT` | Optional | Server environment label, e.g. `production` or `staging` |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Optional | Browser environment label, set before building the image |
+| `LOG_LEVEL` | Optional | Pino level; defaults to `info` in production |
+
+HTTP API responses include `x-request-id`; server logs use the same request ID. Cron and matching runs add `jobExecutionId`. Production logs are JSON; local development uses `pino-pretty`. Log payloads omit exception messages, request bodies, emails, tokens, and passwords. When `SENTRY_DSN` is set, selected job and matching logs also appear in GlitchTip's Logs page. Only fixed operation messages and approved correlation/diagnostic fields are forwarded; other stdout logs stay in Coolify Runtime Logs.
+
+### Seasonal closure
+
+Set `SEASONAL_CLOSURE_UNTIL` on the running deployment to the expected reopening time, including a timezone offset or `Z`. Keep the service running during the closure. Verify that the homepage and `/login` display the reopening time in Lisbon time and respond with `503` and `Retry-After`. API and health-check traffic continue as usual. At the configured time, page requests resume without a restart. Leave the variable empty for normal operation. If the value is invalid, public pages stay open and the service logs a warning.
 
 ### Authentication Notes
 
@@ -280,8 +297,8 @@ Key API routes:
 
 - `/api/auth/[...nextauth]` - NextAuth handlers
 - `/api/auth/configured` - auth readiness check
-- `/api/subjects` - subject data
-- `/api/classes` - class data
+- `/api/subjects` - subject data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session (subject codes are stored upper case)
+- `/api/classes` - class data; `POST`/`PATCH`/`DELETE` require an `ADMIN` session
 - `/api/swap-requests/single`
 - `/api/swap-requests/bundle`
 - `/api/matches`
@@ -289,6 +306,12 @@ Key API routes:
 - `/api/matching` - matching stats and batch trigger
 - `/api/admin/cron` - cron monitoring and controls
 - `/api/health` - health endpoint
+
+### HTTP request handling
+
+API routes share `defineHandler`, backed by the existing `apiAccess` authorization layer. JSON-body routes return `400` for malformed JSON or invalid input; default validation failures use `{ error: string }` without exposing schema details. Domain-specific error messages and existing response contracts remain intact. Session writes always enforce same-origin checks, and admin/cron routes keep their distinct permissions and rate limits. Match actions delegate to the application lifecycle service; the admin dashboard loads statistics server-side and uses `httpClient` for its batch-processing mutation.
+
+Browser components and hooks use the typed `httpClient` for JSON requests and shared HTTP error handling. This change requires no new environment variables or database migration. See `AGENTS.md` for wrapper/client usage and the application-layer boundary.
 
 ## Matching Engine Overview
 
@@ -365,6 +388,7 @@ This recommendation is based on the repo structure and deployment files: the cod
 ## Admin and Operations
 
 Admins have access to an advanced monitoring surface exposed through the dashboard and API.
+The matching dashboard refreshes every 30 seconds while its tab is visible and refreshes when the tab becomes visible again. If cron telemetry fails, matching statistics remain available.
 
 What the admin tooling covers:
 
@@ -416,6 +440,14 @@ Use SMTP configuration to enable:
 If SMTP is not configured, matching can still work, but email delivery features will not.
 
 ## Docker
+
+### GlitchTip in Coolify
+
+Create a Coolify project named **`service:monitoring-GlitchTip`** and add a **Docker Compose Empty** Service in its production environment. Paste [`deploy/coolify/glitchtip.yml`](./deploy/coolify/glitchtip.yml) into its Compose editor. Its GlitchTip 6.2.6, PostgreSQL 18.6, and Valkey 9.1.2 images are pinned by digest so redeploys cannot silently upgrade them; review and test new versions before changing those references. Coolify's stock GlitchTip 6.0 template predates Logs support. Assign an HTTPS domain to the `glitchtip` component (internal port 8000), then set `GLITCHTIP_EMAIL_URL` to a working SMTP URL and `GLITCHTIP_FROM_EMAIL` to the alert sender. Check that Coolify generated a nonempty `SERVICE_BASE64_64_GLITCHTIP_SECRET` before deploying; its Compose reference is required because an empty signing key makes GlitchTip return HTTP 500. Keep the generated PostgreSQL credentials and GlitchTip secret in Coolify; back up the `glitchtip-postgres` and `glitchtip-uploads` volumes. The service uses GlitchTip's all-in-one web/worker process, PostgreSQL, and Valkey. Coolify stores its own Compose copy, so apply future repository changes there explicitly.
+
+After deploying, create the first administrator from the GlitchTip container terminal with `./manage.py createsuperuser`. Public registration starts disabled. Create separate staging and production projects, add team members, and configure **Project Alerts → Create New Alert** for each project. Copy each project's DSN into the corresponding app deployment's `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN`; set matching environment labels. Rebuild the app after changing `NEXT_PUBLIC_*` values. Verify an event arrives with a stack trace and `requestId` tag, then confirm an alert email arrives. After a job runs, check its fixed operation messages and `jobExecutionId` in GlitchTip's Logs page. [GlitchTip installation](https://glitchtip.com/documentation/install/), [Coolify Services](https://coolify.io/docs/services/what-is-a-service), [GlitchTip alerts](https://glitchtip.com/documentation/error-tracking/), [GlitchTip logs](https://glitchtip.com/documentation/logs/).
+
+The SDK reports uncaught server and browser exceptions. It strips request headers, bodies, user fields, breadcrumbs, raw exception messages, and stack local variables before sending events. Stack file names and line numbers remain. Tracing stays disabled until its payloads receive the same privacy review. Existing handled failures continue to appear in application logs; verify them with the `x-request-id` header. Client stack frames can be minified until source maps are uploaded.
 
 ### Run with Docker Compose
 
@@ -480,14 +512,21 @@ Run:
 pnpm seed
 ```
 
+## Match contact sharing
+
+Participants see each other’s email after everyone accepts the match. Phone numbers also require the profile sharing preference. These rules apply to the matches page and its API responses.
+
 ## Authentication Architecture
 
 Authentication is handled by NextAuth with an AuthNEI provider. In the current implementation, that provider is backed by ZITADEL.
+
+See the [security audit](docs/security-audit-98.md) for the reviewed route permissions, credential handling, and follow-up issues.
 
 Key behavior:
 
 - only AuthNEI-authenticated users are expected
 - sign-in is blocked if `email_verified` is missing or false
+- unverified users are guided back to AuthNEI verification once, preserving the destination; an email can identify the existing session when the profile scope is absent
 - a local user is created or linked during JWT callback processing
 - local session data includes:
   - local user ID
@@ -520,13 +559,44 @@ Before merging changes, run:
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test            # or pnpm test:unit (fast, database-independent unit tests)
+pnpm test:integration # runs integration tests against MongoDB replica set
 pnpm build
 ```
 
-`pnpm test` runs Vitest over every `*.test.ts`/`*.spec.ts` file. The current suite covers matching characterization, state transitions, authorization/input boundaries, shared rate limits, scheduler locks, schema/version checks, and DTO privacy. Prefer TDD for regressions: reproduce the failure in a focused test, implement the smallest fix, then refactor.
+`pnpm test` (and `pnpm test:unit`) runs Vitest over unit test files (`*.test.ts`/`*.spec.ts`, excluding `*.integration.test.ts`). `pnpm test:integration` runs integration tests against a real MongoDB replica set, verifying transactions, unique active request indexes, distributed locks, notification reservations, and rate limiting.
 
-GitHub CI uses a frozen install and requires lint, typecheck, all tests, Prisma/schema validation, the production build, a non-root Docker image build, and Gitleaks before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+GitHub CI runs separate parallel gates for lint/typecheck/unit tests/build and a dedicated ephemeral MongoDB replica set integration test job before merge. Pull requests target `dev`; production is reached through the reviewed release flow.
+
+### Running Integration Tests Locally with Docker
+
+Integration tests run against an ephemeral MongoDB 7 replica set to validate transactions (`prisma.$transaction`), partial unique constraints, and atomic operations.
+
+Thanks to the cross-platform integration runner (`tests/run-integration.mjs`), you can execute the entire workflow in a **single command** on Windows, macOS, and Linux:
+
+```bash
+pnpm test:integration
+```
+
+This single command automatically:
+1. Verifies Docker is running (and provides a friendly notice if it isn't).
+2. Starts the ephemeral MongoDB replica set container (`mongo-integration`) on port 27017 and initiates `rs0`.
+3. Runs `pnpm schema:deploy` to apply the Prisma schema and versioned MongoDB indexes to `unclassed_integration`.
+4. Executes the Vitest integration suite.
+5. Stops and tears down the container automatically upon completion.
+
+#### Useful Flags & Options:
+- **Keep container running between test runs** (for fast iteration):
+  ```bash
+  pnpm test:integration --keep-alive
+  ```
+- **Skip schema deployment** (when already deployed and container is kept alive):
+  ```bash
+  pnpm test:integration --skip-deploy
+  ```
+
+> **Prerequisite**: Ensure the Docker service is running (`sudo systemctl start docker` on Linux, or Docker Desktop on Windows/macOS).
+> **Safety Gate**: The test suite strictly validates that `DATABASE_URL` specifies a database name containing `test` or `integration`. Tests will immediately abort if pointed at an unverified or production database.
 
 ## Troubleshooting
 
@@ -567,6 +637,12 @@ Check:
 - `/api/admin/cron` as an admin
 
 
+## Development fixtures
+
+Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
+
+Run `pnpm test:e2e` with the app port free. Playwright starts the fixture OIDC issuer on port 3418 and launches the dev server with that issuer configured. An existing server is reused, so stop it first unless it was started with `AUTH_ISSUER_URL=http://127.0.0.1:3418`.
+
 ## Recommended First Steps for New Contributors
 
 1. Install dependencies with `pnpm install`.
@@ -587,3 +663,14 @@ Check:
 - `ENABLE_CRON_SCHEDULER` matches the deployment model
 - Health checks are wired to `/api/health`
 - Admin access is available for cron and matching supervision
+
+
+### k6 load tests
+
+Install the Grafana k6 binary separately and ensure `k6` is on your PATH. Use `pnpm test:k6:smoke`, `test:k6:load`, `test:k6:stress` or `test:k6:spike`. Set `K6_BASE_URL` to the intended isolated development/staging target. Non-loopback hosts are refused unless `K6_ALLOW_REMOTE=1` is set, so a mistyped URL cannot send session cookies or load to production. Each VU has distinct USER and ADMIN sessions; all scenarios wait 3–4 seconds per iteration to stay below the stats endpoints' 30 requests/minute limit. Thresholds still require every check to pass, <1% failed requests and no server errors.
+
+For local `next dev`, set `E2E_TEST_SECRET` to match the server. Setup creates test users and cleans up partial setup failures as well as normal teardown. Failed cleanup is reported and requires inspection of that isolated test DB.
+
+Hosted Next deployments use NODE_ENV=production, where `/api/auth/test-session` remains disabled. Instead, sign in normally to dedicated staging accounts, then provide `K6_SESSIONS_JSON` with separate cookie strings, for example `{"users":["__Secure-authjs.session-token=<user-session>"],"admins":["__Secure-authjs.session-token=<admin-session>"]}`. Store this as a secret of the same name on the protected `staging` GitHub Environment (required reviewers) for the manual/reusable smoke workflow, and set the environment variable `K6_STAGING_ORIGIN` (https origin); the workflow refuses any `target_url` outside that origin before the secret is exposed; it needs no test-session secret. Refresh expired sessions before running. Treat cookies as credentials; never commit or print them. Supplied accounts are never deleted by teardown. Load/stress/spike need a session per role per maximum VU, each from a different account because the stats limiter keys on the user ID (15 for load, configurable with `K6_MAX_VUS`, 50 for stress, and 100 for spike). Setup checks that each cookie still belongs to a different account with the expected role before scenario iterations start.
+
+Before enabling the smoke workflow, a repository administrator must create the `staging` GitHub Environment, enable required reviewers, and configure its origin variable and session secret. The smoke workflow takes an explicit staging URL. Do not target the production service. Load tests make read-only endpoint requests; POST /api/admin/cron remains excluded.

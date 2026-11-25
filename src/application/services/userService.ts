@@ -1,6 +1,5 @@
-import * as userRepository from "@/application/repositories/userRepository";
 import { isAdmin } from "@/lib/auth-nei-roles";
-import { exclude } from "@/lib/exclude";
+import * as userRepository from "@/application/repositories/userRepository";
 
 export class ValidationError extends Error {}
 
@@ -40,24 +39,22 @@ export async function resolveSessionUser(
     return null;
   }
 
-  const safeUser = exclude(user, [
-    "password",
-    "verificationToken",
-    "verificationTokenExpiry",
-  ]);
-
   const explicitRoles = Array.isArray(session.user.roles)
-    ? session.user.roles.filter((role): role is string => typeof role === "string")
+    ? session.user.roles.filter(
+        (role): role is string => typeof role === "string"
+      )
     : [];
   const derivedRoles = Array.isArray(session.user.authNeiRoles)
-    ? session.user.authNeiRoles.filter((role): role is string => typeof role === "string")
+    ? session.user.authNeiRoles.filter(
+        (role): role is string => typeof role === "string"
+      )
     : [];
   const roles = explicitRoles.length > 0 ? explicitRoles : derivedRoles;
 
   return {
-    ...safeUser,
-    name: safeUser.name ?? "",
-    email: safeUser.email ?? "",
+    ...user,
+    name: user.name ?? "",
+    email: user.email ?? "",
     roles,
     role: isAdmin(session.user) ? "ADMIN" : "USER",
   } as SessionUser;
@@ -79,7 +76,9 @@ export async function updatePreferences(
 
   if (updateData.emailNotifications !== undefined) {
     if (typeof updateData.emailNotifications !== "boolean") {
-      throw new ValidationError("emailNotifications deve ser um valor booleano");
+      throw new ValidationError(
+        "emailNotifications deve ser um valor booleano"
+      );
     }
     validatedData.emailNotifications = updateData.emailNotifications;
   }

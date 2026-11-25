@@ -125,6 +125,10 @@ export async function create(data: {
   return toSingleSwapRequestDto(request, preferredClasses);
 }
 
+export async function createRaw(args: Parameters<typeof prisma.singleSwapRequest.create>[0], tx?: Prisma.TransactionClient) {
+  return (tx || prisma).singleSwapRequest.create(args);
+}
+
 export async function updatePreferredClasses(id: string, preferredClassIds: string[]) {
   const request = await prisma.singleSwapRequest.update({
     where: { id },

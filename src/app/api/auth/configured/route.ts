@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { isAuthConfigured } from "@/lib/auth-config";
+import { defineHandler } from "@/lib/defineHandler";
 
-export async function GET() {
-  return NextResponse.json({
-    configured: isAuthConfigured(),
-  });
-}
+export const GET = defineHandler({
+  auth: false,
+  handler: async () => {
+    return NextResponse.json({
+      configured: isAuthConfigured(),
+    });
+  },
+});

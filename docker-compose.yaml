@@ -12,6 +12,9 @@ services:
     build:
       context: .
       target: runner
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
     depends_on:
       schema:
         condition: service_completed_successfully
@@ -19,6 +22,7 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
       - APP_BASE_URL=${APP_BASE_URL:-${SERVICE_URL_APP:-http://localhost:3000}}
+      - SEASONAL_CLOSURE_UNTIL=${SEASONAL_CLOSURE_UNTIL:-}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-${SERVICE_URL_APP:-http://localhost:3000}}
       - AUTH_SECRET=${AUTH_SECRET:-${SERVICE_REALBASE64_64_AUTH}}
       - AUTH_ISSUER_URL=${AUTH_ISSUER_URL:-https://auth.nei-isep.org}
@@ -44,4 +48,7 @@ services:
       - EMAIL_PASS=${EMAIL_PASS:-}
       - ADMIN_CACHE_TTL=${ADMIN_CACHE_TTL:-300}
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-1}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped

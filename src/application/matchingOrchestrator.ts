@@ -1,20 +1,26 @@
-import * as classRepo from "@/application/repositories/classRepository";
-import * as subjectRepo from "@/application/repositories/subjectRepository";
-import type { JsonValue } from "@/application/repositories/matchRepository";
-
 import { env } from "@/lib/env";
-import * as matchRepo from "@/application/repositories/matchRepository";
-import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
-import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
-import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
-import * as userRepo from "@/application/repositories/userRepository";
-import * as matchNotificationDeliveryRepo from "@/application/repositories/matchNotificationDeliveryRepository";
-import * as txRepo from "@/application/repositories/transactionRepository";
+import { logger, safeError, withJobExecution } from "@/lib/logger";
+import { updatePartitionRequestCount } from "@/application/services/graphPartitionService";
 import {
   emailService,
   type MatchNotificationData,
 } from "@/services/emailService";
+import * as matchNotificationDeliveryService from "@/services/matchNotificationDeliveryService";
 import { buildPartitionKey } from "@/services/partitionKey";
+import {
+  lockPartition,
+  PARTITION_LOCK_STALE_MS,
+  unlockPartition,
+} from "@/services/partitionLock";
+import * as bundleSwapRequestRepo from "@/application/repositories/bundleSwapRequestRepository";
+import * as classRepo from "@/application/repositories/classRepository";
+import * as graphPartitionRepo from "@/application/repositories/graphPartitionRepository";
+import type { JsonValue } from "@/application/repositories/matchRepository";
+import * as matchRepo from "@/application/repositories/matchRepository";
+import * as singleSwapRequestRepo from "@/application/repositories/singleSwapRequestRepository";
+import * as subjectRepo from "@/application/repositories/subjectRepository";
+import * as txRepo from "@/application/repositories/transactionRepository";
+import * as userRepo from "@/application/repositories/userRepository";
 import type { Graph } from "@/domain/graph/graph";
 import {
   areAllRequestsAvailable,
@@ -140,9 +146,6 @@ interface UserRecord {
   emailNotifications?: boolean | null;
 }
 
-const MATCH_NOTIFICATION_TYPE = "MATCH_FOUND";
-const MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS = 15 * 60 * 1000;
-
 interface ClassRecord {
   id: string;
   name: string;
@@ -189,10 +192,9 @@ export function assembleCycleMatch(
   if (!match || !("reason" in match)) return match;
 
   if (match.reason === "missing-edge") {
-    console.warn(
-      `Missing edge from ${match.requestId} to ${match.nextRequestId}`);
+    logger.warn("Missing edge from to");
   } else {
-    console.warn(`Request details not found for ${match.requestId}`);
+    logger.warn("Request details not found for");
   }
 
   return null;
@@ -203,7 +205,6 @@ export function assembleCycleMatch(
 export class MatchingOrchestrator {
   private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds
   private readonly DIRECT_MATCH_TIMEOUT = 5000; // 5 seconds
-  private readonly PARTITION_LOCK_STALE_MS = 2 * 60 * 1000; // 2 minutes
 
   // ===== IMMEDIATE PROCESSING (<5 seconds) =====
 
@@ -211,48 +212,50 @@ export class MatchingOrchestrator {
    * Process immediate direct matches when new request arrives
    */
   async processImmediateMatches(requestId: string): Promise<MatchResult[]> {
-    const startTime = Date.now();
-    const context: ProcessingContext = {
-      timeLimit: this.DIRECT_MATCH_TIMEOUT,
-      startTime,
-      processId: `immediate-${requestId}`,
-      partition: await this.getRequestPartition(requestId),
-    };
-
-    try {
-      console.log(`Starting immediate processing for request ${requestId}`);
-
-      // Acquire partition lock for immediate processing to prevent race conditions
-      const lockAcquired = await this.lockPartition(
-        context.partition.id,
-        context.processId
-      );
-      if (!lockAcquired) {
-        console.log(
-          `Skipping immediate processing for ${requestId}: partition ${context.partition.partitionKey} locked by another machine`);
-        return [];
-      }
+    return withJobExecution(async () => {
+      const startTime = Date.now();
+      const context: ProcessingContext = {
+        timeLimit: this.DIRECT_MATCH_TIMEOUT,
+        startTime,
+        processId: `immediate-${requestId}`,
+        partition: await this.getRequestPartition(requestId),
+      };
 
       try {
-        const matches = await this.findDirectMatches(requestId, context);
+        logger.info("Starting immediate processing for request");
 
-        if (matches.length > 0) {
-          console.log(
-            `Found ${matches.length} immediate matches in ${Date.now() - startTime}ms`);
-
-          return await this.createMatches(matches); // Use the calculated isProvisional from matches
+        // Acquire partition lock for immediate processing to prevent race conditions
+        const lockAcquired = await lockPartition(
+          context.partition.id,
+          context.processId
+        );
+        if (!lockAcquired) {
+          logger.info(
+            "Skipping immediate processing for: partition locked by another machine"
+          );
+          return [];
         }
 
-        console.log(`No immediate matches found for ${requestId}`);
+        try {
+          const matches = await this.findDirectMatches(requestId, context);
+
+          if (matches.length > 0) {
+            logger.info("Found immediate matches in ms");
+
+            return await this.createMatches(matches); // Use the calculated isProvisional from matches
+          }
+
+          logger.info("No immediate matches found for");
+          return [];
+        } finally {
+          // Always unlock the partition
+          await unlockPartition(context.partition.id, context.processId);
+        }
+      } catch (error) {
+        logger.error(safeError(error), "Immediate processing failed");
         return [];
-      } finally {
-        // Always unlock the partition
-        await this.unlockPartition(context.partition.id, context.processId);
       }
-    } catch (error) {
-      console.error(`Immediate processing failed for ${requestId}:`, error);
-      return [];
-    }
+    });
   }
 
   /**
@@ -276,7 +279,7 @@ export class MatchingOrchestrator {
     for (const compatibleRequest of compatibleRequests) {
       // Check if processing time exceeded
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`Direct matching timeout reached`);
+        logger.info("Direct matching timeout reached");
         break;
       }
 
@@ -340,8 +343,7 @@ export class MatchingOrchestrator {
 
         // If this is a perfect match (100% satisfaction for both), return immediately
         if (isFirstChoiceForAll) {
-          console.log(
-            `Perfect match found (both get 1st choice) - stopping search`);
+          logger.debug("Perfect direct match found");
           return [matchCandidate];
         }
 
@@ -349,16 +351,14 @@ export class MatchingOrchestrator {
         if (satisfactionScore > bestSatisfactionScore) {
           bestMatch = matchCandidate;
           bestSatisfactionScore = satisfactionScore;
-          console.log(
-            `Better match found (${(satisfactionScore * 100).toFixed(1)}% satisfaction)`);
+          logger.info("Better match found (% satisfaction)");
         }
       }
     }
 
     // Return the single best match, or empty array if no matches found
     if (bestMatch) {
-      console.log(
-        `Best match selected with ${(bestSatisfactionScore * 100).toFixed(1)}% satisfaction`);
+      logger.info("Best match selected with % satisfaction");
       return [bestMatch];
     }
 
@@ -376,54 +376,63 @@ export class MatchingOrchestrator {
     totalProcessingTime: number;
     errors: string[];
   }> {
-    const startTime = Date.now();
-    const results: BatchProcessingResult = {
-      processedPartitions: 0,
-      matchesFound: 0,
-      totalProcessingTime: 0,
-      errors: [],
-    };
+    return withJobExecution(async () => {
+      const startTime = Date.now();
+      const results: BatchProcessingResult = {
+        processedPartitions: 0,
+        matchesFound: 0,
+        totalProcessingTime: 0,
+        errors: [],
+      };
 
-    try {
-      // Get all active partitions, prioritized
-      const partitions = await this.getActivePartitions();
+      try {
+        // Get all active partitions, prioritized
+        const partitions = await this.getActivePartitions();
 
-      console.log(
-        `Starting batch processing for ${partitions.length} partitions`);
+        logger.info(
+          { partitionCount: partitions.length },
+          "Starting batch processing"
+        );
 
-      // Process per-class graphs first (higher frequency)
-      const specificClassPartitions = partitions.filter(
-        (p) => p.ticketType === "SPECIFIC_CLASS"
-      );
-      const allClassesPartitions = partitions.filter(
-        (p) => p.ticketType === "ALL_CLASSES"
-      );
+        // Process per-class graphs first (higher frequency)
+        const specificClassPartitions = partitions.filter(
+          (p) => p.ticketType === "SPECIFIC_CLASS"
+        );
+        const allClassesPartitions = partitions.filter(
+          (p) => p.ticketType === "ALL_CLASSES"
+        );
 
-      // Process specific class partitions (every 10 min)
-      for (const partition of specificClassPartitions) {
-        if (this.shouldProcessPartition(partition, 10 * 60 * 1000)) {
-          // 10 minutes
-          await this.processBatchPartition(partition, results);
+        // Process specific class partitions (every 10 min)
+        for (const partition of specificClassPartitions) {
+          if (this.shouldProcessPartition(partition, 10 * 60 * 1000)) {
+            // 10 minutes
+            await this.processBatchPartition(partition, results);
+          }
         }
+
+        // Process all-classes partitions (every 7 min)
+        for (const partition of allClassesPartitions) {
+          if (this.shouldProcessPartition(partition, 7 * 60 * 1000)) {
+            // 7 minutes
+            await this.processBatchPartition(partition, results);
+          }
+        }
+
+        results.totalProcessingTime = Date.now() - startTime;
+        logger.info(
+          {
+            matchesFound: results.matchesFound,
+            durationMs: results.totalProcessingTime,
+          },
+          "Batch processing completed"
+        );
+      } catch (error) {
+        results.errors.push(`Batch processing failed: ${String(error)}`);
+        logger.error(safeError(error), "Batch processing error:");
       }
 
-      // Process all-classes partitions (every 7 min)
-      for (const partition of allClassesPartitions) {
-        if (this.shouldProcessPartition(partition, 7 * 60 * 1000)) {
-          // 7 minutes
-          await this.processBatchPartition(partition, results);
-        }
-      }
-
-      results.totalProcessingTime = Date.now() - startTime;
-      console.log(
-        `Batch processing completed: ${results.matchesFound} matches in ${results.totalProcessingTime}ms`);
-    } catch (error) {
-      results.errors.push(`Batch processing failed: ${String(error)}`);
-      console.error("Batch processing error:", error);
-    }
-
-    return results;
+      return results;
+    });
   }
 
   /**
@@ -443,15 +452,13 @@ export class MatchingOrchestrator {
 
     try {
       // Lock partition for processing (distributed lock)
-      const acquired = await this.lockPartition(partition.id, context.processId);
+      const acquired = await lockPartition(partition.id, context.processId);
       if (!acquired) {
-        console.log(
-          `Skipping partition ${partition.partitionKey}: lock already held by another worker`);
+        logger.info("Skipping partition: lock already held by another worker");
         return;
       }
 
-      console.log(
-        `Processing partition ${partition.partitionKey} (${partition.activeRequests} active requests)`);
+      logger.info("Processing partition ( active requests)");
 
       // Build graph for this partition
       const graph = await this.buildPartitionGraph(partition);
@@ -475,14 +482,12 @@ export class MatchingOrchestrator {
       results.processedPartitions++;
     } catch (error) {
       results.errors.push(
-        `Partition ${partition.partitionKey}: ${String(error)}`);
-      console.error(
-        `Error processing partition ${partition.partitionKey}:`,
-        error
+        `Partition ${partition.partitionKey}: ${String(error)}`
       );
+      logger.error(safeError(error), "Error processing partition:");
     } finally {
       // Always unlock partition
-      await this.unlockPartition(partition.id, context.processId);
+      await unlockPartition(partition.id, context.processId);
     }
   }
 
@@ -502,7 +507,7 @@ export class MatchingOrchestrator {
     for (const [nodeId] of graph.vertices()) {
       // Check timeout
       if (Date.now() - context.startTime > context.timeLimit) {
-        console.log(`Batch processing timeout reached`);
+        logger.info("Batch partition timeout reached");
         break;
       }
 
@@ -561,8 +566,7 @@ export class MatchingOrchestrator {
         const shouldUpgrade = satisfactionDiff > improvementThreshold;
 
         if (shouldUpgrade) {
-          console.log(
-            `Upgrading provisional match ${existing.id}: ${Math.round((existing.satisfactionScore || 0) * 100)}% → ${Math.round(newMatch.satisfactionScore * 100)}%`);
+          logger.info("Upgrading provisional match: % → %");
 
           // Mark old match as upgraded and reactivate its requests
           await matchRepo.update({
@@ -573,8 +577,9 @@ export class MatchingOrchestrator {
           // Reactivate requests from the old match
           await this.reactivateRequestsFromMatch(existing);
         } else {
-          console.log(
-            `New match satisfaction (${Math.round(newMatch.satisfactionScore * 100)}%) not significantly better than existing (${Math.round((existing.satisfactionScore || 0) * 100)}%)`);
+          logger.info(
+            "New match satisfaction (%) not significantly better than existing (%)"
+          );
         }
       }
     }
@@ -604,14 +609,11 @@ export class MatchingOrchestrator {
       try {
         await this.reactivateRequestsFromMatch(m);
       } catch (e) {
-        console.error(
-          `Failed to reactivate requests for match ${m.id}:`,
-          e
-        );
+        logger.error(safeError(e), "Failed to reactivate requests for match:");
       }
     }
 
-    console.log(`Expired ${matches.length} provisional matches`);
+    logger.info("Expired provisional matches");
     return matches.length;
   }
 
@@ -709,7 +711,7 @@ export class MatchingOrchestrator {
     }
 
     // Update partition request count
-    await this.updatePartitionRequestCount(partition.partitionKey);
+    await updatePartitionRequestCount(partition.partitionKey);
   }
 
   // ===== UTILITY METHODS =====
@@ -787,51 +789,8 @@ export class MatchingOrchestrator {
     return timeSinceLastProcess >= intervalMs;
   }
 
-  private async lockPartition(
-    partitionId: string,
-    processId: string
-  ): Promise<boolean> {
-    // Attempt to acquire lock if free or stale
-    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
-    const res = await graphPartitionRepo.updateMany({
-      where: {
-        id: partitionId,
-        OR: [
-          { isLocked: false },
-          {
-            isLocked: true,
-            lockedAt: { lt: staleBefore },
-          },
-        ],
-      },
-      data: {
-        isLocked: true,
-        lockedAt: new Date(),
-        lockedBy: processId,
-      },
-    });
-    return res.count === 1;
-  }
-
-  private async unlockPartition(
-    partitionId: string,
-    processId?: string
-  ): Promise<void> {
-    // Release lock only if held by this process (if provided)
-    await graphPartitionRepo.updateMany({
-      where: processId
-        ? { id: partitionId, lockedBy: processId }
-        : { id: partitionId },
-      data: {
-        isLocked: false,
-        lockedAt: null,
-        lockedBy: null,
-      },
-    });
-  }
-
   private async getActivePartitions(): Promise<GraphPartition[]> {
-    const staleBefore = new Date(Date.now() - this.PARTITION_LOCK_STALE_MS);
+    const staleBefore = new Date(Date.now() - PARTITION_LOCK_STALE_MS);
     return await graphPartitionRepo.findMany({
       where: {
         activeRequests: { gt: 0 },
@@ -845,6 +804,37 @@ export class MatchingOrchestrator {
       },
       orderBy: [{ priority: "asc" }, { activeRequests: "desc" }],
     });
+  }
+
+  private async loadActiveSingleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await singleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+      include: { subject: true },
+    })) as unknown as SingleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
+  }
+
+  private async loadActiveBundleRequests(
+    partitionKey: string
+  ): Promise<MatchingRequest[]> {
+    const requests = (await bundleSwapRequestRepo.findMany({
+      where: {
+        graphPartition: partitionKey,
+        status: "ACTIVE",
+      },
+    })) as unknown as BundleSwapRequestRecord[];
+
+    const filtered = await this.filterUsersWithAcceptedMatches(requests);
+
+    return filtered.map(toMatchingRequest);
   }
 
   /**
@@ -888,45 +878,19 @@ export class MatchingOrchestrator {
     }
 
     // Build the list of active requests (nodes) mirroring buildPartitionGraph
-    let requests: MatchingRequest[] = [];
+    let requests: MatchingRequest[];
 
     if (partition.ticketType === "SPECIFIC_CLASS") {
-      const singleRequests = (await singleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-        include: { subject: true },
-      })) as unknown as SingleSwapRequestRecord[];
+      const singleRequests = await this.loadActiveSingleRequests(
+        partition.partitionKey
+      );
+      const bundleRequests = await this.loadActiveBundleRequests(
+        partition.partitionKey
+      );
 
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(singleRequests);
-
-      requests = filtered.map(toMatchingRequest);
-      // Combine with bundle requests
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filteredBundle =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = [...requests, ...filteredBundle.map(toMatchingRequest)];
+      requests = [...singleRequests, ...bundleRequests];
     } else {
-      const bundleRequests = (await bundleSwapRequestRepo.findMany({
-        where: {
-          graphPartition: partition.partitionKey,
-          status: "ACTIVE",
-        },
-      })) as unknown as BundleSwapRequestRecord[];
-
-      const filtered =
-        await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-      requests = filtered.map(toMatchingRequest);
+      requests = await this.loadActiveBundleRequests(partition.partitionKey);
     }
 
     const graph = buildCompatibilityGraph(requests);
@@ -1000,34 +964,14 @@ export class MatchingOrchestrator {
     return { partition, partitionLabel, nodes, edges: edgesWithNames };
   }
 
-  private async updatePartitionRequestCount(
-    partitionKey: string
-  ): Promise<void> {
-    // Count active requests in this partition
-    const [singleCount, bundleCount] = await Promise.all([
-      singleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-      bundleSwapRequestRepo.count({
-        where: {
-          graphPartition: partitionKey,
-          status: "ACTIVE",
-        },
-      }),
-    ]);
-
-    await graphPartitionRepo.update({
-      where: { partitionKey },
-      data: { activeRequests: singleCount + bundleCount },
-    });
-  }
-
   private async updatePartitionStats(
     partitionId: string,
-    data: { activeRequests?: number; lastProcessed?: Date; avgProcessingTime?: number; successRate?: number }
+    data: {
+      activeRequests?: number;
+      lastProcessed?: Date;
+      avgProcessingTime?: number;
+      successRate?: number;
+    }
   ): Promise<void> {
     await graphPartitionRepo.update({
       where: { id: partitionId },
@@ -1040,7 +984,7 @@ export class MatchingOrchestrator {
     match: MatchResult
   ): Promise<void> {
     try {
-      console.log(`Sending match notifications for match ${matchId}`);
+      logger.info("Sending match notifications for match");
 
       // Get detailed user information for all participants
       const userIds = match.participants.map((p: MatchParticipant) => p.userId);
@@ -1056,10 +1000,10 @@ export class MatchingOrchestrator {
       let subjects: string[] = [];
       const singleSwapRequestIds = match.singleSwapRequestIds || [];
       if (singleSwapRequestIds.length > 0) {
-        const subjectData = await singleSwapRequestRepo.findMany({
+        const subjectData = (await singleSwapRequestRepo.findMany({
           where: { id: { in: singleSwapRequestIds } },
           include: { subject: true },
-        }) as unknown as Array<{ subject: { name: string } }>;
+        })) as unknown as Array<{ subject: { name: string } }>;
         subjects = Array.from(
           new Set(
             subjectData.map(
@@ -1076,7 +1020,9 @@ export class MatchingOrchestrator {
           ...match.participants.map((p: MatchParticipant) => p.toClass),
         ])
       );
-      const classes = (await classRepo.findManyByIds(allClassIds)) as unknown as ClassRecord[];
+      const classes = (await classRepo.findManyByIds(
+        allClassIds
+      )) as unknown as ClassRecord[];
       const classMap = new Map<string, string>(
         classes.map((c: ClassRecord) => [c.id, c.name])
       );
@@ -1088,8 +1034,7 @@ export class MatchingOrchestrator {
       for (const participant of match.participants) {
         const user = users.find((u: UserRecord) => u.id === participant.userId);
         if (!user) {
-          console.log(
-            `User ${participant.userId} not found or notifications disabled`);
+          logger.info("User not found or notifications disabled");
           continue;
         }
 
@@ -1109,211 +1054,38 @@ export class MatchingOrchestrator {
           subjects,
           fromClass:
             classMap.get(participant.fromClass) || participant.fromClass,
-          toClass:
-            classMap.get(participant.toClass) || participant.toClass,
+          toClass: classMap.get(participant.toClass) || participant.toClass,
           otherParticipants,
           matchId,
           dashboardUrl: baseUrl,
         };
 
-        const notificationReserved =
-          await this.reserveMatchNotificationDelivery(
+        const outcome =
+          await matchNotificationDeliveryService.deliverMatchNotificationOnce(
             matchId,
             user.id,
-            user.email
+            user.email,
+            () =>
+              emailService.sendMatchNotification(user.email, notificationData)
           );
 
-        if (!notificationReserved) {
-          console.log(
-            `Match notification already handled or currently in progress for match ${matchId} to ${user.email}`);
+        if (outcome === "skipped") {
+          logger.info(
+            "Match notification already handled or currently in progress for match to"
+          );
           continue;
         }
 
-        try {
-          const emailSent = await emailService.sendMatchNotification(
-            user.email,
-            notificationData
-          );
-
-          if (emailSent) {
-            await this.markMatchNotificationDeliverySent(matchId, user.id);
-            console.log(`Match notification sent to ${user.email}`);
-            continue;
-          }
-
-          await this.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            "Email service returned false"
-          );
-          console.log(`Failed to send notification to ${user.email}`);
-        } catch (error) {
-          await this.markMatchNotificationDeliveryFailed(
-            matchId,
-            user.id,
-            this.getErrorMessage(error)
-          );
-          console.error(
-            `Error sending notification to ${user.email} for match ${matchId}:`,
-            error
-          );
+        if (outcome === "sent") {
+          logger.info("Match notification sent to");
+          continue;
         }
+
+        logger.info("Failed to send notification to");
       }
     } catch (error) {
-      console.error("Error sending match notifications:", error);
+      logger.error(safeError(error), "Error sending match notifications:");
     }
-  }
-
-  private async reserveMatchNotificationDelivery(
-    matchId: string,
-    userId: string,
-    email: string
-  ): Promise<boolean> {
-    const now = new Date();
-    const staleReservationThreshold = new Date(
-      now.getTime() - MATCH_NOTIFICATION_RESERVATION_TIMEOUT_MS
-    );
-
-    try {
-      await matchNotificationDeliveryRepo.create({
-        data: {
-          matchId,
-          userId,
-          email,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-          reservedAt: now,
-          sentAt: null,
-          lastError: null,
-        },
-      });
-      return true;
-    } catch (error) {
-      if (this.isUniqueConstraintError(error)) {
-        const existingDelivery =
-          await matchNotificationDeliveryRepo.findUnique({
-            where: {
-              matchId_userId_notificationType: {
-                matchId,
-                userId,
-                notificationType: MATCH_NOTIFICATION_TYPE,
-              },
-            },
-            select: {
-              status: true,
-              updatedAt: true,
-            },
-          });
-
-        if (!existingDelivery) {
-          return false;
-        }
-
-        if (
-          existingDelivery.status === "SENT" ||
-          (existingDelivery.status === "SENDING" &&
-            existingDelivery.updatedAt > staleReservationThreshold)
-        ) {
-          return false;
-        }
-
-        const reclaimedReservation =
-          await matchNotificationDeliveryRepo.updateMany({
-            where: {
-              matchId,
-              userId,
-              notificationType: MATCH_NOTIFICATION_TYPE,
-              OR: [
-                { status: "FAILED" },
-                {
-                  status: "SENDING",
-                  updatedAt: { lte: staleReservationThreshold },
-                },
-              ],
-            },
-            data: {
-              email,
-              status: "SENDING",
-              reservedAt: now,
-              sentAt: null,
-              lastError: null,
-            },
-          });
-
-        return reclaimedReservation.count > 0;
-      }
-
-      throw error;
-    }
-  }
-
-  private async markMatchNotificationDeliverySent(
-    matchId: string,
-    userId: string
-  ): Promise<void> {
-    try {
-      await matchNotificationDeliveryRepo.updateMany({
-        where: {
-          matchId,
-          userId,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-        },
-        data: {
-          status: "SENT",
-          sentAt: new Date(),
-          lastError: null,
-        },
-      });
-    } catch (error) {
-      console.warn(
-        `Failed to mark match notification delivery as sent for match ${matchId} and user ${userId}:`,
-        error
-      );
-    }
-  }
-
-  private async markMatchNotificationDeliveryFailed(
-    matchId: string,
-    userId: string,
-    reason: string
-  ): Promise<void> {
-    try {
-      await matchNotificationDeliveryRepo.updateMany({
-        where: {
-          matchId,
-          userId,
-          notificationType: MATCH_NOTIFICATION_TYPE,
-          status: "SENDING",
-        },
-        data: {
-          status: "FAILED",
-          lastError: reason.slice(0, 500),
-        },
-      });
-    } catch (error) {
-      console.warn(
-        `Failed to mark match notification delivery as failed for match ${matchId} and user ${userId}:`,
-        error
-      );
-    }
-  }
-
-  private isUniqueConstraintError(error: unknown): boolean {
-    return (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "P2002"
-    );
-  }
-
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return "Unknown delivery error";
   }
 
   private async createMatches(
@@ -1343,14 +1115,16 @@ export class MatchingOrchestrator {
         );
 
         if (overlapDecision.action === "skip-committed") {
-          console.log(
-            `Skipping match creation: committed overlap exists for users ${userIds.join(",")}`);
+          logger.info(
+            "Skipping match creation: committed overlap exists for users"
+          );
           continue;
         }
 
         if (overlapDecision.action === "skip-not-improved") {
-          console.log(
-            `Skipping provisional match creation: not better than existing for users ${userIds.join(",")}`);
+          logger.info(
+            "Skipping provisional match creation: not better than existing for users"
+          );
           continue;
         }
 
@@ -1362,9 +1136,9 @@ export class MatchingOrchestrator {
             });
             await this.reactivateRequestsFromMatch(existing);
           } catch (error) {
-            console.warn(
-              `Failed to upgrade prior provisional match ${existing.id}:`,
-              error
+            logger.warn(
+              safeError(error),
+              "Failed to upgrade prior provisional match:"
             );
           }
         }
@@ -1377,10 +1151,13 @@ export class MatchingOrchestrator {
         const result = await txRepo.executeInTransaction(async (tx) => {
           // Final check that requests are still ACTIVE (within transaction lock)
           if (match.singleSwapRequestIds.length > 0) {
-            const singles = await singleSwapRequestRepo.findMany({
-              where: { id: { in: match.singleSwapRequestIds } },
-              select: { id: true, status: true, provisionalMatchId: true },
-            }, tx);
+            const singles = await singleSwapRequestRepo.findMany(
+              {
+                where: { id: { in: match.singleSwapRequestIds } },
+                select: { id: true, status: true, provisionalMatchId: true },
+              },
+              tx
+            );
             const allActive = areAllRequestsAvailable(
               match.singleSwapRequestIds,
               singles
@@ -1393,10 +1170,13 @@ export class MatchingOrchestrator {
           }
 
           if (match.bundleSwapRequestIds.length > 0) {
-            const bundles = await bundleSwapRequestRepo.findMany({
-              where: { id: { in: match.bundleSwapRequestIds } },
-              select: { id: true, status: true, provisionalMatchId: true },
-            }, tx);
+            const bundles = await bundleSwapRequestRepo.findMany(
+              {
+                where: { id: { in: match.bundleSwapRequestIds } },
+                select: { id: true, status: true, provisionalMatchId: true },
+              },
+              tx
+            );
             const allActive = areAllRequestsAvailable(
               match.bundleSwapRequestIds,
               bundles
@@ -1409,44 +1189,53 @@ export class MatchingOrchestrator {
           }
 
           // Create the match atomically
-          const createdMatch = await matchRepo.create({
-            data: {
-              matchType:
-                match.singleSwapRequestIds.length > 0 ? "SINGLE" : "BUNDLE",
-              swapPattern: match.pattern,
-              status: "PROPOSED",
-              isProvisional,
-              provisionalUntil,
-              satisfactionScore: match.satisfactionScore,
-              processingTime: match.processingTime,
-              graphPartition: match.graphPartition,
-              participants: match.participants as unknown as JsonValue[],
-              singleSwapRequestIds: match.singleSwapRequestIds,
-              bundleSwapRequestIds: match.bundleSwapRequestIds,
+          const createdMatch = await matchRepo.create(
+            {
+              data: {
+                matchType:
+                  match.singleSwapRequestIds.length > 0 ? "SINGLE" : "BUNDLE",
+                swapPattern: match.pattern,
+                status: "PROPOSED",
+                isProvisional,
+                provisionalUntil,
+                satisfactionScore: match.satisfactionScore,
+                processingTime: match.processingTime,
+                graphPartition: match.graphPartition,
+                participants: match.participants as unknown as JsonValue[],
+                singleSwapRequestIds: match.singleSwapRequestIds,
+                bundleSwapRequestIds: match.bundleSwapRequestIds,
+              },
             },
-          }, tx);
+            tx
+          );
 
           // Update request statuses atomically in same transaction
           if (match.singleSwapRequestIds.length > 0) {
-            await singleSwapRequestRepo.updateMany({
-              where: { id: { in: match.singleSwapRequestIds } },
-              data: {
-                status: "MATCHED", // Lock request while match is proposed (provisional or not)
-                provisionalMatchId: createdMatch.id,
-                provisionalUntil,
+            await singleSwapRequestRepo.updateMany(
+              {
+                where: { id: { in: match.singleSwapRequestIds } },
+                data: {
+                  status: "MATCHED", // Lock request while match is proposed (provisional or not)
+                  provisionalMatchId: createdMatch.id,
+                  provisionalUntil,
+                },
               },
-            }, tx);
+              tx
+            );
           }
 
           if (match.bundleSwapRequestIds.length > 0) {
-            await bundleSwapRequestRepo.updateMany({
-              where: { id: { in: match.bundleSwapRequestIds } },
-              data: {
-                status: "MATCHED", // Lock request while match is proposed (provisional or not)
-                provisionalMatchId: createdMatch.id,
-                provisionalUntil,
+            await bundleSwapRequestRepo.updateMany(
+              {
+                where: { id: { in: match.bundleSwapRequestIds } },
+                data: {
+                  status: "MATCHED", // Lock request while match is proposed (provisional or not)
+                  provisionalMatchId: createdMatch.id,
+                  provisionalUntil,
+                },
               },
-            }, tx);
+              tx
+            );
           }
 
           return { createdMatch, match };
@@ -1461,10 +1250,9 @@ export class MatchingOrchestrator {
           error instanceof Error &&
           error.message.includes("race condition detected")
         ) {
-          console.log(
-            `Race condition detected for match - skipping (another machine already processed these requests)`);
+          logger.debug("Match creation race detected");
         } else {
-          console.error(`Error creating match:`, error);
+          logger.error(safeError(error), "Error creating match");
         }
       }
     }
@@ -1475,7 +1263,7 @@ export class MatchingOrchestrator {
     );
     await Promise.all(
       affectedPartitions.map((partitionKey: string) =>
-        this.updatePartitionRequestCount(partitionKey)
+        updatePartitionRequestCount(partitionKey)
       )
     );
 
@@ -1516,7 +1304,7 @@ export class MatchingOrchestrator {
    * Reactivate requests from an upgraded/cancelled match
    */
   private async reactivateRequestsFromMatch(match: StoredMatch): Promise<void> {
-    console.log(`Reactivating requests from upgraded match ${match.id}`);
+    logger.info("Reactivating requests from upgraded match");
 
     // Reactivate single swap requests
     const singleSwapIds = match.singleSwapRequestIds || [];
@@ -1529,8 +1317,7 @@ export class MatchingOrchestrator {
           provisionalUntil: null,
         },
       });
-      console.log(
-        `Reactivated ${match.singleSwapRequestIds?.length || 0} single swap requests`);
+      logger.info("Reactivated single swap requests");
     }
 
     // Reactivate bundle swap requests
@@ -1544,8 +1331,7 @@ export class MatchingOrchestrator {
           provisionalUntil: null,
         },
       });
-      console.log(
-        `Reactivated ${match.bundleSwapRequestIds?.length || 0} bundle swap requests`);
+      logger.info("Reactivated bundle swap requests");
     }
   }
 
@@ -1559,59 +1345,26 @@ export class MatchingOrchestrator {
       });
 
       if (!partition) {
-        console.error(`Partition ${partitionStub.id} not found`);
+        logger.error("Partition not found");
         return buildCompatibilityGraph([]);
       }
 
-      console.log(`Building graph for partition ${partition.partitionKey}`);
+      logger.info("Building graph for partition");
 
-      // Get all active requests in this partition
-      let requests: MatchingRequest[];
+      const requests =
+        partition.ticketType === "SPECIFIC_CLASS"
+          ? await this.loadActiveSingleRequests(partition.partitionKey)
+          : await this.loadActiveBundleRequests(partition.partitionKey);
 
-      if (partition.ticketType === "SPECIFIC_CLASS") {
-        // Get all active requests in this partition
-        const singleRequests = (await singleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-          include: { subject: true },
-        })) as unknown as SingleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredSingleRequests =
-          await this.filterUsersWithAcceptedMatches(singleRequests);
-
-        requests = filteredSingleRequests.map(toMatchingRequest);
-      } else {
-        // Bundle swap requests for year-based swaps
-        const bundleRequests = (await bundleSwapRequestRepo.findMany({
-          where: {
-            graphPartition: partition.partitionKey,
-            status: "ACTIVE",
-          },
-        })) as unknown as BundleSwapRequestRecord[];
-
-        // Filter out users with accepted matches
-        const filteredBundleRequests =
-          await this.filterUsersWithAcceptedMatches(bundleRequests);
-
-        requests = filteredBundleRequests.map(toMatchingRequest);
-      }
-
-      console.log(`Found ${requests.length} active requests in partition`);
+      logger.info("Found active requests in partition");
 
       const builtGraph = buildCompatibilityGraph(requests);
 
-      console.log(
-        `Built graph with ${builtGraph.size} nodes and ${builtGraph.edgeCount} edges`);
+      logger.info("Built graph with nodes and edges");
 
       return builtGraph;
     } catch (error) {
-      console.error(
-        `Error building graph for partition ${partitionStub.partitionKey}:`,
-        error
-      );
+      logger.error(safeError(error), "Error building graph for partition:");
       return buildCompatibilityGraph([]);
     }
   }
@@ -1622,7 +1375,7 @@ export class MatchingOrchestrator {
     context: ProcessingContext
   ): MatchResult | null {
     try {
-      console.log(`Converting cycle to match: ${cycle.join(" → ")}`);
+      logger.info("Converting cycle to match:");
 
       const matchResult = assembleCycleMatch(
         cycle,
@@ -1632,13 +1385,12 @@ export class MatchingOrchestrator {
       );
 
       if (matchResult) {
-        console.log(
-          `Created ${matchResult.pattern} match with satisfaction score ${matchResult.satisfactionScore.toFixed(3)}`);
+        logger.info("Created match with satisfaction score");
       }
 
       return matchResult;
     } catch (error) {
-      console.error(`Error converting cycle to match:`, error);
+      logger.error(safeError(error), "Error converting cycle to match");
       return null;
     }
   }
@@ -1683,15 +1435,16 @@ export class MatchingOrchestrator {
    * Get comprehensive matching statistics
    */
   async getAdvancedStats(): Promise<AdvancedStats> {
-    const [partitions, provisionalMatches, totalActiveRequests] = await Promise.all([
-      graphPartitionRepo.findMany(),
-      matchRepo.findMany({
-        where: {
-          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-        },
-      }),
-      this.countActiveRequests(),
-    ]);
+    const [partitions, provisionalMatches, totalActiveRequests] =
+      await Promise.all([
+        graphPartitionRepo.findMany(),
+        matchRepo.findMany({
+          where: {
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+        }),
+        this.countActiveRequests(),
+      ]);
 
     const m = provisionalMatches as unknown as StoredMatch[];
     const totalMatches = m.length || 1;

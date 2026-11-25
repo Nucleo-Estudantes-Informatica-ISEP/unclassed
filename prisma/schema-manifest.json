@@ -1,6 +1,6 @@
 {
-  "currentVersion": 4,
-  "currentSchemaSha256": "6f77d3ca2b7534ef5edcec36461656ca27ba752f2de30e52c4acadacc79c60a5",
+  "currentVersion": 5,
+  "currentSchemaSha256": "db7e04c5af43b760e85412879f66e0fd5b54bb9650f39a840445c29072eeb29e",
   "changes": [
     {
       "version": 1,
@@ -21,6 +21,11 @@
       "version": 4,
       "file": "schema-changes/0004-onboarding-completion.md",
       "schemaSha256": "6f77d3ca2b7534ef5edcec36461656ca27ba752f2de30e52c4acadacc79c60a5"
+    },
+    {
+      "version": 5,
+      "file": "schema-changes/0005-remove-legacy-local-auth.md",
+      "schemaSha256": "db7e04c5af43b760e85412879f66e0fd5b54bb9650f39a840445c29072eeb29e"
     }
   ]
 }

@@ -7,6 +7,8 @@ interface MatchContactInfoProps {
 }
 
 export function MatchContactInfo({ user }: MatchContactInfoProps) {
+  if (!user.email) return null;
+
   return (
     <div>
       <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1">

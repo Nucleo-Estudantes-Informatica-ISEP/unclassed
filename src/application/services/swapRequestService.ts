@@ -1,9 +1,11 @@
-import { SessionUser } from "./userService";
+import { logger, safeError } from "@/lib/logger";
+import { triggerImmediateMatching } from "@/services/matchingTriggers";
+import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
 import * as classRepo from "@/application/repositories/classRepository";
 import * as requestService from "@/application/services/requestService";
 import * as userService from "@/application/services/userService";
-import { triggerImmediateMatching } from "@/services/matchingTriggers";
-import { isUniqueConstraintError } from "@/services/swapRequestConflicts";
+
+import { SessionUser } from "./userService";
 
 // ============================================================================
 // Domain Errors
@@ -48,7 +50,8 @@ export class SwapRequestValidationError extends SwapRequestError {
 // Helpers
 // ============================================================================
 
-export type SwapRequestStatus = "ACTIVE" | "CANCELLED" | "MATCHED" | "COMPLETED" | "EXPIRED";
+export type SwapRequestStatus =
+  "ACTIVE" | "CANCELLED" | "MATCHED" | "COMPLETED" | "EXPIRED";
 
 export interface SwapRequestEntity {
   id: string;
@@ -60,24 +63,30 @@ export interface SwapRequestEntity {
 }
 
 function isSwapRequestStatus(value: string): value is SwapRequestStatus {
-  return [
-    "ACTIVE",
-    "CANCELLED",
-    "MATCHED",
-    "COMPLETED",
-    "EXPIRED",
-  ].includes(value);
+  return ["ACTIVE", "CANCELLED", "MATCHED", "COMPLETED", "EXPIRED"].includes(
+    value
+  );
 }
 
-export interface ISwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> {
+export interface ISwapRequestRepository<
+  TEntity extends SwapRequestEntity = SwapRequestEntity,
+> {
   getByIdWithDetails(id: string): Promise<TEntity | null>;
-  listWithDetails(filters: { userId?: string; status?: SwapRequestStatus }): Promise<TEntity[]>;
-  updatePreferredClasses(id: string, preferredClassIds: string[]): Promise<TEntity>;
+  listWithDetails(filters: {
+    userId?: string;
+    status?: SwapRequestStatus;
+  }): Promise<TEntity[]>;
+  updatePreferredClasses(
+    id: string,
+    preferredClassIds: string[]
+  ): Promise<TEntity>;
   cancel(id: string): Promise<TEntity>;
   remove(id: string): Promise<void>;
 }
 
-export interface ISingleSwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> extends ISwapRequestRepository<TEntity> {
+export interface ISingleSwapRequestRepository<
+  TEntity extends SwapRequestEntity = SwapRequestEntity,
+> extends ISwapRequestRepository<TEntity> {
   create(data: {
     userId: string;
     subjectId: string;
@@ -87,7 +96,9 @@ export interface ISingleSwapRequestRepository<TEntity extends SwapRequestEntity 
   }): Promise<TEntity>;
 }
 
-export interface IBundleSwapRequestRepository<TEntity extends SwapRequestEntity = SwapRequestEntity> extends ISwapRequestRepository<TEntity> {
+export interface IBundleSwapRequestRepository<
+  TEntity extends SwapRequestEntity = SwapRequestEntity,
+> extends ISwapRequestRepository<TEntity> {
   create(data: {
     userId: string;
     currentClassId: string;
@@ -97,27 +108,38 @@ export interface IBundleSwapRequestRepository<TEntity extends SwapRequestEntity 
   }): Promise<TEntity>;
 }
 
-function assertCanManageSwapRequest(session: SessionUser, requestUserId: string) {
+function assertCanManageSwapRequest(
+  session: SessionUser,
+  requestUserId: string
+) {
   if (session.role !== "ADMIN" && requestUserId !== session.id) {
     throw new SwapRequestForbiddenError();
   }
 }
 
-async function getExistingRequest(session: SessionUser, id: string, repo: ISwapRequestRepository) {
+async function getExistingRequest(
+  session: SessionUser,
+  id: string,
+  repo: ISwapRequestRepository
+) {
   const existing = await repo.getByIdWithDetails(id);
-  
+
   if (!existing) {
     throw new SwapRequestNotFoundError();
   }
-  
+
   assertCanManageSwapRequest(session, existing.userId);
-  
+
   return existing;
 }
 
-function triggerMatchingSilently(id: string, type: "single" | "bundle", context: string) {
+function triggerMatchingSilently(
+  id: string,
+  type: "single" | "bundle",
+  context: string
+) {
   void triggerImmediateMatching(id, type).catch((error: unknown) => {
-    console.warn(`Failed to trigger immediate matching on ${context} for ${type} request ${id}:`, error);
+    logger.warn({ ...safeError(error), operation: context, requestType: type }, "Failed to trigger immediate matching");
   });
 }
 
@@ -126,7 +148,7 @@ async function ensureOnboardingRecorded(session: SessionUser) {
     try {
       await userService.markOnboardingComplete(session.id);
     } catch (error) {
-      console.warn("Failed to record onboarding completion:", error);
+      logger.warn(safeError(error), "Failed to record onboarding completion:");
     }
   }
 }
@@ -145,12 +167,11 @@ export interface ListSwapRequestsInput {
 export async function listSwapRequests(input: ListSwapRequestsInput) {
   const { session, queryUserId, queryStatus, repo } = input;
 
-  const userId = session.role !== "ADMIN" ? session.id : (queryUserId || undefined);
+  const userId =
+    session.role !== "ADMIN" ? session.id : queryUserId || undefined;
 
   const status =
-    queryStatus && isSwapRequestStatus(queryStatus)
-      ? queryStatus
-      : undefined;
+    queryStatus && isSwapRequestStatus(queryStatus) ? queryStatus : undefined;
 
   return repo.listWithDetails({
     userId,
@@ -158,7 +179,11 @@ export async function listSwapRequests(input: ListSwapRequestsInput) {
   });
 }
 
-export async function getSwapRequestById(session: SessionUser, id: string, repo: ISwapRequestRepository) {
+export async function getSwapRequestById(
+  session: SessionUser,
+  id: string,
+  repo: ISwapRequestRepository
+) {
   const existing = await getExistingRequest(session, id, repo);
   return existing;
 }
@@ -171,7 +196,7 @@ export interface CreateSingleSwapRequestInput {
 }
 
 export async function createSingleSwapRequest(
-  session: SessionUser, 
+  session: SessionUser,
   input: CreateSingleSwapRequestInput,
   repo: ISingleSwapRequestRepository
 ) {
@@ -207,7 +232,9 @@ export async function createSingleSwapRequest(
     return requestDto;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      throw new SwapRequestConflictError("Já tens um pedido ativo para esta disciplina");
+      throw new SwapRequestConflictError(
+        "Já tens um pedido ativo para esta disciplina"
+      );
     }
     throw error;
   }
@@ -220,7 +247,7 @@ export interface CreateBundleSwapRequestInput {
 }
 
 export async function createBundleSwapRequest(
-  session: SessionUser, 
+  session: SessionUser,
   input: CreateBundleSwapRequestInput,
   repo: IBundleSwapRequestRepository
 ) {
@@ -255,7 +282,9 @@ export async function createBundleSwapRequest(
     return requestDto;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      throw new SwapRequestConflictError("Já tens um pedido de permuta completa ativo para esta turma");
+      throw new SwapRequestConflictError(
+        "Já tens um pedido de permuta completa ativo para esta turma"
+      );
     }
     throw error;
   }
@@ -269,18 +298,24 @@ export async function updateSwapRequestPreferredClasses(
   preferredClassIds: string[]
 ) {
   if (preferredClassIds.length === 0) {
-    throw new SwapRequestValidationError("Por favor seleciona pelo menos uma turma preferida");
+    throw new SwapRequestValidationError(
+      "Por favor seleciona pelo menos uma turma preferida"
+    );
   }
 
   const existing = await getExistingRequest(session, id, repo);
 
   if (existing.status !== "ACTIVE") {
-    throw new SwapRequestConflictError("Apenas pedidos ativos podem ser editados");
+    throw new SwapRequestConflictError(
+      "Apenas pedidos ativos podem ser editados"
+    );
   }
 
   const preferredClasses = await classRepo.findManyByIds(preferredClassIds);
   if (preferredClasses.length !== preferredClassIds.length) {
-    throw new SwapRequestNotFoundError("Uma ou mais turmas preferidas não foram encontradas");
+    throw new SwapRequestNotFoundError(
+      "Uma ou mais turmas preferidas não foram encontradas"
+    );
   }
 
   if (type === "bundle") {
@@ -292,7 +327,9 @@ export async function updateSwapRequestPreferredClasses(
     const allClasses = [currentClass, ...preferredClasses];
     const years = Array.from(new Set(allClasses.map((c) => c.year)));
     if (years.length > 1) {
-      throw new SwapRequestValidationError("Todas as turmas têm de ser do mesmo ano letivo");
+      throw new SwapRequestValidationError(
+        "Todas as turmas têm de ser do mesmo ano letivo"
+      );
     }
   }
 
@@ -303,30 +340,38 @@ export async function updateSwapRequestPreferredClasses(
 }
 
 export async function cancelSwapRequest(
-  session: SessionUser, 
-  id: string, 
+  session: SessionUser,
+  id: string,
   repo: ISwapRequestRepository
 ) {
   const existing = await getExistingRequest(session, id, repo);
 
   if (existing.status !== "ACTIVE") {
-    throw new SwapRequestConflictError("Apenas pedidos ativos podem ser cancelados");
+    throw new SwapRequestConflictError(
+      "Apenas pedidos ativos podem ser cancelados"
+    );
   }
 
   const updatedDto = await repo.cancel(id);
-  
+
   return updatedDto;
 }
 
 export async function deleteSwapRequest(
-  session: SessionUser, 
-  id: string, 
+  session: SessionUser,
+  id: string,
   repo: ISwapRequestRepository
 ) {
   const existingRequest = await getExistingRequest(session, id, repo);
 
-  if (existingRequest.status === "MATCHED" || existingRequest.status === "COMPLETED" || !!existingRequest.provisionalUntil) {
-    throw new SwapRequestConflictError("Não é possível eliminar um pedido que possui matches associados.");
+  if (
+    existingRequest.status === "MATCHED" ||
+    existingRequest.status === "COMPLETED" ||
+    !!existingRequest.provisionalUntil
+  ) {
+    throw new SwapRequestConflictError(
+      "Não é possível eliminar um pedido que possui matches associados."
+    );
   }
 
   await repo.remove(id);
