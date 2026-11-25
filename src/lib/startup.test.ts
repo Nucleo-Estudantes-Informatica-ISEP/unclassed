@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { afterEach, test, vi } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 
 vi.mock("@/services/cronScheduler", () => ({
   initializeCronScheduler: vi.fn(),
 }));
 
+beforeEach(() => vi.stubGlobal("unclassedStartupComplete", undefined));
+
 afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
   vi.restoreAllMocks();
   vi.resetModules();
   vi.unstubAllEnvs();
@@ -37,4 +41,16 @@ test("initializeApplication() is idempotent and does not schedule a startup time
   assert.equal(isAppInitialized(), true);
   assert.equal(vi.mocked(initializeCronScheduler).mock.calls.length, 1);
   assert.equal(setTimeoutSpy.mock.calls.length, 0);
+});
+
+test("the app can report completed startup from a separate module instance", async () => {
+  const { initializeApplication } = await import("./startup");
+  const { initializeCronScheduler } = await import("@/services/cronScheduler");
+  initializeApplication();
+
+  vi.resetModules();
+  const routeStartup = await import("./startup");
+  assert.equal(routeStartup.isAppInitialized(), true);
+  routeStartup.initializeApplication();
+  assert.equal(vi.mocked(initializeCronScheduler).mock.calls.length, 1);
 });
