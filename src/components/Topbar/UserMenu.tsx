@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { LogOut, RefreshCw, User, UserCog } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
@@ -23,29 +22,29 @@ interface UserMenuProps {
 export default function UserMenu({ user }: UserMenuProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const router = useRouter();
 
   const handleSwitchAccount = async () => {
     setShowMenu(false);
     await switchAuthNeiAccount("/dashboard");
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (shared: boolean) => {
     setIsLoggingOut(true);
-    setShowMenu(false);
 
     try {
-      const data = await httpClient.get<{ redirectTo?: string }>("/api/logout-url", { cache: "no-store" });
-      const redirectTo = data.redirectTo || "/";
+      const redirectTo = shared
+        ? (
+            await httpClient.get<{ redirectTo: string }>("/api/logout-url", {
+              cache: "no-store",
+            })
+          ).redirectTo
+        : "/";
 
       await signOut({ redirect: false });
       window.location.href = redirectTo;
     } catch {
       logger.error("Logout error:");
-      toast.error("Erro ao terminar sessão");
-      router.push("/");
-      router.refresh();
-    } finally {
+      toast.error("Não foi possível terminar a sessão. Tenta novamente.");
       setIsLoggingOut(false);
     }
   };
@@ -169,13 +168,34 @@ export default function UserMenu({ user }: UserMenuProps) {
             </button>
 
             <button
-              onClick={handleLogout}
+              onClick={() => handleLogout(false)}
               disabled={isLoggingOut}
               className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
             >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>{isLoggingOut ? "A sair..." : "Terminar sessão"}</span>
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              <span>Terminar sessão só nesta aplicação</span>
             </button>
+            <button
+              onClick={() => handleLogout(true)}
+              disabled={isLoggingOut}
+              className="flex w-full cursor-pointer items-center rounded px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+              aria-describedby="shared-signout-note"
+            >
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              <span>Terminar sessão nesta aplicação e no AuthNEI</span>
+            </button>
+            <p
+              role="status"
+              className={isLoggingOut ? "px-2 text-sm" : "sr-only"}
+            >
+              {isLoggingOut ? "A sair..." : ""}
+            </p>
+            <p
+              id="shared-signout-note"
+              className="text-muted-foreground px-2 pb-2 text-xs"
+            >
+              Outras aplicações abertas podem manter a sessão iniciada.
+            </p>
           </div>
         </div>
       )}
