@@ -1,9 +1,16 @@
+import { cookies } from "next/headers";
 import NextAuth, { AuthError } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import Zitadel from "next-auth/providers/zitadel";
 
 import { getMissingAuthEnvVars, isAuthConfigured } from "@/lib/auth-config";
 import { getAuthNeiRoles, isAdmin } from "@/lib/auth-nei-roles";
+import {
+  appReturnPath,
+  EMAIL_VERIFICATION_COOKIE,
+  emailVerificationCookieOptions,
+  readEmailVerificationRecovery,
+} from "@/lib/email-verification-recovery";
 import { env } from "@/lib/env";
 import { syncLocalUserFromOidc } from "@/lib/local-user";
 import { logger, safeError } from "@/lib/logger";
@@ -196,15 +203,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider !== "zitadel") return true;
 
       const claims = (profile ?? {}) as Record<string, unknown>;
-      if (parseEmailVerifiedClaim(claims) !== true) {
-        logger.warn(
-          "Blocking ZITADEL sign-in because email_verified claim is missing or false."
-        );
-        return false;
-      }
-
       const sub = getClaim(claims, "sub") || account.providerAccountId || null;
-      return Boolean(sub);
+      if (!sub) return false;
+
+      const verified = parseEmailVerifiedClaim(claims);
+      if (verified !== true) {
+        logger.warn("AuthNEI sign-in blocked by email verification requirement");
+        const jar = await cookies();
+        const previous = readEmailVerificationRecovery(
+          jar.get(EMAIL_VERIFICATION_COOKIE)?.value
+        );
+        const hint =
+          getClaim(claims, "preferred_username") ||
+          getClaim(claims, "email") ||
+          "";
+        if (!previous?.attempted || previous.subject !== sub) {
+          const destination = appReturnPath(
+            jar.get("__Secure-authjs.callback-url")?.value ??
+              jar.get("authjs.callback-url")?.value
+          );
+          jar.set(
+            EMAIL_VERIFICATION_COOKIE,
+            JSON.stringify({ subject: sub, hint, destination, attempted: false }),
+            emailVerificationCookieOptions(
+              process.env.NODE_ENV === "production"
+            )
+          );
+        }
+        return "/verify-email";
+      }
+      const jar = await cookies();
+      if (jar.has(EMAIL_VERIFICATION_COOKIE))
+        jar.delete(EMAIL_VERIFICATION_COOKIE);
+      return true;
     },
     async jwt({ token, account, profile, trigger }) {
       if (
