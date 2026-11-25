@@ -631,6 +631,10 @@ Check:
 - `/api/admin/cron` as an admin
 
 
+## Development fixtures
+
+Run Playwright and the sample match endpoint against a disposable MongoDB replica set named `unclassed_e2e`. The Playwright session endpoint also requires `E2E_TEST_SECRET`. Both fixture routes are available only through `pnpm dev`.
+
 ## Recommended First Steps for New Contributors
 
 1. Install dependencies with `pnpm install`.
